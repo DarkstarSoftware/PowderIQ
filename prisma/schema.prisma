@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  user
+  pro_user
+  admin
+}
+
+model User {
+  id         String   @id @default(cuid())
+  supabaseId String   @unique
+  email      String   @unique
+  role       Role     @default(user)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  profile      RiderProfile?
+  favorites    FavoriteMountain[]
+  alerts       AlertSubscription[]
+  subscription Subscription?
+  auditLogs    AuditLog[]
+}
+
+model RiderProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  displayName   String?
+  style         String   @default("all_mountain")
+  skillLevel    String   @default("intermediate")
+  homeMountain  String?
+  notifications Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Mountain {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  state       String
+  country     String   @default("US")
+  latitude    Float
+  longitude   Float
+  baseElevFt  Int
+  topElevFt   Int
+  totalTrails Int      @default(0)
+  totalLifts  Int      @default(0)
+  imageUrl    String?
+  websiteUrl  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  favorites    FavoriteMountain[]
+  weatherSnaps WeatherSnapshot[]
+  snowSnaps    SnowSnapshot[]
+  scores       MountainScore[]
+  alerts       AlertSubscription[]
+}
+
+model FavoriteMountain {
+  id         String   @id @default(cuid())
+  userId     String
+  mountainId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mountain   Mountain @relation(fields: [mountainId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, mountainId])
+}
+
+model WeatherSnapshot {
+  id         String   @id @default(cuid())
+  mountainId String
+  mountain   Mountain @relation(fields: [mountainId], references: [id], onDelete: Cascade)
+  payload    Json
+  fetchedAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([mountainId, expiresAt])
+}
+
+model SnowSnapshot {
+  id         String   @id @default(cuid())
+  mountainId String
+  mountain   Mountain @relation(fields: [mountainId], references: [id], onDelete: Cascade)
+  provider   String   @default("mock")
+  payload    Json
+  fetchedAt  DateTime @default(now())
+  expiresAt  DateTime
+
+  @@index([mountainId, expiresAt])
+}
+
+model MountainScore {
+  id          String   @id @default(cuid())
+  mountainId  String
+  mountain    Mountain @relation(fields: [mountainId], references: [id], onDelete: Cascade)
+  score       Float
+  breakdown   Json
+  explanation String
+  computedAt  DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([mountainId, expiresAt])
+}
+
+model AlertSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  mountainId String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mountain   Mountain @relation(fields: [mountainId], references: [id], onDelete: Cascade)
+  threshold  Int      @default(70)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  events AlertEvent[]
+
+  @@unique([userId, mountainId])
+}
+
+model AlertEvent {
+  id             String            @id @default(cuid())
+  subscriptionId String
+  subscription   AlertSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  score          Float
+  emailSent      Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String    @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  status               String    @default("inactive")
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String?
+  entityId  String?
+  meta      Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

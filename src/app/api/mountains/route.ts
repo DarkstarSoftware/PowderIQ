@@ -1,0 +1,33 @@
+import { NextRequest } from 'next/server';
+import { ok, handleError } from '@/lib/apiResponse';
+import { prisma } from '@/lib/prisma';
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const near   = searchParams.get('near');
+    const radius = Number(searchParams.get('radius') || '200');
+
+    const mountains = await prisma.mountain.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    if (near) {
+      const [lat, lon] = near.split(',').map(Number);
+      // Simple Euclidean distance approximation (suitable for short ranges)
+      const filtered = mountains.filter((m) => {
+        const distKm =
+          Math.sqrt(
+            Math.pow((m.latitude - lat) * 111, 2) +
+            Math.pow((m.longitude - lon) * 85, 2)  // ~85km per degree longitude at 40°N
+          );
+        return distKm <= radius;
+      });
+      return ok(filtered);
+    }
+
+    return ok(mountains);
+  } catch (e) {
+    return handleError(e);
+  }
+}
