@@ -36,7 +36,6 @@ export default function DashboardPage() {
         const favData = await favRes.json();
         const items: FavoriteItem[] = favData.data || [];
 
-        // Fetch scores in parallel
         const withScores = await Promise.all(
           items.map(async (f) => {
             try {
@@ -64,7 +63,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
       <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -90,6 +88,11 @@ export default function DashboardPage() {
                 </Link>
               </>
             )}
+            {(userRole === 'resort_operator' || userRole === 'resort_admin') && (
+              <Link href="/resort/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors focus-ring rounded">
+                🏔️ Resort Ops
+              </Link>
+            )}
             <Link href="/account" className="text-gray-400 hover:text-white text-sm transition-colors focus-ring rounded" aria-label="Account settings">
               ⚙️
             </Link>
@@ -110,7 +113,6 @@ export default function DashboardPage() {
         </h1>
         <p className="text-gray-400 mb-8">Your favorite mountains and today&apos;s powder windows.</p>
 
-        {/* Pro upgrade banner */}
         {userRole === 'user' && (
           <div className="mb-8 bg-gradient-to-r from-brand-900/40 to-blue-900/40 border border-brand-700/50 rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
@@ -128,7 +130,6 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Favorites grid */}
         {loading ? (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6" aria-label="Loading favorites">
             {[...Array(3)].map((_, i) => (
