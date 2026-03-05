@@ -70,10 +70,10 @@ const features = geo?.features ?? [];
 
     // Build name lookup maps for status matching
     const liftByName = new Map(
-      liftStatuses.map((l) => [l.liftName.toLowerCase(), l])
+      liftStatuses.map((l: any) => [l.liftName.toLowerCase(), l])
     );
     const trailByName = new Map(
-      trailStatuses.map((t) => [t.trailName.toLowerCase(), t])
+      trailStatuses.map((t: any) => [t.trailName.toLowerCase(), t])
     );
 
     // Enrich OSM features with statuses + normalized difficulty
