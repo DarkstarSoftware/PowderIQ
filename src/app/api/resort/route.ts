@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const resorts = operators.map(op => ({
+    const resorts = operators.map((op: any) => ({
       ...op.resort,
       staffRole:   op.staffRole,
       liftsOpen:   op.resort.liftStatuses.filter((l: any) => l.status === 'open').length,
