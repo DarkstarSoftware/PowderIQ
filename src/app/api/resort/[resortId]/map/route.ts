@@ -69,10 +69,10 @@ export async function GET(
 const features = geo?.features ?? [];
 
     // Build name lookup maps for status matching
-    const liftByName = new Map(
+    const liftByName = new Map<string, any>(
       liftStatuses.map((l: any) => [l.liftName.toLowerCase(), l])
     );
-    const trailByName = new Map(
+    const trailByName = new Map<string, any>(
       trailStatuses.map((t: any) => [t.trailName.toLowerCase(), t])
     );
 
