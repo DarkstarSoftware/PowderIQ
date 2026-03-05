@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { createServerSupabase } from './supabase/server';
 import { prisma } from './prisma';
-import type { User } from '@prisma/client';
+
 
 // ─── Existing Consumer Auth ───────────────────────────────────────────────────
 
