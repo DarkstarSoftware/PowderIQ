@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         state:    f.mountain.state,
         addedAt:  f.createdAt,
       })),
-      alerts: alerts.map((a) => ({
+      alerts: alerts.map((a: any) => ({
         mountain:  a.mountain.name,
         threshold: a.threshold,
         active:    a.active,
