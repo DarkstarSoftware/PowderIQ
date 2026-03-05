@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         createdAt: user.createdAt,
       },
       profile,
-      favorites: favorites.map((f) => ({
+      favorites: favorites.map((f: any) => ({
         mountain: f.mountain.name,
         state:    f.mountain.state,
         addedAt:  f.createdAt,
