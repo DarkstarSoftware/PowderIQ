@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     if (near) {
       const [lat, lon] = near.split(',').map(Number);
       // Simple Euclidean distance approximation (suitable for short ranges)
-      const filtered = mountains.filter((m) => {
+      const filtered = mountains.filter((m: any) => {
         const distKm =
           Math.sqrt(
             Math.pow((m.latitude - lat) * 111, 2) +
