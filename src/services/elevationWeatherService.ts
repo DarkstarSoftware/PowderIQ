@@ -312,7 +312,7 @@ export async function getResortElevationWeather(resortId: string): Promise<Resor
       return prisma.elevationWeather.upsert({
         where: { resortId_zone: { resortId, zone: z } },
         update: { ...w, expiresAt, fetchedAt: now },
-        create: { resortId, zone: z, ...w, expiresAt },
+        create: { resortId, ...w, expiresAt },
       });
     })
   );

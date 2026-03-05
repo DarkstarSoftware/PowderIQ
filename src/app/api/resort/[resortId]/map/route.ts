@@ -5,208 +5,164 @@
 import { NextRequest } from 'next/server';
 import { ok, handleError } from '@/lib/apiResponse';
 import { prisma } from '@/lib/prisma';
-import { getResortMapGeoJSON, matchOSMNameToStatus, osmDifficultyToAppDifficulty } from '@/services/trailMapService';
+import {
+  getResortMapGeoJSON,
+  matchOSMNameToStatus,
+  osmDifficultyToAppDifficulty,
+} from '@/services/trailMapService';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { resortId: string } }
+  context: { params: Promise<{ resortId: string }> }
 ) {
   try {
-    const { resortId } = params;
+    const { resortId } = await context.params;
 
     // Fetch in parallel: OSM geometry + live statuses + weather zones
-    const [mapGeoJSON, liftStatuses, trailStatuses, weatherZones, resort] = await Promise.all([
-      getResortMapGeoJSON(resortId),
-      prisma.liftStatus.findMany({ where: { resortId } }),
-      prisma.trailStatus.findMany({ where: { resortId } }),
-      prisma.elevationWeather.findMany({ where: { resortId } }),
-      prisma.resort.findUniqueOrThrow({
-        where: { id: resortId },
-        include: { mountain: true },
-      }),
-    ]);
+    const [mapGeoJSON, liftStatuses, trailStatuses, weatherZones, resort] =
+      await Promise.all([
+        getResortMapGeoJSON(resortId),
+        prisma.liftStatus.findMany({
+          where: { resortId },
+          orderBy: { liftName: 'asc' },
+        }),
+        prisma.trailStatus.findMany({
+          where: { resortId },
+          orderBy: { trailName: 'asc' },
+        }),
+        prisma.elevationWeather.findMany({
+          where: { resortId },
+          orderBy: { zone: 'asc' },
+        }),
+        prisma.resort.findUnique({
+          where: { id: resortId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            baseElevFt: true,
+            midElevFt: true,
+            summitElevFt: true,
+            // Map override fields (optional)
+            customMapImageUrl: true,
+            customMapBounds: true,
+            customMapOpacity: true,
+            // Cached map fields (optional)
+            mapCacheExpiresAt: true,
+          },
+        }),
+      ]);
 
-    // ── Enrich lift features with live status ─────────────────────────────────
-    const enrichedLifts = mapGeoJSON.lifts.features.map(feature => {
-      const match = matchOSMNameToStatus(feature.properties.name, liftStatuses.map(l => ({ ...l, liftName: l.liftName })));
-      return {
-        ...feature,
-        properties: {
-          ...feature.properties,
-          // Live status from PowderIQ DB
-          status:      match?.status ?? null,
-          waitMinutes: match?.waitMinutes ?? null,
-          dbId:        match?.id ?? null,
-          // Display helpers
-          statusColor: liftStatusColor(match?.status ?? null),
-          statusLabel: match ? match.status.replace('_', ' ') : 'unknown',
-        },
-      };
-    });
+    if (!resort) {
+      return ok({
+        resortId,
+        map: null,
+        lifts: [],
+        trails: [],
+        weatherZones: [],
+        overlays: null,
+      });
+    }
 
-    // Add any DB lifts that didn't match OSM geometry (show as point markers at resort center)
-    const matchedOSMNames = new Set(
-      enrichedLifts.map(f => f.properties.name?.toLowerCase()).filter(Boolean)
+    // Defensive: geojson might be null if cache/service fails
+   const geo = mapGeoJSON as unknown as { features?: any[] } | null;
+const features = geo?.features ?? [];
+
+    // Build name lookup maps for status matching
+    const liftByName = new Map(
+      liftStatuses.map((l) => [l.liftName.toLowerCase(), l])
     );
-    const unmatchedLifts = liftStatuses.filter(l => {
-      const norm = l.liftName.toLowerCase();
-      return ![...matchedOSMNames].some(m => m?.includes(norm) || norm.includes(m ?? ''));
-    });
+    const trailByName = new Map(
+      trailStatuses.map((t) => [t.trailName.toLowerCase(), t])
+    );
 
-    // ── Enrich trail features with live status ────────────────────────────────
-    const enrichedTrails = mapGeoJSON.runs.features.map(feature => {
-      const match = matchOSMNameToStatus(feature.properties.name, trailStatuses.map(t => ({ ...t, trailName: t.trailName })));
-      const appDifficulty = match?.difficulty ?? osmDifficultyToAppDifficulty(feature.properties.difficulty);
+    // Enrich OSM features with statuses + normalized difficulty
+    const enrichedFeatures = features.map((f: any) => {
+      const props = f.properties || {};
+      const name = (props.name || props.ref || '').toString();
+      const kind = (props.piste_type || props.kind || props.type || '').toString();
+
+      // Determine if this is lift or trail-ish
+      const isLift =
+        props.aerialway ||
+        kind === 'lift' ||
+        kind === 'aerialway' ||
+        props.lift ||
+        props.way === 'aerialway';
+
+      const isTrail =
+        props.piste_type === 'downhill' ||
+        props.piste_type === 'nordic' ||
+        props.piste_type === 'sled' ||
+        props.piste_type === 'hike' ||
+        props.route === 'piste' ||
+        kind === 'trail' ||
+        props.piste;
+
+      let status: any = null;
+      let difficulty: any = null;
+
+      if (name) {
+        if (isLift) {
+          const matched = matchOSMNameToStatus(name, liftByName);
+          if (matched) status = matched;
+        } else if (isTrail) {
+          const matched = matchOSMNameToStatus(name, trailByName);
+          if (matched) status = matched;
+        }
+      }
+
+      // Normalize difficulty for trails
+      if (isTrail) {
+        const osmDiff = props.piste_difficulty || props.difficulty || props.color;
+        difficulty = osmDifficultyToAppDifficulty(osmDiff);
+      }
+
       return {
-        ...feature,
+        ...f,
         properties: {
-          ...feature.properties,
-          status:       match?.status ?? null,
-          snowDepthIn:  match?.snowDepthIn ?? null,
-          groomedAt:    match?.groomedAt ?? null,
-          appDifficulty,
-          dbId:         match?.id ?? null,
-          // Display helpers
-          trailColor:   trailDifficultyColor(appDifficulty, match?.status ?? null),
-          strokeWeight: match?.status === 'groomed' ? 4 : 3,
-          dashArray:    match?.status === 'closed' ? '6,4' : null,
+          ...props,
+          displayName: name || props.id || 'Unnamed',
+          isLift: Boolean(isLift),
+          isTrail: Boolean(isTrail),
+          status: status ? status.status : null,
+          waitMinutes: status?.waitMinutes ?? null,
+          updatedAt: status?.updatedAt ?? null,
+          difficulty,
         },
       };
     });
 
-    // ── Weather pins at summit / mid / base ───────────────────────────────────
-    const { mountain } = resort;
-    const baseElev  = resort.baseElevFt  || mountain.baseElevFt;
-    const summitElev = resort.summitElevFt || mountain.topElevFt;
-    const midElev   = resort.midElevFt   || Math.round((baseElev + summitElev) / 2);
-    const elevRange = summitElev - baseElev;
-    const latDelta  = elevRange / 364000;
-
-    const weatherPins = weatherZones.map(zone => {
-      const pinLat = zone.zone === 'summit'
-        ? mountain.latitude + latDelta
-        : zone.zone === 'mid'
-        ? mountain.latitude + latDelta * 0.5
-        : mountain.latitude;
-
-      return {
-        type: 'Feature' as const,
-        geometry: { type: 'Point' as const, coordinates: [mountain.longitude, pinLat] },
-        properties: {
-          zone:         zone.zone,
-          elevFt:       zone.elevFt,
-          tempF:        zone.tempF,
-          feelsLikeF:   zone.feelsLikeF,
-          windMph:      zone.windMph,
-          windGustMph:  zone.windGustMph,
-          windDir:      zone.windDir,
-          conditionDesc: zone.conditionDesc,
-          snowfall24hIn: zone.snowfall24hIn,
-          snowDepthIn:  zone.snowDepthIn,
-          forecastHigh: zone.forecastHigh,
-          forecastLow:  zone.forecastLow,
-          windHold:     (zone.windMph ?? 0) > 35,
-        },
-      };
-    });
-
-    // ── Unmatched lifts as point markers ──────────────────────────────────────
-    const unmatchedLiftPoints = unmatchedLifts.map((lift, i) => ({
-      type: 'Feature' as const,
-      geometry: {
-        type: 'Point' as const,
-        // Spread them slightly north of resort center so they're visible
-        coordinates: [mountain.longitude + (i * 0.002), mountain.latitude + 0.01],
-      },
-      properties: {
-        osmId:        null,
-        name:         lift.liftName,
-        aerialwayType: lift.liftType,
-        status:       lift.status,
-        waitMinutes:  lift.waitMinutes,
-        statusColor:  liftStatusColor(lift.status),
-        statusLabel:  lift.status.replace('_', ' '),
-        dbId:         lift.id,
-        isUnmatched:  true,
-      },
-    }));
-
-    // ── Summary stats ─────────────────────────────────────────────────────────
-    const summary = {
-      lifts: {
-        total:     liftStatuses.length,
-        open:      liftStatuses.filter(l => l.status === 'open').length,
-        on_hold:   liftStatuses.filter(l => l.status === 'on_hold').length,
-        scheduled: liftStatuses.filter(l => l.status === 'scheduled').length,
-        closed:    liftStatuses.filter(l => l.status === 'closed').length,
-        osmMatched: enrichedLifts.filter(f => f.properties.dbId).length,
-      },
-      trails: {
-        total:     trailStatuses.length,
-        open:      trailStatuses.filter(t => t.status === 'open').length,
-        groomed:   trailStatuses.filter(t => t.status === 'groomed').length,
-        closed:    trailStatuses.filter(t => t.status === 'closed').length,
-        osmRuns:   enrichedTrails.length,
-        osmMatched: enrichedTrails.filter(f => f.properties.dbId).length,
-      },
-      osmSource: mapGeoJSON.source,
-      osmFetchedAt: mapGeoJSON.fetchedAt,
-    };
+    // Prepare overlays (custom trail map image), if the resort provided one
+    const overlays =
+      resort.customMapImageUrl && resort.customMapBounds
+        ? {
+            type: 'customMap',
+            imageUrl: resort.customMapImageUrl,
+            bounds: resort.customMapBounds,
+            opacity: resort.customMapOpacity ?? 0.85,
+          }
+        : null;
 
     return ok({
       resort: {
-        id:   resort.id,
+        id: resort.id,
         name: resort.name,
-        plan: resort.plan,
-        customMap: resort.customMapImageUrl ? {
-          imageUrl:  resort.customMapImageUrl,
-          bounds:    resort.customMapBounds,   // [[s,w],[n,e]]
-          opacity:   resort.customMapOpacity ?? 0.85,
-        } : null,
-        mountain: {
-          name:      mountain.name,
-          latitude:  mountain.latitude,
-          longitude: mountain.longitude,
-          baseElevFt,
-          summitElevFt,
-          midElevFt,
-        },
+        slug: resort.slug,
+        baseElevFt: resort.baseElevFt,
+        midElevFt: resort.midElevFt,
+        summitElevFt: resort.summitElevFt,
       },
-      bbox: mapGeoJSON.bbox,
-      layers: {
-        trails:        { type: 'FeatureCollection', features: enrichedTrails },
-        lifts:         { type: 'FeatureCollection', features: enrichedLifts },
-        liftPoints:    { type: 'FeatureCollection', features: unmatchedLiftPoints },
-        weatherPins:   { type: 'FeatureCollection', features: weatherPins },
+      map: {
+        ...mapGeoJSON,
+        features: enrichedFeatures,
       },
-      summary,
+      lifts: liftStatuses,
+      trails: trailStatuses,
+      weatherZones,
+      overlays,
     });
   } catch (e) {
     return handleError(e);
-  }
-}
-
-// ─── Color helpers (used by frontend for consistent styling) ──────────────────
-
-function liftStatusColor(status: string | null): string {
-  switch (status) {
-    case 'open':      return '#10b981'; // emerald
-    case 'on_hold':   return '#f59e0b'; // amber
-    case 'scheduled': return '#3b82f6'; // blue
-    case 'closed':    return '#ef4444'; // red
-    default:          return '#6b7280'; // gray (unknown)
-  }
-}
-
-function trailDifficultyColor(difficulty: string, status: string | null): string {
-  if (status === 'closed') return '#ef4444'; // red = closed regardless of difficulty
-  switch (difficulty) {
-    case 'green':        return '#22c55e';
-    case 'blue':         return '#3b82f6';
-    case 'black':        return '#e2e8f0';
-    case 'double_black': return '#cbd5e1';
-    case 'terrain_park': return '#f97316';
-    case 'backcountry':  return '#fbbf24';
-    default:             return '#6b7280';
   }
 }

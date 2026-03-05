@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { ok, created, handleError } from '@/lib/apiResponse';
+import { ok, created, err, handleError } from '@/lib/apiResponse';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { seedLiftsFromLiftie, deriveSlug } from '@/services/liftieSeeder';
@@ -86,10 +86,10 @@ export async function POST(req: NextRequest) {
     const body = CreateResortSchema.parse(await req.json());
 
     const mountain = await prisma.mountain.findUnique({ where: { id: body.mountainId } });
-    if (!mountain) return handleError(new Error('Mountain not found'), 404);
+    if (!mountain) return err('Mountain not found', 404);
 
     const existing = await prisma.resort.findUnique({ where: { mountainId: body.mountainId } });
-    if (existing) return handleError(new Error('This mountain already has a resort account'), 409);
+    if (existing) return err('This mountain already has a resort account', 409);
 
     const slug = mountain.slug + '-ops';
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);

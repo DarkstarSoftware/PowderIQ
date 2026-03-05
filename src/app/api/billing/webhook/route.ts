@@ -9,13 +9,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
-  const sig  = req.headers.get('stripe-signature');
+  const sig = req.headers.get('stripe-signature');
 
   if (!sig) {
     return NextResponse.json({ error: 'Missing stripe-signature' }, { status: 400 });
   }
 
   let event: Stripe.Event;
+
   try {
     event = stripe.webhooks.constructEvent(
       body,
@@ -29,66 +30,85 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (event.type) {
+
       case 'checkout.session.completed': {
-        const session  = event.data.object as Stripe.CheckoutSession;
-        const userId   = session.metadata?.userId;
+        const session = event.data.object as Stripe.Checkout.Session;
+
+        const userId = session.metadata?.userId;
         if (!userId) break;
 
         await prisma.subscription.update({
           where: { userId },
           data: {
             stripeSubscriptionId: session.subscription as string,
-            status:               'active',
+            status: 'active',
           },
         });
+
         await prisma.user.update({
           where: { id: userId },
-          data:  { role: 'pro_user' },
+          data: { role: 'pro_user' },
         });
-        await auditLog({ userId, action: 'billing.subscription_activated' });
+
+        await auditLog({
+          userId,
+          action: 'billing.subscription_activated',
+        });
+
         break;
       }
 
       case 'customer.subscription.updated': {
-        const sub   = event.data.object as Stripe.Subscription;
+        const sub = event.data.object as Stripe.Subscription;
+
         const dbSub = await prisma.subscription.findUnique({
           where: { stripeSubscriptionId: sub.id },
         });
+
         if (!dbSub) break;
 
         await prisma.subscription.update({
           where: { id: dbSub.id },
           data: {
-            status:          sub.status,
+            status: sub.status,
             currentPeriodEnd: new Date(sub.current_period_end * 1000),
           },
         });
+
         break;
       }
 
       case 'customer.subscription.deleted': {
-        const sub   = event.data.object as Stripe.Subscription;
+        const sub = event.data.object as Stripe.Subscription;
+
         const dbSub = await prisma.subscription.findUnique({
           where: { stripeSubscriptionId: sub.id },
         });
+
         if (!dbSub) break;
 
         await prisma.subscription.update({
           where: { id: dbSub.id },
-          data:  { status: 'canceled' },
+          data: { status: 'canceled' },
         });
+
         await prisma.user.update({
           where: { id: dbSub.userId },
-          data:  { role: 'user' },
+          data: { role: 'user' },
         });
-        await auditLog({ userId: dbSub.userId, action: 'billing.subscription_canceled' });
+
+        await auditLog({
+          userId: dbSub.userId,
+          action: 'billing.subscription_canceled',
+        });
+
         break;
       }
 
       default:
-        // Unhandled event type — ignore
         break;
     }
+
   } catch (e) {
     console.error('[webhook] Handler error:', e);
     return NextResponse.json({ error: 'Handler failed' }, { status: 500 });

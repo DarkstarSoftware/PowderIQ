@@ -5,29 +5,30 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
 const CreateLiftSchema = z.object({
-  liftName:   z.string().min(1),
-  liftType:   z.string().default('chairlift'),
-  status:     z.enum(['open', 'on_hold', 'closed', 'scheduled']).default('closed'),
-  topElevFt:  z.number().optional(),
+  liftName: z.string().min(1),
+  liftType: z.string().default('chairlift'),
+  status: z.enum(['open', 'on_hold', 'closed', 'scheduled']).default('closed'),
+  topElevFt: z.number().optional(),
   baseElevFt: z.number().optional(),
   waitMinutes: z.number().optional(),
 });
 
 const UpdateLiftSchema = z.object({
-  liftName:   z.string().min(1),
-  status:     z.enum(['open', 'on_hold', 'closed', 'scheduled']),
+  liftName: z.string().min(1),
+  status: z.enum(['open', 'on_hold', 'closed', 'scheduled']),
   waitMinutes: z.number().optional(),
 });
 
 // GET /api/resort/[resortId]/lifts
 export async function GET(
   req: NextRequest,
-  { params }: { params: { resortId: string } }
+  context: { params: Promise<{ resortId: string }> }
 ) {
   try {
-    const { resortId } = params;
+    const { resortId } = await context.params;
+
     const ctx = await verifyResortAccess(req, resortId);
-    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'), 401);
+    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'));
 
     const lifts = await prisma.liftStatus.findMany({
       where: { resortId },
@@ -36,10 +37,10 @@ export async function GET(
 
     const summary = {
       total: lifts.length,
-      open:      lifts.filter(l => l.status === 'open').length,
-      on_hold:   lifts.filter(l => l.status === 'on_hold').length,
+      open: lifts.filter(l => l.status === 'open').length,
+      on_hold: lifts.filter(l => l.status === 'on_hold').length,
       scheduled: lifts.filter(l => l.status === 'scheduled').length,
-      closed:    lifts.filter(l => l.status === 'closed').length,
+      closed: lifts.filter(l => l.status === 'closed').length,
     };
 
     return ok({ lifts, summary });
@@ -48,15 +49,16 @@ export async function GET(
   }
 }
 
-// POST /api/resort/[resortId]/lifts — create a single lift
+// POST /api/resort/[resortId]/lifts
 export async function POST(
   req: NextRequest,
-  { params }: { params: { resortId: string } }
+  context: { params: Promise<{ resortId: string }> }
 ) {
   try {
-    const { resortId } = params;
+    const { resortId } = await context.params;
+
     const ctx = await verifyResortAccess(req, resortId, 'supervisor');
-    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'), 401);
+    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'));
 
     const body = CreateLiftSchema.parse(await req.json());
 
@@ -72,15 +74,16 @@ export async function POST(
   }
 }
 
-// PATCH /api/resort/[resortId]/lifts — update a lift's status
+// PATCH /api/resort/[resortId]/lifts
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { resortId: string } }
+  context: { params: Promise<{ resortId: string }> }
 ) {
   try {
-    const { resortId } = params;
+    const { resortId } = await context.params;
+
     const ctx = await verifyResortAccess(req, resortId, 'staff');
-    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'), 401);
+    if (!ctx) return handleError(new Error('RESORT_UNAUTHORIZED'));
 
     const body = UpdateLiftSchema.parse(await req.json());
 
@@ -93,8 +96,13 @@ export async function PATCH(
       },
     });
 
-    if (lift.count === 0) return handleError(new Error('Lift not found'), 404);
-    return ok({ updated: true, liftName: body.liftName, status: body.status });
+    if (lift.count === 0) return handleError(new Error('Lift not found'));
+
+    return ok({
+      updated: true,
+      liftName: body.liftName,
+      status: body.status,
+    });
   } catch (e) {
     return handleError(e);
   }
