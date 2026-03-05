@@ -5,7 +5,7 @@ import { prisma } from './prisma';
 
 // ─── Existing Consumer Auth ───────────────────────────────────────────────────
 
-export async function getAuthUser(req: NextRequest): Promise<User | null> {
+export async function getAuthUser(req: NextRequest): Promise<any | null> {
   const authHeader = req.headers.get('authorization');
   const token =
     authHeader?.replace('Bearer ', '') ||
@@ -19,19 +19,19 @@ export async function getAuthUser(req: NextRequest): Promise<User | null> {
   return prisma.user.findUnique({ where: { supabaseId: data.user.id } });
 }
 
-export async function requireAuth(req: NextRequest): Promise<User> {
+export async function requireAuth(req: NextRequest): Promise<any> {
   const user = await getAuthUser(req);
   if (!user) throw new Error('UNAUTHORIZED');
   return user;
 }
 
-export async function requirePro(req: NextRequest): Promise<User> {
+export async function requirePro(req: NextRequest): Promise<any> {
   const user = await requireAuth(req);
   if (user.role !== 'pro_user' && user.role !== 'admin') throw new Error('PRO_REQUIRED');
   return user;
 }
 
-export async function requireAdmin(req: NextRequest): Promise<User> {
+export async function requireAdmin(req: NextRequest): Promise<any> {
   const user = await requireAuth(req);
   if (user.role !== 'admin') throw new Error('FORBIDDEN');
   return user;
