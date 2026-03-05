@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
             currentPeriodEnd:subscription.currentPeriodEnd,
           }
         : null,
-      activityLog: auditLogs.map((l) => ({
+      activityLog: auditLogs.map((l: any) => ({
         action: l.action,
         entity: l.entity,
         ts:     l.createdAt,
