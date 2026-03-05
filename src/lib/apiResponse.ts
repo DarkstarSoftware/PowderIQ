@@ -4,6 +4,10 @@ export function ok<T>(data: T, status = 200) {
   return NextResponse.json({ success: true, data }, { status });
 }
 
+export function created<T>(data: T) {
+  return NextResponse.json({ success: true, data }, { status: 201 });
+}
+
 export function err(message: string, status: number, details?: unknown) {
   return NextResponse.json({ success: false, error: message, details }, { status });
 }
