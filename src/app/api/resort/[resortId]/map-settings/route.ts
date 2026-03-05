@@ -9,7 +9,6 @@ import { ok, handleError } from '@/lib/apiResponse';
 import { requireResortAccess } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
-import { Prisma } from '@prisma/client';
 
 const BoundsSchema = z.tuple([
   z.tuple([z.number(), z.number()]),
