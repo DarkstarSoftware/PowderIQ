@@ -42,9 +42,9 @@ export async function GET(req: NextRequest) {
       return ok([{
         ...resort,
         staffRole:   null,
-        liftsOpen:   resort.liftStatuses.filter(l => l.status === 'open').length,
+        liftsOpen:   resort.liftStatuses.filter((l: any) => l.status === 'open').length,
         totalLifts:  resort.liftStatuses.length,
-        trailsOpen:  resort.trailStatuses.filter(t => t.status === 'open' || t.status === 'groomed').length,
+        trailsOpen:  resort.trailStatuses.filter((t: any) => t.status === 'open' || t.status === 'groomed').length,
         totalTrails: resort.trailStatuses.length,
       }]);
     }
@@ -67,9 +67,9 @@ export async function GET(req: NextRequest) {
     const resorts = operators.map(op => ({
       ...op.resort,
       staffRole:   op.staffRole,
-      liftsOpen:   op.resort.liftStatuses.filter(l => l.status === 'open').length,
+      liftsOpen:   op.resort.liftStatuses.filter((l: any) => l.status === 'open').length,
       totalLifts:  op.resort.liftStatuses.length,
-      trailsOpen:  op.resort.trailStatuses.filter(t => t.status === 'open' || t.status === 'groomed').length,
+      trailsOpen:  op.resort.trailStatuses.filter((t: any) => t.status === 'open' || t.status === 'groomed').length,
       totalTrails: op.resort.trailStatuses.length,
     }));
 

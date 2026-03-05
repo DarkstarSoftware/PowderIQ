@@ -37,10 +37,10 @@ export async function GET(
 
     const summary = {
       total: lifts.length,
-      open: lifts.filter(l => l.status === 'open').length,
-      on_hold: lifts.filter(l => l.status === 'on_hold').length,
-      scheduled: lifts.filter(l => l.status === 'scheduled').length,
-      closed: lifts.filter(l => l.status === 'closed').length,
+      open: lifts.filter((l: any) => l.status === 'open').length,
+      on_hold: lifts.filter((l: any) => l.status === 'on_hold').length,
+      scheduled: lifts.filter((l: any) => l.status === 'scheduled').length,
+      closed: lifts.filter((l: any) => l.status === 'closed').length,
     };
 
     return ok({ lifts, summary });
