@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -18,23 +17,23 @@ enum Role {
 }
 
 enum ResortPlan {
-  starter    // Weather dashboard, basic lift/trail status
-  pro        // + Guest analytics, AI daily report gen, crowd data
-  enterprise // + Custom branding, API access, multi-resort, snowmaking
+  starter
+  pro
+  enterprise
 }
 
 enum OperatorRole {
-  staff         // View-only + update lift/trail status
-  supervisor    // + Edit snow reports, grooming logs
-  manager       // + Edit resort settings, manage staff
-  owner         // Full access including billing
+  staff
+  supervisor
+  manager
+  owner
 }
 
 enum LiftState {
   open
-  on_hold      // Temporarily stopped (wind, maintenance)
+  on_hold
   closed
-  scheduled    // Planned to open later today
+  scheduled
 }
 
 enum Difficulty {
@@ -48,9 +47,9 @@ enum Difficulty {
 
 enum TrailState {
   open
-  groomed        // Open + freshly groomed
+  groomed
   closed
-  patrol_only    // Ski patrol access only
+  patrol_only
 }
 
 enum ElevationZone {
@@ -68,14 +67,14 @@ enum NotificationType {
   general
 }
 
-// ─── Core Consumer Models ─────────────────────────────────────────────────────
+// ─── Consumer Models ──────────────────────────────────────────────────────────
 
 model User {
   id         String   @id @default(cuid())
   supabaseId String   @unique
   email      String   @unique
   role       Role     @default(user)
-  resortId   String?  // Quick lookup for resort_operator / resort_admin users
+  resortId   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -230,30 +229,35 @@ model Resort {
   id         String @id @default(cuid())
   name       String
   slug       String @unique
-  liftieSlug   String?   // Liftie.info resort slug for live lift sync
   mountainId String @unique
   mountain   Mountain @relation(fields: [mountainId], references: [id])
 
-  // Contact & branding
   logoUrl      String?
   primaryColor String  @default("#0ea5e9")
   websiteUrl   String?
   phone        String?
   email        String?
 
-  // Subscription tier
   plan        ResortPlan @default(starter)
-  planStatus  String     @default("trial") // trial | active | suspended
+  planStatus  String     @default("trial")
   trialEndsAt DateTime?
 
-  // Stripe B2B billing
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique
 
-  // Elevation zones (ft) — used for weather bucketing
   baseElevFt   Int @default(0)
   midElevFt    Int @default(0)
   summitElevFt Int @default(0)
+
+  liftieSlug          String?
+  mapGeoJSON          Json?     // Cached OSM trail/lift geometry (24h TTL)
+  mapCacheExpiresAt   DateTime?
+
+  // Custom trail map image overlay (overrides satellite base when set)
+  // Resort uploads their official trail map PDF/PNG; we georegister it using corner coords.
+  customMapImageUrl   String?   // publicly accessible image URL
+  customMapBounds     Json?     // [[southLat, westLon], [northLat, eastLon]]
+  customMapOpacity    Float     @default(0.85)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -283,36 +287,36 @@ model ResortOperator {
 }
 
 model LiftStatus {
-  id         String    @id @default(cuid())
-  resortId   String
-  resort     Resort    @relation(fields: [resortId], references: [id], onDelete: Cascade)
-  liftName   String
-  liftType   String    @default("chairlift") // chairlift | gondola | surface | tram
-  status     LiftState @default(closed)
-  topElevFt  Int?
-  baseElevFt Int?
-  verticalFt Int?
+  id          String    @id @default(cuid())
+  resortId    String
+  resort      Resort    @relation(fields: [resortId], references: [id], onDelete: Cascade)
+  liftName    String
+  liftType    String    @default("chairlift")
+  status      LiftState @default(closed)
+  topElevFt   Int?
+  baseElevFt  Int?
+  verticalFt  Int?
   waitMinutes Int?
-  updatedBy  String?
-  updatedAt  DateTime  @updatedAt
-  openedAt   DateTime  @default(now())
+  updatedBy   String?
+  updatedAt   DateTime  @updatedAt
+  openedAt    DateTime  @default(now())
 
   @@unique([resortId, liftName])
   @@index([resortId])
 }
 
 model TrailStatus {
-  id           String     @id @default(cuid())
-  resortId     String
-  resort       Resort     @relation(fields: [resortId], references: [id], onDelete: Cascade)
-  trailName    String
-  difficulty   Difficulty @default(blue)
-  status       TrailState @default(closed)
-  groomedAt    DateTime?
-  snowDepthIn  Int?
-  zone         String?    // e.g. "Summit", "Mid", "Base", "Terrain Park"
-  updatedBy    String?
-  updatedAt    DateTime   @updatedAt
+  id          String     @id @default(cuid())
+  resortId    String
+  resort      Resort     @relation(fields: [resortId], references: [id], onDelete: Cascade)
+  trailName   String
+  difficulty  Difficulty @default(blue)
+  status      TrailState @default(closed)
+  groomedAt   DateTime?
+  snowDepthIn Int?
+  zone        String?
+  updatedBy   String?
+  updatedAt   DateTime   @updatedAt
 
   @@unique([resortId, trailName])
   @@index([resortId])
@@ -325,7 +329,6 @@ model ElevationWeather {
   zone     ElevationZone
   elevFt   Int
 
-  // Current conditions
   tempF         Float
   feelsLikeF    Float?
   windMph       Float
@@ -336,14 +339,12 @@ model ElevationWeather {
   conditionDesc String?
   humidity      Int?
 
-  // Snowfall
   snowfall1hIn  Float @default(0)
   snowfall24hIn Float @default(0)
   snowDepthIn   Float @default(0)
 
-  // Forecast (next 24h snapshot)
-  forecastHigh  Float?
-  forecastLow   Float?
+  forecastHigh   Float?
+  forecastLow    Float?
   forecastSnowIn Float?
 
   fetchedAt DateTime @default(now())
@@ -365,11 +366,9 @@ model ResortSnowReport {
   baseDepthIn   Float    @default(0)
   summitDepthIn Float    @default(0)
 
-  // Surface conditions
   surfaceCondition String?
   snowType         String?
 
-  // Open stats
   openLifts   Int @default(0)
   totalLifts  Int @default(0)
   openTrails  Int @default(0)
@@ -377,7 +376,6 @@ model ResortSnowReport {
   openAcres   Int @default(0)
   totalAcres  Int @default(0)
 
-  // AI-drafted morning report
   narrative   String?
   publishedAt DateTime?
   publishedBy String?
@@ -408,7 +406,7 @@ model ResortNotification {
   type        NotificationType
   title       String
   body        String
-  channel     String           @default("all") // all | email | push | sms
+  channel     String           @default("all")
   sentAt      DateTime?
   scheduledAt DateTime?
   createdBy   String?
