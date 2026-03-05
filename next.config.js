@@ -2,6 +2,8 @@
 const nextConfig = {
   serverExternalPackages: ['@prisma/client'],
 
+  turbopack: false,
+
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
