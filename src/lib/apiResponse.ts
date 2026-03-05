@@ -5,7 +5,7 @@ export function ok<T>(data: T, status = 200) {
 }
 
 export function created<T>(data: T) {
-  return NextResponse.json({ success: true, data }, { status: 201 });
+  return ok(data, 201);
 }
 
 export function err(message: string, status: number, details?: unknown) {
