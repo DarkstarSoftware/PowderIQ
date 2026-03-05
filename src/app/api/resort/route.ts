@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     const slug = mountain.slug + '-ops';
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       const resort = await tx.resort.create({
         data: {
           name: mountain.name, slug,
