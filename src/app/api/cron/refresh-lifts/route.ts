@@ -21,7 +21,7 @@ async function handler(req: NextRequest) {
   });
 
   const results = await Promise.allSettled(
-    resorts.map((r: { id: string; name: string; liftieSlug: string }) =>
+    resorts.map((r: { id: string; name: string; liftieSlug: string | null }) =>
       refreshLiftsFromLiftie(r.id, r.liftieSlug!).then(res => ({ name: r.name, ...res }))
     )
   );
