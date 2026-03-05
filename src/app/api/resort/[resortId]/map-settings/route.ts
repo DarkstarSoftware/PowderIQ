@@ -97,7 +97,7 @@ await prisma.resort.update({
   where: { id: resortId },
   data: {
     customMapImageUrl: null,
-    customMapBounds: Prisma.JsonNull, // clears the JSON field
+    customMapBounds: null,
   },
 });
 
