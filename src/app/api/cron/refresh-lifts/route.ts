@@ -24,7 +24,7 @@ async function handler(req: NextRequest) {
     resorts.map(r => refreshLiftsFromLiftie(r.id, r.liftieSlug!).then(res => ({ name: r.name, ...res })))
   );
 
-  const summary = results.map(r =>
+  const summary = results.map((r: PromiseSettledResult<any>) =>
     r.status === 'fulfilled' ? r.value : { error: (r as PromiseRejectedResult).reason?.message }
   );
 
