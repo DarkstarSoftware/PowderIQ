@@ -5,29 +5,12 @@
 import { NextRequest } from 'next/server';
 import { ok, handleError } from '@/lib/apiResponse';
 import { prisma } from '@/lib/prisma';
+import { fetchSkimapImage } from '@/lib/skimap';
 import {
   getResortMapGeoJSON,
   matchOSMNameToStatus,
   osmDifficultyToAppDifficulty,
 } from '@/services/trailMapService';
-
-// Scrape the most recent trail map image from skimap.org for a given area ID.
-// Results are cached for 24h via Next.js fetch cache.
-async function fetchSkimapImage(areaId: number): Promise<string | null> {
-  try {
-    const res = await fetch(`https://skimap.org/skiareas/view/${areaId}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PowderIQ/1.0)' },
-      next: { revalidate: 86400 },
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    // First <source type="image/jpg"> is the most recent map (page ordered newest first)
-    const match = html.match(/<source srcSet="(https:\/\/files\.skimap\.org\/[^"]+)" type="image\/jpg"/);
-    return match ? match[1] : null;
-  } catch {
-    return null;
-  }
-}
 
 export async function GET(
   req: NextRequest,

@@ -4,6 +4,7 @@ import { ok, err, handleError } from '@/lib/apiResponse';
 import { requireAuth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { auditLog } from '@/lib/audit';
+import { fetchSkimapImage } from '@/lib/skimap';
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,27 @@ export async function GET(req: NextRequest) {
       include: { mountain: true },
       orderBy: { createdAt: 'desc' },
     });
-    return ok(favorites);
+
+    // Enrich mountains with skimap trail map images
+    const enriched = await Promise.all(
+      favorites.map(async (f) => {
+        // Already has an image, skip
+        if (f.mountain.imageUrl) return f;
+        // Has a skimap area ID, fetch the most recent trail map
+        if ((f.mountain as any).skimapAreaId) {
+          const imageUrl = await fetchSkimapImage((f.mountain as any).skimapAreaId);
+          if (imageUrl) {
+            return {
+              ...f,
+              mountain: { ...f.mountain, imageUrl },
+            };
+          }
+        }
+        return f;
+      })
+    );
+
+    return ok(enriched);
   } catch (e) {
     return handleError(e);
   }
