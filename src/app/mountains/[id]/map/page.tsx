@@ -60,14 +60,15 @@ export default function PublicTrailMapPage({ params }: PageProps) {
     (async () => {
       try {
         // Try slug first (most common inbound link format)
-        const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
-        let mountain = await mountainRes.json().then(d => d.data?.[0] ?? null);
+    const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
+const mountainJson = await mountainRes.json();
+let mountain = mountainJson.data?.[0] ?? null;
 
-        // Fallback: try as mountain id
-        if (!mountain) {
-          const byId = await fetch(`/api/mountains/${params.id}`);
-          if (byId.ok) mountain = await byId.json().then(d => d.data);
-        }
+// Fallback: try as mountain id
+if (!mountain) {
+  const byId = await fetch(`/api/mountains?id=${params.id}`);
+  if (byId.ok) mountain = await byId.json().then((d: any) => d.data?.[0] ?? null);
+}
 
         if (!mountain) throw new Error('Mountain not found');
 
