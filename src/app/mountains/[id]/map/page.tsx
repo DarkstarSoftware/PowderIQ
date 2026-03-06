@@ -55,20 +55,30 @@ export default function PublicTrailMapPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState<string | null>(null);
 
-  useEffect(() => {
-    // Resolve mountain slug → resort id via the public mountains API
-    (async () => {
-      try {
-        // Try slug first (most common inbound link format)
-    const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
-const mountainJson = await mountainRes.json();
-let mountain = mountainJson.data?.[0] ?? null;
+useEffect(() => {
+  (async () => {
+    try {
+      const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
+      const mountainJson = await mountainRes.json();
+      console.log('mountain json:', JSON.stringify(mountainJson));
+      let mountain = mountainJson.data?.[0] ?? null;
+      console.log('mountain:', mountain);
 
-// Fallback: try as mountain id
-if (!mountain) {
-  const byId = await fetch(`/api/mountains?id=${params.id}`);
-  if (byId.ok) mountain = await byId.json().then((d: any) => d.data?.[0] ?? null);
-}
+      if (!mountain) {
+        const byId = await fetch(`/api/mountains?id=${params.id}`);
+        if (byId.ok) mountain = await byId.json().then((d: any) => d.data?.[0] ?? null);
+      }
+
+      if (!mountain) throw new Error('Mountain not found');
+
+      const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
+      console.log('resort status:', resortRes.status);
+      const resortJson = await resortRes.json();
+      console.log('resort json:', JSON.stringify(resortJson));
+      const resort = resortJson.data?.[0] ?? resortJson.data;
+      console.log('resort:', resort);
+
+      if (!resort) throw new Error('No active resort for this mountain');
 
         if (!mountain) throw new Error('Mountain not found');
 
