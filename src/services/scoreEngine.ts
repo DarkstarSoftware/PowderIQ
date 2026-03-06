@@ -1,3 +1,5 @@
+// src/services/scoreEngine.ts
+
 import type { RiderProfile } from '@prisma/client';
 
 export interface SnowData {
@@ -23,12 +25,12 @@ export interface ScoreBreakdown {
 type Weights = Record<string, number>;
 
 const DEFAULT_WEIGHTS: Weights = {
-  snowfall24h:  0.30,
-  snowfall7d:   0.15,
-  baseDepth:    0.15,
-  wind:         0.20,
-  tempStability:0.10,
-  crowd:        0.10,
+  snowfall24h:   0.30,
+  snowfall7d:    0.15,
+  baseDepth:     0.15,
+  wind:          0.20,
+  tempStability: 0.10,
+  crowd:         0.10,
 };
 
 function adjustWeights(profile: RiderProfile | null): Weights {
@@ -36,38 +38,32 @@ function adjustWeights(profile: RiderProfile | null): Weights {
   if (!profile) return w;
 
   if (profile.style === 'powder') {
-    w.snowfall24h  = 0.40;
-    w.snowfall7d   = 0.20;
-    w.baseDepth    = 0.15;
-    w.wind         = 0.10;
-    w.tempStability= 0.05;
-    w.crowd        = 0.10;
+    w.snowfall24h  = 0.40; w.snowfall7d   = 0.20;
+    w.baseDepth    = 0.15; w.wind         = 0.10;
+    w.tempStability= 0.05; w.crowd        = 0.10;
   } else if (profile.style === 'beginner' || profile.skillLevel === 'beginner') {
-    w.wind          = 0.15;
-    w.crowd         = 0.20;
-    w.tempStability = 0.15;
-    w.snowfall24h   = 0.20;
-    w.snowfall7d    = 0.15;
-    w.baseDepth     = 0.15;
+    w.wind         = 0.15; w.crowd        = 0.20;
+    w.tempStability= 0.15; w.snowfall24h  = 0.20;
+    w.snowfall7d   = 0.15; w.baseDepth    = 0.15;
   } else if (profile.style === 'freestyle') {
-    w.snowfall24h  = 0.20;
-    w.snowfall7d   = 0.10;
-    w.baseDepth    = 0.20;
-    w.wind         = 0.20;
-    w.tempStability= 0.15;
-    w.crowd        = 0.15;
+    w.snowfall24h  = 0.20; w.snowfall7d   = 0.10;
+    w.baseDepth    = 0.20; w.wind         = 0.20;
+    w.tempStability= 0.15; w.crowd        = 0.15;
   }
 
-  // Normalize to sum to 1
   const sum = Object.values(w).reduce((a, b) => a + b, 0);
-  Object.keys(w).forEach((k) => { w[k] /= sum; });
+  Object.keys(w).forEach(k => { w[k] /= sum; });
   return w;
 }
 
 // Individual component scorers (0–100)
-const scoreSnowfall24h  = (in_: number) => Math.min(100, (in_ / 18) * 100);
-const scoreSnowfall7d   = (in_: number) => Math.min(100, (in_ / 36) * 100);
-const scoreBaseDepth    = (in_: number) => Math.min(100, (in_ / 120) * 100);
+// Thresholds reflect real-world conditions, not inflated mock data:
+//   - 6" in 24h is an excellent powder day (not 18")
+//   - 24" in 7 days is exceptional (not 36")
+//   - 48" base is solid coverage (not 120")
+const scoreSnowfall24h   = (i: number) => Math.min(100, (i / 6)  * 100);  // 6"  = perfect
+const scoreSnowfall7d    = (i: number) => Math.min(100, (i / 24) * 100);  // 24" = perfect
+const scoreBaseDepth     = (i: number) => Math.min(100, (i / 60) * 100);  // 60" = full coverage
 const scoreTempStability = (min: number, max: number) => {
   const spread = max - min;
   if (spread <= 5)  return 100;
@@ -76,11 +72,19 @@ const scoreTempStability = (min: number, max: number) => {
 };
 const scoreWind = (mph: number) => {
   if (mph <= 5)  return 100;
-  if (mph >= 60) return 0;
-  return 100 - ((mph - 5) / 55) * 100;
+  if (mph >= 50) return 0;
+  return 100 - ((mph - 5) / 45) * 100;
 };
 const scoreCrowd = (dayOfWeek: number) =>
   dayOfWeek === 0 || dayOfWeek === 6 ? 30 : 80;
+
+// Temperature penalty: very warm (above 38°F) softens snow, very cold (below 5°F) is harsh
+function scoreTempBonus(tempF: number): number {
+  if (tempF >= 20 && tempF <= 32) return 10;  // ideal skiing temp — small bonus
+  if (tempF > 36) return -15;                  // slushy/icy — penalty
+  if (tempF < 5)  return -10;                  // dangerously cold — penalty
+  return 0;
+}
 
 export function computeScore(
   snow: SnowData,
@@ -95,8 +99,9 @@ export function computeScore(
   const sWind = scoreWind(snow.windMph);
   const sTemp = scoreTempStability(snow.tempMinF, snow.tempMaxF);
   const sCrd  = scoreCrowd(dow);
+  const tBonus = scoreTempBonus(snow.tempF);
 
-  const total = Math.round(
+  const weighted = Math.round(
     s24h  * w.snowfall24h +
     s7d   * w.snowfall7d +
     sBase * w.baseDepth +
@@ -105,13 +110,15 @@ export function computeScore(
     sCrd  * w.crowd
   );
 
+  const total = Math.min(100, Math.max(0, weighted + tBonus));
+
   const breakdown: ScoreBreakdown = {
-    snowfall24h:  Math.round(s24h),
-    snowfall7d:   Math.round(s7d),
-    baseDepth:    Math.round(sBase),
-    wind:         Math.round(sWind),
-    tempStability:Math.round(sTemp),
-    crowd:        Math.round(sCrd),
+    snowfall24h:   Math.round(s24h),
+    snowfall7d:    Math.round(s7d),
+    baseDepth:     Math.round(sBase),
+    wind:          Math.round(sWind),
+    tempStability: Math.round(sTemp),
+    crowd:         Math.round(sCrd),
     total,
   };
 
@@ -121,33 +128,39 @@ export function computeScore(
 function generateExplanation(snow: SnowData, total: number): string {
   const parts: string[] = [];
 
-  if (snow.snowfall24h >= 12)
-    parts.push(`Outstanding fresh snowfall of ${snow.snowfall24h}" in the last 24 hours — prime powder.`);
-  else if (snow.snowfall24h >= 6)
+  if (snow.snowfall24h >= 6)
+    parts.push(`Excellent fresh snowfall of ${snow.snowfall24h}" in the last 24 hours.`);
+  else if (snow.snowfall24h >= 2)
     parts.push(`Good recent snowfall of ${snow.snowfall24h}" in the past day.`);
   else if (snow.snowfall24h > 0)
-    parts.push(`Light snowfall of ${snow.snowfall24h}" in the past 24 hours.`);
+    parts.push(`Light dusting of ${snow.snowfall24h}" in the past 24 hours.`);
   else
     parts.push('No new snowfall in the past 24 hours.');
 
-  if (snow.baseDepthIn >= 80)
-    parts.push(`Deep base of ${snow.baseDepthIn}" ensures excellent coverage everywhere.`);
-  else if (snow.baseDepthIn >= 40)
-    parts.push(`Solid base depth of ${snow.baseDepthIn}".`);
+  if (snow.baseDepthIn >= 60)
+    parts.push(`Deep base of ${snow.baseDepthIn}" ensures full coverage.`);
+  else if (snow.baseDepthIn >= 30)
+    parts.push(`Moderate base depth of ${snow.baseDepthIn}".`);
   else
     parts.push(`Thin base of ${snow.baseDepthIn}" — watch for rocks on lower runs.`);
 
   if (snow.windMph <= 10)
-    parts.push('Calm winds mean ideal lift operations and clear visibility.');
+    parts.push('Calm winds — ideal conditions.');
   else if (snow.windMph <= 25)
-    parts.push(`Moderate winds at ${snow.windMph} mph — some upper chairs may be slow.`);
+    parts.push(`Moderate winds at ${Math.round(snow.windMph)} mph.`);
   else
-    parts.push(`High winds at ${snow.windMph} mph may close upper lifts and reduce visibility.`);
+    parts.push(`High winds at ${Math.round(snow.windMph)} mph may close upper lifts.`);
+
+  if (snow.tempF > 36)
+    parts.push(`Warm temps at ${Math.round(snow.tempF)}°F — expect soft or slushy conditions.`);
+  else if (snow.tempF < 10)
+    parts.push(`Very cold at ${Math.round(snow.tempF)}°F — dress in layers.`);
 
   const prefix =
-    total >= 80 ? 'Outstanding powder day! ' :
-    total >= 60 ? 'Good conditions worth riding. ' :
-    total >= 40 ? 'Decent conditions with some caveats. ' :
+    total >= 80 ? 'Outstanding conditions! ' :
+    total >= 65 ? 'Great day on the mountain. ' :
+    total >= 50 ? 'Decent conditions. ' :
+    total >= 35 ? 'Fair conditions with some caveats. ' :
                   'Challenging conditions today. ';
 
   return prefix + parts.join(' ');
