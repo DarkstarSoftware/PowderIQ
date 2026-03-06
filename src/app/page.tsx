@@ -517,7 +517,7 @@ export default function LandingPage() {
               <div key={heading}>
                 <div style={{fontSize:'12px', fontWeight:800, color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'14px'}}>{heading}</div>
                 <ul style={{listStyle:'none', display:'flex', flexDirection:'column', gap:'9px'}}>
-                  {links.map((link) => <li key={link[0] as string}><Link href={link[1] as string} style={{fontSize:'13px', color:'rgba(255,255,255,0.4)', textDecoration:'none'}}>{link[0] as string}</Link></li>)}
+                  {links.map(([label, href]) => <li key={label}><Link href={href} style={{fontSize:'13px', color:'rgba(255,255,255,0.4)', textDecoration:'none'}}>{label}</Link></li>)}
                 </ul>
               </div>
             ))}
