@@ -11,6 +11,24 @@ import {
   osmDifficultyToAppDifficulty,
 } from '@/services/trailMapService';
 
+// Scrape the most recent trail map image from skimap.org for a given area ID.
+// Results are cached for 24h via Next.js fetch cache.
+async function fetchSkimapImage(areaId: number): Promise<string | null> {
+  try {
+    const res = await fetch(`https://skimap.org/skiareas/view/${areaId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PowderIQ/1.0)' },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    // First <source type="image/jpg"> is the most recent map (page ordered newest first)
+    const match = html.match(/<source srcSet="(https:\/\/files\.skimap\.org\/[^"]+)" type="image\/jpg"/);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(
   req: NextRequest,
   context: { params: Promise<{ resortId: string }> }
@@ -43,12 +61,17 @@ export async function GET(
             baseElevFt: true,
             midElevFt: true,
             summitElevFt: true,
-            // Map override fields (optional)
             customMapImageUrl: true,
             customMapBounds: true,
             customMapOpacity: true,
-            // Cached map fields (optional)
             mapCacheExpiresAt: true,
+            mountain: {
+              select: {
+                latitude: true,
+                longitude: true,
+                skimapAreaId: true,
+              },
+            },
           },
         }),
       ]);
@@ -64,11 +87,9 @@ export async function GET(
       });
     }
 
-    // Defensive: geojson might be null if cache/service fails
-   const geo = mapGeoJSON as unknown as { features?: any[] } | null;
-const features = geo?.features ?? [];
+    const geo = mapGeoJSON as unknown as { features?: any[] } | null;
+    const features = geo?.features ?? [];
 
-    // Build name lookup maps for status matching
     const liftByName = new Map<string, any>(
       liftStatuses.map((l: any) => [l.liftName.toLowerCase(), l])
     );
@@ -76,13 +97,11 @@ const features = geo?.features ?? [];
       trailStatuses.map((t: any) => [t.trailName.toLowerCase(), t])
     );
 
-    // Enrich OSM features with statuses + normalized difficulty
     const enrichedFeatures = features.map((f: any) => {
       const props = f.properties || {};
       const name = (props.name || props.ref || '').toString();
       const kind = (props.piste_type || props.kind || props.type || '').toString();
 
-      // Determine if this is lift or trail-ish
       const isLift =
         props.aerialway ||
         kind === 'lift' ||
@@ -112,7 +131,6 @@ const features = geo?.features ?? [];
         }
       }
 
-      // Normalize difficulty for trails
       if (isTrail) {
         const osmDiff = props.piste_difficulty || props.difficulty || props.color;
         difficulty = osmDifficultyToAppDifficulty(osmDiff);
@@ -133,16 +151,28 @@ const features = geo?.features ?? [];
       };
     });
 
-    // Prepare overlays (custom trail map image), if the resort provided one
-    const overlays =
-      resort.customMapImageUrl && resort.customMapBounds
-        ? {
-            type: 'customMap',
-            imageUrl: resort.customMapImageUrl,
-            bounds: resort.customMapBounds,
-            opacity: resort.customMapOpacity ?? 0.85,
-          }
-        : null;
+    // Resolve trail map image:
+    // 1. Resort's manually uploaded custom map (highest priority)
+    // 2. Most recent map from skimap.org (automatic fallback)
+    let overlays = null;
+
+    if (resort.customMapImageUrl && resort.customMapBounds) {
+      overlays = {
+        type: 'customMap',
+        imageUrl: resort.customMapImageUrl,
+        bounds: resort.customMapBounds,
+        opacity: resort.customMapOpacity ?? 0.85,
+      };
+    } else if (resort.mountain?.skimapAreaId) {
+      const skimapImageUrl = await fetchSkimapImage(resort.mountain.skimapAreaId);
+      if (skimapImageUrl) {
+        overlays = {
+          type: 'skimapImage',
+          imageUrl: skimapImageUrl,
+          skimapAreaId: resort.mountain.skimapAreaId,
+        };
+      }
+    }
 
     return ok({
       resort: {
@@ -152,6 +182,7 @@ const features = geo?.features ?? [];
         baseElevFt: resort.baseElevFt,
         midElevFt: resort.midElevFt,
         summitElevFt: resort.summitElevFt,
+        mountain: resort.mountain,
       },
       map: {
         ...mapGeoJSON,
