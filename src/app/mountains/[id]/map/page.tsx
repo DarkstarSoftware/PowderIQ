@@ -60,9 +60,7 @@ useEffect(() => {
     try {
       const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
       const mountainJson = await mountainRes.json();
-      console.log('mountain json:', JSON.stringify(mountainJson));
       let mountain = mountainJson.data?.[0] ?? null;
-      console.log('mountain:', mountain);
 
       if (!mountain) {
         const byId = await fetch(`/api/mountains?id=${params.id}`);
@@ -72,29 +70,17 @@ useEffect(() => {
       if (!mountain) throw new Error('Mountain not found');
 
       const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
-      console.log('resort status:', resortRes.status);
+      if (!resortRes.ok) throw new Error('No active resort for this mountain');
       const resortJson = await resortRes.json();
-      console.log('resort json:', JSON.stringify(resortJson));
       const resort = resortJson.data?.[0] ?? resortJson.data;
-      console.log('resort:', resort);
-
       if (!resort) throw new Error('No active resort for this mountain');
 
-        // Fetch resort for this mountain
-        const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
-        if (!resortRes.ok) throw new Error('No active resort for this mountain');
-        const resortJson = await resortRes.json();
-        const resort = resortJson.data?.[0] ?? resortJson.data;
-        if (!resort) throw new Error('No active resort for this mountain');
-
-        // Fetch weather + latest snow report in parallel
-        const [weatherRes, reportRes] = await Promise.allSettled([
-          fetch(`/api/resort/${resort.id}/weather`).then(r => r.ok ? r.json() : null),
-          fetch(`/api/resort/${resort.id}/snow-report`).then(r => r.ok ? r.json() : null),
-        ]);
-
-        const weatherData = weatherRes.status === 'fulfilled' ? weatherRes.value?.data : null;
-        const reportData  = reportRes.status === 'fulfilled'  ? reportRes.value?.data?.[0] : null;
+      const [weatherRes, reportRes] = await Promise.allSettled([
+        fetch(`/api/resort/${resort.id}/weather`).then(r => r.ok ? r.json() : null),
+        fetch(`/api/resort/${resort.id}/snow-report`).then(r => r.ok ? r.json() : null),
+      ]);
+      const weatherData = weatherRes.status === 'fulfilled' ? weatherRes.value?.data : null;
+      const reportData  = reportRes.status === 'fulfilled'  ? reportRes.value?.data?.[0] : null;
 
         setData({
           resort,
