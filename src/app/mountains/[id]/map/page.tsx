@@ -1,19 +1,11 @@
 'use client';
 // src/app/mountains/[id]/map/page.tsx
-//
-// Public trail map page — visible to all guests, no login required.
-// Shows the same OSM geometry + live lift/trail status + weather pins
-// as the operator dashboard, but read-only with a consumer-focused UI.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 const TrailMap = dynamic(() => import('@/components/resort/TrailMap'), { ssr: false });
-
-interface PageProps {
-  params: { id: string }; // mountain slug or cuid
-}
 
 interface PublicMapData {
   resort: {
@@ -50,37 +42,40 @@ interface PublicMapData {
   };
 }
 
-export default function PublicTrailMapPage({ params }: PageProps) {
-  const [data, setData]     = useState<PublicMapData | null>(null);
+export default function PublicTrailMapPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  const params = use(paramsPromise);
+  const slug = params.id;
+
+  const [data, setData]       = useState<PublicMapData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error, setError]     = useState<string | null>(null);
 
-useEffect(() => {
-  (async () => {
-    try {
-      const mountainRes = await fetch(`/api/mountains?slug=${params.id}`);
-      const mountainJson = await mountainRes.json();
-      let mountain = mountainJson.data?.[0] ?? null;
+  useEffect(() => {
+    if (!slug) return;
+    (async () => {
+      try {
+        // Resolve mountain slug
+        const mountainRes = await fetch(`/api/mountains?slug=${slug}`);
+        const mountainJson = await mountainRes.json();
+        const mountain = mountainJson.data?.[0] ?? null;
+        if (!mountain) throw new Error('Mountain not found');
 
-      if (!mountain) {
-        const byId = await fetch(`/api/mountains?id=${params.id}`);
-        if (byId.ok) mountain = await byId.json().then((d: any) => d.data?.[0] ?? null);
-      }
+        // Fetch resort for this mountain
+        const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
+        if (!resortRes.ok) throw new Error('No active resort for this mountain');
+        const resortJson = await resortRes.json();
+        // API may return single object or array
+        const resort = Array.isArray(resortJson.data) ? resortJson.data[0] : resortJson.data;
+        if (!resort) throw new Error('No active resort for this mountain');
 
-      if (!mountain) throw new Error('Mountain not found');
+        // Fetch weather + latest snow report in parallel
+        const [weatherRes, reportRes] = await Promise.allSettled([
+          fetch(`/api/resort/${resort.id}/weather`).then(r => r.ok ? r.json() : null),
+          fetch(`/api/resort/${resort.id}/snow-report`).then(r => r.ok ? r.json() : null),
+        ]);
 
-      const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
-      if (!resortRes.ok) throw new Error('No active resort for this mountain');
-      const resortJson = await resortRes.json();
-      const resort = resortJson.data?.[0] ?? resortJson.data;
-      if (!resort) throw new Error('No active resort for this mountain');
-
-      const [weatherRes, reportRes] = await Promise.allSettled([
-        fetch(`/api/resort/${resort.id}/weather`).then(r => r.ok ? r.json() : null),
-        fetch(`/api/resort/${resort.id}/snow-report`).then(r => r.ok ? r.json() : null),
-      ]);
-      const weatherData = weatherRes.status === 'fulfilled' ? weatherRes.value?.data : null;
-      const reportData  = reportRes.status === 'fulfilled'  ? reportRes.value?.data?.[0] : null;
+        const weatherData = weatherRes.status === 'fulfilled' ? weatherRes.value?.data : null;
+        const reportData  = reportRes.status === 'fulfilled'  ? reportRes.value?.data?.[0] : null;
 
         setData({
           resort,
@@ -98,7 +93,7 @@ useEffect(() => {
         setLoading(false);
       }
     })();
-  }, [params.id]);
+  }, [slug]);
 
   if (loading) return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -134,8 +129,8 @@ useEffect(() => {
             <Link href="/" className="text-white font-bold text-base shrink-0">❄️ PowderIQ</Link>
             <span className="text-gray-700">·</span>
             <div className="min-w-0">
-              <h1 className="text-white font-semibold text-sm truncate">{resort.mountain.name}</h1>
-              <p className="text-gray-500 text-xs">{resort.mountain.state} · Live Trail Map</p>
+              <h1 className="text-white font-semibold text-sm truncate">{resort.mountain?.name ?? resort.name}</h1>
+              <p className="text-gray-500 text-xs">{resort.mountain?.state ?? ''} · Live Trail Map</p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -144,7 +139,7 @@ useEffect(() => {
                 ⚠ Wind Hold Risk
               </span>
             )}
-            <Link href={`/mountains/${params.id}`}
+            <Link href={`/mountains/${slug}`}
               className="text-gray-500 hover:text-gray-300 text-xs border border-gray-700 hover:border-gray-600 px-2.5 py-1.5 rounded-lg transition-colors">
               Details
             </Link>
@@ -193,19 +188,18 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Map — fills remaining height */}
+      {/* Map */}
       <div className="flex-1 flex flex-col">
         <div className="max-w-6xl w-full mx-auto px-4 py-4 flex-1 flex flex-col gap-4">
 
           <TrailMap
             resortId={resort.id}
-            token=""          // public endpoint — no token needed
+            token=""
             height="calc(100vh - 200px)"
             showWeather={true}
             readOnly={true}
           />
 
-          {/* Latest snow report narrative */}
           {latestReport?.narrative && (
             <div className="bg-gray-900 border border-gray-800 rounded-2xl px-5 py-4">
               <div className="flex items-start gap-3">
@@ -222,7 +216,6 @@ useEffect(() => {
             </div>
           )}
 
-          {/* Footer credits */}
           <p className="text-gray-700 text-xs text-center pb-2">
             Trail geometry © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" className="hover:text-gray-500 underline">OpenStreetMap contributors</a>
             {' · '}Powered by <a href="/" className="hover:text-gray-500 underline">PowderIQ</a>
