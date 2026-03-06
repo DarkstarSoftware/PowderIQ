@@ -338,13 +338,72 @@ export default function TrailMap({ resortId, token, height = '600px', showWeathe
       const headers: Record<string, string> = {};
       if (token) headers.Authorization = `Bearer ${token}`;
       const res = await fetch(`/api/resort/${resortId}/map`, { headers });
-      if (!res.ok) throw new Error(`Map API ${res.status}`);
-      const json = await res.json();
-      setMapData(json.data);
-      if (json.data?.resort?.customMap) {
-        setCustomMap(json.data.resort.customMap);
-        setMapMode('custom');
-      }
+if (!res.ok) throw new Error(`Map API ${res.status}`);
+const json = await res.json();
+const d = json.data;
+
+// Transform API response to component's expected shape
+const bbox = d.map?.bbox ?? [0,0,0,0];
+const runs = d.map?.runs ?? { type: 'FeatureCollection', features: [] };
+const lifts = d.map?.lifts ?? { type: 'FeatureCollection', features: [] };
+
+// Build weather pins GeoJSON from weatherZones
+const weatherPins = {
+  type: 'FeatureCollection' as const,
+  features: (d.weatherZones ?? []).map((z: any) => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [
+        z.zone === 'base'    ? d.resort.mountain?.longitude ?? 0 :
+        z.zone === 'summit'  ? d.resort.mountain?.longitude ?? 0 :
+                               d.resort.mountain?.longitude ?? 0,
+        z.zone === 'base'    ? d.resort.mountain?.latitude ?? 0 :
+        z.zone === 'summit'  ? d.resort.mountain?.latitude ?? 0 :
+                               d.resort.mountain?.latitude ?? 0,
+      ],
+    },
+    properties: { ...z },
+  })),
+};
+
+const transformed: MapData = {
+  resort: {
+    ...d.resort,
+    plan: d.resort.plan ?? 'starter',
+    customMap: d.overlays?.type === 'customMap' ? {
+      imageUrl: d.overlays.imageUrl,
+      bounds: d.overlays.bounds,
+      opacity: d.overlays.opacity,
+    } : null,
+    mountain: {
+      latitude: d.resort.mountain?.latitude ?? 42.73,
+      longitude: d.resort.mountain?.longitude ?? -83.38,
+      baseElevFt: d.resort.baseElevFt ?? 900,
+      summitElevFt: d.resort.summitElevFt ?? 1100,
+      midElevFt: d.resort.midElevFt ?? 1000,
+    },
+  },
+  bbox,
+  layers: {
+    trails: runs,
+    lifts: lifts,
+    liftPoints: { type: 'FeatureCollection', features: [] },
+    weatherPins,
+  },
+  summary: {
+    lifts:  { total: d.lifts?.length ?? 0, open: 0, on_hold: 0, closed: 0, osmMatched: 0 },
+    trails: { total: d.trails?.length ?? 0, open: 0, groomed: 0, closed: 0, osmRuns: runs.features.length },
+    osmSource: d.map?.source ?? 'osm',
+    osmFetchedAt: d.map?.fetchedAt ?? new Date().toISOString(),
+  },
+};
+
+setMapData(transformed);
+if (transformed.resort.customMap) {
+  setCustomMap(transformed.resort.customMap);
+  setMapMode('custom');
+}
     } catch (e: any) {
       setError(e.message);
     } finally {
