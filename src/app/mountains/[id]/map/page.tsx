@@ -80,8 +80,6 @@ useEffect(() => {
 
       if (!resort) throw new Error('No active resort for this mountain');
 
-        if (!mountain) throw new Error('Mountain not found');
-
         // Fetch resort for this mountain
         const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
         if (!resortRes.ok) throw new Error('No active resort for this mountain');
