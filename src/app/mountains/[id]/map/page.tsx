@@ -75,7 +75,7 @@ export default function PublicTrailMapPage({ params }: PageProps) {
         const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
         if (!resortRes.ok) throw new Error('No active resort for this mountain');
         const resortJson = await resortRes.json();
-        const resort = resortJson.data?.[0];
+        const resort = resortJson.data?.[0] ?? resortJson.data;
         if (!resort) throw new Error('No active resort for this mountain');
 
         // Fetch weather + latest snow report in parallel
