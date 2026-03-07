@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [loading, setLoading]     = useState(true);
   const [userRole, setUserRole]   = useState<string>('user');
   const [userName, setUserName]   = useState<string>('');
+  const [hasResort, setHasResort] = useState<boolean>(false);
 
   useEffect(() => {
     (async () => {
@@ -21,15 +22,21 @@ export default function DashboardPage() {
       if (!data.session) { router.push('/auth/login'); return; }
       const token = data.session.access_token;
 
-      const [meRes, favRes] = await Promise.all([
+      const [meRes, favRes, resortRes] = await Promise.all([
         fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } }),
         fetch('/api/favorites', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/resort', { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
       if (meRes.ok) {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
+      }
+
+      if (resortRes.ok) {
+        const resortData = await resortRes.json();
+        setHasResort((resortData.data?.length ?? 0) > 0);
       }
 
       if (favRes.ok) {
@@ -80,6 +87,11 @@ export default function DashboardPage() {
             <Link href="/mountains" className="text-gray-400 hover:text-white text-sm transition-colors focus-ring rounded">
               Mountains
             </Link>
+            {hasResort && (
+              <Link href="/resort/dashboard" className="text-gray-400 hover:text-white text-sm transition-colors focus-ring rounded">
+                Resort
+              </Link>
+            )}
             {(userRole === 'pro_user' || userRole === 'admin') && (
               <>
                 <Link href="/compare" className="text-gray-400 hover:text-white text-sm transition-colors focus-ring rounded">
