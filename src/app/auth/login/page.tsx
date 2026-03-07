@@ -35,14 +35,14 @@ export default function LoginPage() {
       },
     });
 
-    router.push('/mountains');
+    router.push('/dashboard');
   }
 
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+          <Link href="/" className="inline-flex items-center gap-2 focus-ring rounded">
             <span className="text-3xl" aria-hidden="true">❄️</span>
             <span className="text-2xl font-bold text-white">PowderIQ</span>
           </Link>
@@ -72,7 +72,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus-ring focus:border-brand-500 transition-colors"
               placeholder="you@example.com"
             />
           </div>
@@ -88,7 +88,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus-ring focus:border-brand-500 transition-colors"
               placeholder="••••••••"
             />
           </div>
@@ -96,14 +96,14 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-3 rounded-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white py-3 rounded-lg font-semibold transition-colors focus-ring"
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
 
           <p className="text-center text-sm text-gray-500">
             No account?{' '}
-            <Link href="/auth/signup" className="text-blue-400 hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded">
+            <Link href="/auth/signup" className="text-brand-400 hover:text-brand-300 focus-ring rounded">
               Sign up free
             </Link>
           </p>
