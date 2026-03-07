@@ -35,7 +35,7 @@ export default function LoginPage() {
       },
     });
 
-    router.push('/');
+    router.push('/mountains');
   }
 
   return (
