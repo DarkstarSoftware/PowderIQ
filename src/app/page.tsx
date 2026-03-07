@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export default function DashboardPage() {
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-950 via-blue-950/20 to-gray-950">
       {/* Nav */}
@@ -16,13 +16,13 @@ export default function DashboardPage() {
           <div className="flex items-center gap-4">
             <Link
               href="/auth/login"
-              className="text-gray-400 hover:text-white transition-colors text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 rounded px-2 py-1"
+              className="text-gray-400 hover:text-white transition-colors text-sm focus-ring rounded px-2 py-1"
             >
               Sign in
             </Link>
             <Link
               href="/auth/signup"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors focus-ring"
             >
               Get Started Free
             </Link>
@@ -32,14 +32,14 @@ export default function DashboardPage() {
 
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 bg-blue-900/40 border border-blue-700/50 rounded-full px-4 py-1.5 text-sm text-blue-300 mb-6">
+        <div className="inline-flex items-center gap-2 bg-brand-900/40 border border-brand-700/50 rounded-full px-4 py-1.5 text-sm text-brand-300 mb-6">
           <span aria-hidden="true">❄️</span>
           <span>Real-time powder intelligence</span>
         </div>
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold text-white leading-tight mb-6">
           Know before you go.
           <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-blue-300">
             Score the powder.
           </span>
         </h1>
@@ -50,13 +50,13 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Link
             href="/auth/signup"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="bg-brand-600 hover:bg-brand-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors focus-ring"
           >
             Start Free Today
           </Link>
           <Link
             href="/auth/login"
-            className="border border-gray-700 hover:border-gray-500 text-gray-300 hover:text-white px-8 py-4 rounded-xl text-lg font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+            className="border border-gray-700 hover:border-gray-500 text-gray-300 px-8 py-4 rounded-xl text-lg font-semibold transition-colors focus-ring"
           >
             Sign In
           </Link>
@@ -115,7 +115,7 @@ export default function DashboardPage() {
           <nav aria-label="Footer links" className="flex gap-6">
             <Link
               href="/auth/signup"
-              className="hover:text-gray-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-500 rounded"
+              className="hover:text-gray-300 transition-colors focus-ring rounded"
             >
               Sign Up
             </Link>
