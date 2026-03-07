@@ -513,7 +513,7 @@ export default function LandingPage() {
               </div>
               <p style={{fontSize:'13px', color:'rgba(255,255,255,0.4)', lineHeight:1.65, maxWidth:'240px'}}>Real-time powder scoring and snow intelligence for 370+ mountains. Know before you go.</p>
             </div>
-            {(([["Product",[["Mountains","/mountains"],["Dashboard","/dashboard"],["Compare Resorts","/compare"],["Powder Alerts","/alerts"]]],["For Resorts",[["Operator Dashboard","/resort/dashboard"],["Pricing","#pricing"],["Request Demo","/auth/signup"]]],["Company",[["About","/about"],["Privacy","/privacy"],["Terms","/terms"],["Contact","mailto:hello@powderiq.com"]]]]) as unknown as [string, [string, string][][]][]).map(([heading,links]) => (
+            {(([["Product",[["Mountains","/mountains"],["Dashboard","/dashboard"],["Compare Resorts","/compare"],["Powder Alerts","/alerts"]]],["For Resorts",[["Operator Dashboard","/resort/dashboard"],["Pricing","#pricing"],["Request Demo","/auth/signup"]]],["Company",[["About","/about"],["Privacy","/privacy"],["Terms","/terms"],["Contact","mailto:hello@powderiq.com"]]]]) as unknown as [string, [string, string][]][]).map(([heading,links]) => (
               <div key={heading}>
                 <div style={{fontSize:'12px', fontWeight:800, color:'rgba(255,255,255,0.7)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:'14px'}}>{heading}</div>
                 <ul style={{listStyle:'none', display:'flex', flexDirection:'column', gap:'9px'}}>
