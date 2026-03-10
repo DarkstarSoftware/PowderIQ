@@ -13,6 +13,7 @@ interface ForecastDay {
   tempHighF?: number;
   tempLowF?: number;
   conditionDesc?: string;
+  precipPct?: number;
 }
 
 interface ResortForecast {
@@ -48,40 +49,44 @@ function weatherIcon(desc?: string, snow?: number): string {
 
 function fmt(n?: number, dec = 0) { return n == null ? '—' : n.toFixed(dec); }
 
-function parseForecast(fd: any): ForecastDay[] {
-  // Try standard array shapes
-  let raw: any[] = Array.isArray(fd) ? fd
-    : Array.isArray(fd.data) ? fd.data
-    : Array.isArray(fd.data?.periods) ? fd.data.periods
-    : Array.isArray(fd.data?.forecast) ? fd.data.forecast
-    : Array.isArray(fd.data?.daily) ? fd.data.daily
-    : [];
+// WMO weather code descriptions
+const WMO: Record<number, string> = {
+  0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+  45:'Fog', 48:'Icy fog',
+  51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle',
+  61:'Light rain', 63:'Rain', 65:'Heavy rain',
+  71:'Light snow', 73:'Snow', 75:'Heavy snow',
+  77:'Snow grains', 85:'Snow showers', 86:'Heavy snow showers',
+  95:'Thunderstorm', 96:'Thunderstorm w/ hail', 99:'Heavy thunderstorm',
+};
 
-  // Fallback: API returns { data: { mountain, snow: { zones: { base, mid, summit } } } }
-  if (raw.length === 0) {
-    const snow  = fd.data?.snow ?? fd.snow ?? fd.data;
-    const zones = snow?.zones ?? snow;
-    const best  = zones?.base ?? zones?.mid ?? zones?.summit ?? null;
-    if (best) {
-      const today = new Date();
-      const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-      raw = [
-        { dayLabel:'Today', snowIn: best.snowfall24hIn ?? 0, tempHighF: best.forecastHigh ?? best.tempF, tempLowF: best.forecastLow, conditionDesc: best.conditionDesc ?? '' },
-        ...[1,2,3,4,5].map(i => {
-          const d = new Date(today); d.setDate(d.getDate() + i);
-          return { dayLabel: days[d.getDay()], snowIn: best.forecastSnowIn ?? 0, tempHighF: best.forecastHigh, tempLowF: best.forecastLow, conditionDesc: best.conditionDesc ?? '' };
-        }),
-      ];
-    }
-  }
+// Fetch 7-day Open-Meteo forecast directly using mountain coordinates
+async function fetchOpenMeteoForecast(lat: number, lon: number, summitElevFt: number): Promise<ForecastDay[]> {
+  const summitElevM = Math.round(summitElevFt * 0.3048);
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode` +
+    `&temperature_unit=fahrenheit&precipitation_unit=inch` +
+    `&timezone=auto&forecast_days=7&elevation=${summitElevM}`;
 
-  return raw.slice(0, 7).map((p: any) => ({
-    dayLabel:     p.dayLabel ?? p.day ?? (p.date ? new Date(p.date).toLocaleDateString('en-US',{weekday:'short'}) : '?'),
-    snowIn:       p.snowIn ?? p.snowfall24hIn ?? p.precipIn ?? p.snow ?? 0,
-    tempHighF:    p.tempHighF ?? p.high ?? p.maxTempF,
-    tempLowF:     p.tempLowF  ?? p.low  ?? p.minTempF,
-    conditionDesc:p.conditionDesc ?? p.description ?? p.shortForecast ?? '',
-  }));
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+  const om = await res.json();
+  const daily = om.daily ?? {};
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  return (daily.time ?? []).slice(0, 7).map((dateStr: string, i: number) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    const wcode = daily.weathercode?.[i] ?? 0;
+    return {
+      dayLabel:     i === 0 ? 'Today' : dayNames[d.getDay()],
+      snowIn:       daily.snowfall_sum?.[i] ?? 0,
+      tempHighF:    daily.temperature_2m_max?.[i],
+      tempLowF:     daily.temperature_2m_min?.[i],
+      conditionDesc:WMO[wcode] ?? 'Mixed',
+      precipPct:    daily.precipitation_probability_max?.[i],
+    };
+  });
 }
 
 const SHARED_CSS = `
@@ -167,12 +172,25 @@ export default function ForecastsPage() {
         setPageLoad(false);
 
         // Fetch forecasts for each in parallel
+        // Forecast API returns { data: { mountain, snow: SnowData } }
+        // SnowData = { snowfall24h, snowfall7d, baseDepthIn, windMph, tempF, tempMinF, tempMaxF }
+        // We use the mountain's lat/lon from the response to call Open-Meteo for real daily forecasts
         items.forEach(async (fav, idx) => {
           try {
             const res = await fetch(`/api/mountains/${fav.mountain.id}/forecast`, {
               headers: { Authorization: `Bearer ${tok}` },
             });
-            const days = res.ok ? parseForecast(await res.json()) : [];
+            let days: ForecastDay[] = [];
+            if (res.ok) {
+              const fd = await res.json();
+              const mountain = fd.data?.mountain ?? {};
+              const lat = mountain.latitude;
+              const lon = mountain.longitude;
+              const summitElev = mountain.topElevFt ?? 8000;
+              if (lat != null && lon != null) {
+                days = await fetchOpenMeteoForecast(lat, lon, summitElev);
+              }
+            }
             setResorts(prev => prev.map((r, i) => i === idx ? { ...r, days, loading: false } : r));
           } catch {
             setResorts(prev => prev.map((r, i) => i === idx ? { ...r, loading: false, error: 'Failed to load' } : r));
@@ -210,6 +228,8 @@ export default function ForecastsPage() {
         .fc-snow { font-size:16px; font-weight:900; color:var(--text); }
         .fc-snow-unit { font-size:10px; color:var(--text-3); font-weight:500; }
         .fc-temp { font-size:10px; color:var(--text-3); margin-top:3px; }
+        .fc-desc { font-size:9px; color:var(--text-3); margin-top:3px; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .fc-precip { font-size:9px; color:#3b82f6; margin-top:2px; font-weight:600; }
         .fc-empty { height:120px; display:flex; align-items:center; justify-content:center; color:var(--text-3); font-size:13px; background:var(--bg); border-radius:12px; border:1px dashed var(--border-2); }
         .divider { height:1px; background:var(--border); margin:6px 0 24px; }
       `}</style>
@@ -295,6 +315,12 @@ export default function ForecastsPage() {
                               {d.tempHighF != null ? `${fmt(d.tempHighF)}°` : ''}
                               {d.tempLowF  != null ? ` / ${fmt(d.tempLowF)}°` : ''}
                             </div>
+                          )}
+                          {d.conditionDesc && (
+                            <div className="fc-desc">{d.conditionDesc}</div>
+                          )}
+                          {d.precipPct != null && (
+                            <div className="fc-precip">💧 {d.precipPct}%</div>
                           )}
                         </div>
                       ))}

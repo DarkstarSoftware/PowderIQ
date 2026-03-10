@@ -160,40 +160,111 @@ export default function DashboardPage() {
         fetch(`/api/mountains/${fav.mountain.id}/forecast`, { headers: { Authorization: `Bearer ${tok}` } }),
       ]);
 
-      if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
-        const sd = await scoreRes.value.json();
-        const d = sd.data;
-        // Score API may return nested weather zones or flat fields — handle both
-        const base = d?.weather?.zones?.base ?? d?.zones?.base ?? null;
-        setScoreData({
-          score:        d?.score          ?? fav.score ?? 0,
-          snowfall24hIn:base?.snowfall24hIn ?? d?.snowfall24hIn ?? d?.newSnowIn,
-          windMph:      base?.windMph      ?? d?.windMph,
-          tempF:        base?.tempF        ?? d?.tempF,
-          snowDepthIn:  base?.snowDepthIn  ?? d?.snowDepthIn ?? d?.baseDepthIn,
-          conditionDesc:base?.conditionDesc ?? d?.conditionDesc,
-          fetchedAt:    d?.fetchedAt       ?? d?.updatedAt,
-        });
-      }
+      // ── Score API: returns { data: { score, breakdown, explanation } }
+      // ── Forecast API: returns { data: { mountain, snow: SnowData } }
+      //    SnowData = { snowfall24h, snowfall7d, baseDepthIn, windMph, tempF, tempMinF, tempMaxF }
+
+      let mountainLat: number | null = null;
+      let mountainLon: number | null = null;
+      let mountainBaseElev = 4000;
+      let mountainSummitElev = 8000;
 
       if (forecastRes.status === 'fulfilled' && forecastRes.value.ok) {
         const fd = await forecastRes.value.json();
-        // Handle array at root or nested under data/periods/forecast
-        const raw: any[] = Array.isArray(fd) ? fd
-          : Array.isArray(fd.data) ? fd.data
-          : Array.isArray(fd.data?.periods) ? fd.data.periods
-          : Array.isArray(fd.data?.forecast) ? fd.data.forecast
-          : [];
-        const periods: ForecastPeriod[] = raw.slice(0, 6).map((p: any) => ({
-          date:         p.date ?? p.validDate ?? '',
-          dayLabel:     p.dayLabel ?? p.day ?? (p.date ? new Date(p.date).toLocaleDateString('en-US',{weekday:'short'}) : '?'),
-          snowIn:       p.snowIn ?? p.snowfall24hIn ?? p.precipIn ?? p.snow ?? 0,
-          tempHighF:    p.tempHighF ?? p.high ?? p.maxTempF,
-          tempLowF:     p.tempLowF  ?? p.low  ?? p.minTempF,
-          conditionDesc:p.conditionDesc ?? p.description ?? p.shortForecast ?? '',
-          precipPct:    p.precipPct ?? p.pop ?? p.precipProb,
-        }));
-        setForecast(periods);
+        // snow is the SnowData flat object
+        const snow = fd.data?.snow ?? fd.data ?? {};
+        const mountain = fd.data?.mountain ?? {};
+
+        mountainLat         = mountain.latitude  ?? null;
+        mountainLon         = mountain.longitude ?? null;
+        mountainBaseElev    = mountain.baseElevFt   ?? 4000;
+        mountainSummitElev  = mountain.topElevFt    ?? 8000;
+
+        // Derive a condition description from SnowData fields
+        const snow24h = snow.snowfall24h ?? 0;
+        const wind    = snow.windMph ?? 0;
+        const temp    = snow.tempF ?? 28;
+        let condDesc = '';
+        if (snow24h > 6)       condDesc = 'Heavy snow';
+        else if (snow24h > 2)  condDesc = 'Snow showers';
+        else if (snow24h > 0)  condDesc = 'Light snow';
+        else if (wind > 35)    condDesc = 'Windy';
+        else if (temp > 34)    condDesc = 'Partly cloudy';
+        else                   condDesc = 'Clear & cold';
+
+        // Use score from scoreRes if available, else fav.score
+        let scoreVal = fav.score ?? 0;
+        if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
+          const sd = await scoreRes.value.json();
+          scoreVal = sd.data?.score ?? scoreVal;
+        }
+
+        setScoreData({
+          score:         scoreVal,
+          snowfall24hIn: snow.snowfall24h,
+          windMph:       snow.windMph,
+          tempF:         snow.tempF,
+          snowDepthIn:   snow.baseDepthIn,
+          conditionDesc: condDesc,
+          fetchedAt:     null,
+        });
+      } else if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
+        // Score-only fallback if forecast failed
+        const sd = await scoreRes.value.json();
+        setScoreData({
+          score:         sd.data?.score ?? fav.score ?? 0,
+          snowfall24hIn: undefined,
+          windMph:       undefined,
+          tempF:         undefined,
+          snowDepthIn:   undefined,
+          conditionDesc: undefined,
+          fetchedAt:     null,
+        });
+      }
+
+      // ── 6-day forecast: fetch Open-Meteo directly using mountain lat/lon
+      if (mountainLat !== null && mountainLon !== null) {
+        try {
+          const summitElevM = Math.round(mountainSummitElev * 0.3048);
+          const omUrl =
+            `https://api.open-meteo.com/v1/forecast?latitude=${mountainLat}&longitude=${mountainLon}` +
+            `&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode` +
+            `&temperature_unit=fahrenheit&precipitation_unit=inch` +
+            `&timezone=auto&forecast_days=7&elevation=${summitElevM}`;
+
+          const omRes = await fetch(omUrl);
+          if (omRes.ok) {
+            const om = await omRes.json();
+            const daily = om.daily ?? {};
+            const WMO: Record<number, string> = {
+              0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
+              45:'Fog', 48:'Icy fog',
+              51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle',
+              61:'Light rain', 63:'Rain', 65:'Heavy rain',
+              71:'Light snow', 73:'Snow', 75:'Heavy snow',
+              77:'Snow grains', 80:'Rain showers', 81:'Rain showers', 82:'Heavy showers',
+              85:'Snow showers', 86:'Heavy snow showers',
+              95:'Thunderstorm', 96:'Thunderstorm w/ hail', 99:'Heavy thunderstorm',
+            };
+            const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            const periods: ForecastPeriod[] = (daily.time ?? []).slice(0, 7).map((dateStr: string, i: number) => {
+              const d = new Date(dateStr + 'T12:00:00');
+              const wcode = daily.weathercode?.[i] ?? 0;
+              return {
+                date:         dateStr,
+                dayLabel:     i === 0 ? 'Today' : dayNames[d.getDay()],
+                snowIn:       daily.snowfall_sum?.[i] ?? 0,
+                tempHighF:    daily.temperature_2m_max?.[i],
+                tempLowF:     daily.temperature_2m_min?.[i],
+                conditionDesc:WMO[wcode] ?? 'Mixed',
+                precipPct:    daily.precipitation_probability_max?.[i],
+              };
+            });
+            setForecast(periods);
+          }
+        } catch (omErr) {
+          console.warn('Open-Meteo forecast fetch failed:', omErr);
+        }
       }
     } catch (e) {
       console.error('Failed to load resort detail', e);
@@ -391,19 +462,25 @@ export default function DashboardPage() {
           </Link>
 
           <nav className="topnav-tabs" aria-label="Main navigation">
-            {[
-              {key:'dashboard',label:'Dashboard',icon:'📊'},
-              {key:'resorts',  label:'Resorts',  icon:'🏔️'},
-              {key:'forecasts',label:'Forecasts',icon:'📅'},
-              {key:'analytics',label:'Analytics',icon:'📈'},
-              {key:'alerts',   label:'Alerts',   icon:'🔔'},
-            ].map(t=>(
-              <button key={t.key} onClick={()=>setActiveTab(t.key)}
-                className={`topnav-tab${activeTab===t.key?' active':''}`}
-                aria-current={activeTab===t.key?'page':undefined}>
-                <span aria-hidden="true">{t.icon}</span>{t.label}
-              </button>
-            ))}
+            <Link href="/dashboard" className="topnav-tab active" aria-current="page">
+              <span aria-hidden="true">📊</span>Dashboard
+            </Link>
+            <Link href="/mountains" className="topnav-tab">
+              <span aria-hidden="true">🏔️</span>Resorts
+            </Link>
+            <Link href="/forecasts" className="topnav-tab">
+              <span aria-hidden="true">📅</span>Forecasts
+            </Link>
+            {(userRole==='pro_user'||userRole==='admin') && (
+              <Link href="/compare" className="topnav-tab">
+                <span aria-hidden="true">📈</span>Analytics
+              </Link>
+            )}
+            {(userRole==='pro_user'||userRole==='admin') && (
+              <Link href="/alerts" className="topnav-tab">
+                <span aria-hidden="true">🔔</span>Alerts
+              </Link>
+            )}
             {hasResort && (
               <Link href="/resort/dashboard" className="topnav-tab">
                 <span aria-hidden="true">🎿</span>Resort
@@ -431,20 +508,25 @@ export default function DashboardPage() {
           {/* ── SIDEBAR ── */}
           <aside className="sidebar" aria-label="Sidebar navigation">
             <div className="sidebar-section">
-              {[
-                {key:'dashboard',label:'Dashboard',icon:'📊'},
-                {key:'resorts',  label:'Resorts',  icon:'🏔️'},
-                {key:'forecasts',label:'Forecasts',icon:'📅'},
-                {key:'analytics',label:'Analytics',icon:'📈'},
-                {key:'alerts',   label:'Alerts',   icon:'🔔'},
-              ].map(item=>(
-                <button key={item.key} onClick={()=>setActiveTab(item.key)}
-                  className={`sidebar-nav-item${activeTab===item.key?' active':''}`}
-                  aria-current={activeTab===item.key?'page':undefined}>
-                  <span className="sidebar-nav-icon" aria-hidden="true">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
+              <Link href="/dashboard" className="sidebar-nav-item active" aria-current="page">
+                <span className="sidebar-nav-icon" aria-hidden="true">📊</span>Dashboard
+              </Link>
+              <Link href="/mountains" className="sidebar-nav-item">
+                <span className="sidebar-nav-icon" aria-hidden="true">🏔️</span>Resorts
+              </Link>
+              <Link href="/forecasts" className="sidebar-nav-item">
+                <span className="sidebar-nav-icon" aria-hidden="true">📅</span>Forecasts
+              </Link>
+              {(userRole==='pro_user'||userRole==='admin') && (
+                <Link href="/compare" className="sidebar-nav-item">
+                  <span className="sidebar-nav-icon" aria-hidden="true">📈</span>Analytics
+                </Link>
+              )}
+              {(userRole==='pro_user'||userRole==='admin') && (
+                <Link href="/alerts" className="sidebar-nav-item">
+                  <span className="sidebar-nav-icon" aria-hidden="true">🔔</span>Alerts
+                </Link>
+              )}
             </div>
 
             <div className="sidebar-divider" />
