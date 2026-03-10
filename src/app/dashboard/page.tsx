@@ -206,7 +206,7 @@ export default function DashboardPage() {
           tempF:         snow.tempF,
           snowDepthIn:   snow.baseDepthIn,
           conditionDesc: condDesc,
-          fetchedAt:     null,
+          fetchedAt:     undefined,
         });
       } else if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
         // Score-only fallback if forecast failed
@@ -218,7 +218,7 @@ export default function DashboardPage() {
           tempF:         undefined,
           snowDepthIn:   undefined,
           conditionDesc: undefined,
-          fetchedAt:     null,
+          fetchedAt:     undefined,
         });
       }
 
