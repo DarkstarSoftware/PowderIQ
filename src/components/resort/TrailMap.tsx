@@ -371,11 +371,11 @@ const transformed: MapData = {
   resort: {
     ...d.resort,
     plan: d.resort.plan ?? 'starter',
-    customMap: d.overlays?.type === 'customMap' ? {
-      imageUrl: d.overlays.imageUrl,
-      bounds: d.overlays.bounds,
-      opacity: d.overlays.opacity,
-    } : null,
+   customMap: (d.overlays?.type === 'customMap' || d.overlays?.type === 'skimapImage') ? {
+  imageUrl: d.overlays.imageUrl,
+  bounds: d.overlays.bounds ?? null,
+  opacity: d.overlays.opacity ?? 0.85,
+} : null,
     mountain: {
       latitude: d.resort.mountain?.latitude ?? 42.73,
       longitude: d.resort.mountain?.longitude ?? -83.38,

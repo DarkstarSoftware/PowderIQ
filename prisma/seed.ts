@@ -1,5 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false, checkServerIdentity: () => undefined } });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const mountains = [
   { name: 'Vail', slug: 'vail', state: 'CO', country: 'US', latitude: 39.6433, longitude: -106.3781, baseElevFt: 8120, topElevFt: 11570, totalTrails: 195, totalLifts: 31, websiteUrl: 'https://www.vail.com' },
