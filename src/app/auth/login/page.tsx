@@ -54,7 +54,7 @@ export default function LoginPage() {
         .login-bg {
           position: fixed;
           inset: 0;
-          background-image: url('https://images.unsplash.com/photo-1612886683694-83b12afef9c7?w=1600&q=85');
+          background-image: url('/brand/auth-bg.jpg');
           background-size: cover;
           background-position: center 30%;
           z-index: 0;
@@ -100,8 +100,8 @@ export default function LoginPage() {
           margin-bottom: 24px;
         }
         .logo-badge {
-          width: 90px;
-          height: 90px;
+          width: 110px;
+          height: auto;
           filter: drop-shadow(0 6px 20px rgba(20,60,150,0.28));
           animation: logoIn 0.55s cubic-bezier(0.22,1,0.36,1) 0.08s both;
         }
@@ -285,69 +285,13 @@ export default function LoginPage() {
           {/* Shield Logo */}
           <div className="logo-wrap">
             <Link href="/" aria-label="PowderIQ home">
-              <svg className="logo-badge" viewBox="0 0 120 132" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <defs>
-                  <linearGradient id="lg-shield" x1="0" y1="0" x2="0" y2="132" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#1c3d82"/>
-                    <stop offset="100%" stopColor="#0e2354"/>
-                  </linearGradient>
-                  <linearGradient id="lg-sky" x1="15" y1="18" x2="105" y2="88" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#b8d8f0"/>
-                    <stop offset="45%" stopColor="#88c8ec"/>
-                    <stop offset="100%" stopColor="#a8dfc0"/>
-                  </linearGradient>
-                  <linearGradient id="lg-banner" x1="0" y1="84" x2="0" y2="118" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#1c3d82"/>
-                    <stop offset="100%" stopColor="#0e2354"/>
-                  </linearGradient>
-                  <clipPath id="shield-clip">
-                    <path d="M60 6 L110 26 L110 74 C110 100 60 122 60 122 C60 122 10 100 10 74 L10 26 Z"/>
-                  </clipPath>
-                </defs>
-                {/* Shield base */}
-                <path d="M60 6 L110 26 L110 74 C110 100 60 122 60 122 C60 122 10 100 10 74 L10 26 Z"
-                  fill="url(#lg-shield)" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5"/>
-                {/* Sky fill */}
-                <rect x="10" y="26" width="100" height="96" fill="url(#lg-sky)" clipPath="url(#shield-clip)"/>
-                {/* Mountains */}
-                <g clipPath="url(#shield-clip)">
-                  {/* Back mountains */}
-                  <polygon points="35,70 20,75 50,75" fill="rgba(200,220,240,0.6)"/>
-                  <polygon points="88,68 70,75 106,75" fill="rgba(200,220,240,0.6)"/>
-                  {/* Main center peak */}
-                  <polygon points="60,28 92,75 28,75" fill="#fff" opacity="0.96"/>
-                  {/* Snow shadow on main */}
-                  <polygon points="60,28 74,55 46,55" fill="rgba(220,236,250,0.55)"/>
-                  {/* Left peak */}
-                  <polygon points="36,46 58,75 14,75" fill="#fff" opacity="0.88"/>
-                  <polygon points="36,46 44,60 28,60" fill="rgba(220,236,250,0.5)"/>
-                  {/* Right peak */}
-                  <polygon points="87,50 106,75 68,75" fill="#fff" opacity="0.84"/>
-                  <polygon points="87,50 94,62 80,62" fill="rgba(220,236,250,0.5)"/>
-                  {/* Snow base line */}
-                  <rect x="10" y="72" width="100" height="6" fill="rgba(255,255,255,0.55)"/>
-                </g>
-                {/* Banner */}
-                <path d="M10 80 L110 80 L110 108 C110 118 86 122 60 122 C34 122 10 118 10 108 Z"
-                  fill="url(#lg-banner)" clipPath="url(#shield-clip)"/>
-                <text x="60" y="107" textAnchor="middle" fill="white" fontSize="13" fontWeight="800"
-                  fontFamily="DM Sans, system-ui, sans-serif" letterSpacing="1">PowderIQ</text>
-                {/* Rim highlight */}
-                <path d="M60 6 L110 26 L110 74 C110 100 60 122 60 122 C60 122 10 100 10 74 L10 26 Z"
-                  fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="2"/>
-                {/* Top highlight */}
-                <path d="M60 6 L110 26 L100 26 L60 10 L20 26 L10 26 Z"
-                  fill="rgba(255,255,255,0.12)"/>
-              </svg>
+              <img
+                src="/brand/powderiq_logo.png"
+                alt="PowderIQ"
+                className="logo-badge"
+              />
             </Link>
           </div>
-
-          <h1 className="login-title">Welcome Back</h1>
-          <p className="login-sub">Log in and find the <em>best</em> snow.</p>
-
-          <form onSubmit={handleSubmit} noValidate aria-label="Sign in form">
-            {error && (
-              <div role="alert" className="error-box">{error}</div>
             )}
 
             <div className="field">
