@@ -337,11 +337,7 @@ export default function DashboardPage() {
         /* SIDEBAR */
         .sidebar { width:196px; background:var(--white); border-right:1px solid var(--border-2); display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0; }
         .sidebar-section { padding:12px 8px 4px; }
-        .sidebar-nav-item { display:flex; align-items:center; gap:8px; padding:8px 10px; border-radius:9px; font-size:13px; font-weight:600; color:var(--text-3); cursor:pointer; text-decoration:none; transition:background .15s,color .15s; border:none; background:transparent; font-family:'Inter',sans-serif; width:100%; }
-        .sidebar-nav-item:hover { background:var(--bg); color:var(--text); }
-        .sidebar-nav-item.active { background:var(--blue-light); color:var(--blue); }
-        .sidebar-nav-icon { font-size:14px; width:18px; text-align:center; }
-        .sidebar-divider { height:1px; background:var(--border); margin:6px 10px; }
+
         .sidebar-label { font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.06em; text-transform:uppercase; padding:8px 10px 4px; }
         .sidebar-resort-item { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:9px; cursor:pointer; transition:background .15s; margin:1px 4px; }
         .sidebar-resort-item:hover { background:var(--bg); }
@@ -507,29 +503,6 @@ export default function DashboardPage() {
 
           {/* ── SIDEBAR ── */}
           <aside className="sidebar" aria-label="Sidebar navigation">
-            <div className="sidebar-section">
-              <Link href="/dashboard" className="sidebar-nav-item active" aria-current="page">
-                <span className="sidebar-nav-icon" aria-hidden="true">📊</span>Dashboard
-              </Link>
-              <Link href="/mountains" className="sidebar-nav-item">
-                <span className="sidebar-nav-icon" aria-hidden="true">🏔️</span>Resorts
-              </Link>
-              <Link href="/forecasts" className="sidebar-nav-item">
-                <span className="sidebar-nav-icon" aria-hidden="true">📅</span>Forecasts
-              </Link>
-              {(userRole==='pro_user'||userRole==='admin') && (
-                <Link href="/compare" className="sidebar-nav-item">
-                  <span className="sidebar-nav-icon" aria-hidden="true">📈</span>Analytics
-                </Link>
-              )}
-              {(userRole==='pro_user'||userRole==='admin') && (
-                <Link href="/alerts" className="sidebar-nav-item">
-                  <span className="sidebar-nav-icon" aria-hidden="true">🔔</span>Alerts
-                </Link>
-              )}
-            </div>
-
-            <div className="sidebar-divider" />
 
             {favorites.length > 0 && (
               <>
