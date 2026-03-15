@@ -214,14 +214,25 @@ export default function MountainDetailPage() {
           --shadow:0 2px 12px rgba(15,40,80,0.08);
           --shadow-lg:0 8px 32px rgba(15,40,80,0.14);
         }
-        html,body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
+        html,body { height:100%; font-family:'Inter',sans-serif; color:var(--text); }
+        body {
+          background-color:#ffffff;
+          background-image:url('/brand/auth-bg.jpg');
+          background-size:cover;
+          background-position:center 30%;
+          background-attachment:fixed;
+        }
+        body::before {
+          content:''; position:fixed; inset:0; z-index:0;
+          background:rgba(255,255,255,0.50); pointer-events:none;
+        }
 
         /* TOPNAV */
         .tnav {
           position:sticky; top:0; z-index:100; height:60px;
-          background:var(--white); border-bottom:1px solid var(--border-2);
+          background:rgba(255,255,255,0.92); border-bottom:1px solid var(--border-2);
           display:flex; align-items:center; padding:0 20px; gap:10px;
-          box-shadow:var(--shadow);
+          box-shadow:var(--shadow); backdrop-filter:blur(8px);
         }
         .tnav-logo { display:flex; align-items:center; text-decoration:none; flex-shrink:0; }
         .tnav-logo img { height:34px; width:auto; }
@@ -253,12 +264,13 @@ export default function MountainDetailPage() {
         .tnav-signout:hover { color:var(--text); }
 
         /* SHELL */
-        .shell { display:flex; height:calc(100vh - 60px); overflow:hidden; }
+        .shell { display:flex; height:calc(100vh - 60px); overflow:hidden; position:relative; z-index:1; }
 
         /* SIDEBAR */
         .sidebar {
-          width:196px; flex-shrink:0; background:var(--white);
+          width:196px; flex-shrink:0; background:rgba(255,255,255,0.88);
           border-right:1px solid var(--border-2); overflow-y:auto; padding:12px 8px;
+          backdrop-filter:blur(6px);
         }
         .sb-label {
           font-size:10px; font-weight:700; color:var(--text-3);
@@ -284,11 +296,10 @@ export default function MountainDetailPage() {
         .sb-score { font-size:11px; font-weight:700; color:var(--blue); flex-shrink:0; }
 
         /* MAIN */
-        .main-scroll { flex:1; overflow-y:auto; padding:24px 24px 40px; }
+        .main-scroll { flex:1; overflow-y:auto; padding:24px 24px 40px; background:transparent; }
 
-        /* Page header */
-        .pg-title { font-size:30px; font-weight:800; color:var(--text); line-height:1.1; }
-        .pg-loc   { font-size:14px; color:var(--text-3); margin-top:4px; margin-bottom:20px; }
+        .pg-title { font-size:30px; font-weight:800; color:#0d2856; line-height:1.1; }
+        .pg-loc   { font-size:14px; color:#2a4a7f; margin-top:4px; margin-bottom:20px; font-weight:500; }
 
         /* Content grid */
         .cgrid { display:grid; grid-template-columns:1fr 288px; gap:20px; align-items:start; }
@@ -324,7 +335,7 @@ export default function MountainDetailPage() {
         }
 
         /* Card */
-        .card { background:var(--white); border:1px solid var(--border-2); border-radius:14px; overflow:hidden; }
+        .card { background:rgba(255,255,255,0.92); border:1px solid var(--border-2); border-radius:14px; overflow:hidden; backdrop-filter:blur(4px); }
 
         /* Conditions card top */
         .cond-top { padding:16px 18px 14px; border-bottom:1px solid var(--border); }
