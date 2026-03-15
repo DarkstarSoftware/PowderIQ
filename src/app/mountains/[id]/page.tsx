@@ -115,7 +115,7 @@ export default function MountainDetailPage() {
       const t = sess.session?.access_token || '';
       setToken(t);
       setUserEmail(sess.session?.user?.email || '');
-      const headers = t ? { Authorization: `Bearer ${t}` } : {};
+      const headers: Record<string, string> = t ? { Authorization: `Bearer ${t}` } : {};
 
       const [mRes, sRes, fRes, favsRes, meRes] = await Promise.all([
         fetch(`/api/mountains/${id}`),
