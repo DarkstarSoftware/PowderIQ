@@ -206,8 +206,8 @@ async function fetchOpenMeteo(lat: number, lon: number, elevFt: number): Promise
     snowfall24hIn:   snow24hIn,
     snowDepthIn:     Math.round((c?.snow_depth ?? 0) * 39.3701 * 10) / 10, // m → in
     precipMm:        c?.precipitation ?? 0,
-    forecastHigh:    daily?.temperature_2m_max?.[0] ?? (c?.temperature_2m + 5) ?? 35,
-    forecastLow:     daily?.temperature_2m_min?.[0] ?? (c?.temperature_2m - 8) ?? 20,
+    forecastHigh:    daily?.temperature_2m_max?.[0] ?? ((c?.temperature_2m ?? 30) + 5),
+    forecastLow:     daily?.temperature_2m_min?.[0] ?? ((c?.temperature_2m ?? 30) - 8),
     forecastSnow7dIn: Math.round(snow7dIn * 10) / 10,
     weatherCode,
   };
