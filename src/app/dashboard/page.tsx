@@ -13,6 +13,9 @@ interface FavoriteItem { id: string; mountain: Mountain; score?: number }
 interface MountainScore {
   score: number;
   snowfall24hIn?: number;
+  snowfall48hIn?: number;
+  snowfall72hIn?: number;
+  forecastSnow24hIn?: number;
   windMph?: number;
   tempF?: number;
   snowDepthIn?: number;
@@ -182,12 +185,14 @@ export default function DashboardPage() {
 
         // Derive a condition description from SnowData fields
         const snow24h = snow.snowfall24h ?? 0;
+        const snow48h = snow.snowfall48h ?? 0;
         const wind    = snow.windMph ?? 0;
         const temp    = snow.tempF ?? 28;
         let condDesc = '';
         if (snow24h > 6)       condDesc = 'Heavy snow';
         else if (snow24h > 2)  condDesc = 'Snow showers';
         else if (snow24h > 0)  condDesc = 'Light snow';
+        else if (snow48h > 4)  condDesc = 'Recent snowfall';
         else if (wind > 35)    condDesc = 'Windy';
         else if (temp > 34)    condDesc = 'Partly cloudy';
         else                   condDesc = 'Clear & cold';
@@ -200,13 +205,16 @@ export default function DashboardPage() {
         }
 
         setScoreData({
-          score:         scoreVal,
-          snowfall24hIn: snow.snowfall24h,
-          windMph:       snow.windMph,
-          tempF:         snow.tempF,
-          snowDepthIn:   snow.baseDepthIn,
-          conditionDesc: condDesc,
-          fetchedAt:     undefined,
+          score:             scoreVal,
+          snowfall24hIn:     snow.snowfall24h,
+          snowfall48hIn:     snow.snowfall48h,
+          snowfall72hIn:     snow.snowfall72h,
+          forecastSnow24hIn: snow.forecastSnow24h,
+          windMph:           snow.windMph,
+          tempF:             snow.tempF,
+          snowDepthIn:       snow.baseDepthIn,
+          conditionDesc:     condDesc,
+          fetchedAt:         undefined,
         });
       } else if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
         // Score-only fallback if forecast failed
@@ -611,6 +619,62 @@ export default function DashboardPage() {
                                   <div className="metric-key">{m.key}</div>
                                 </div>
                               ))}
+                            </div>
+
+                            {/* SNOW HISTORY + FORECAST */}
+                            <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid var(--border)'}}>
+                              <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:10}}>
+                                ❄️ Snowfall History &amp; Forecast
+                              </div>
+                              {scoreLoading ? (
+                                <div className="skeleton" style={{height:56,borderRadius:10}} />
+                              ) : (
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+                                  {[
+                                    {
+                                      val: scoreData?.snowfall24hIn != null ? `${fmt(scoreData.snowfall24hIn,1)}"` : '—',
+                                      label: 'Last 24h',
+                                      sub: 'actual',
+                                      color: (scoreData?.snowfall24hIn ?? 0) > 3 ? '#1d6ef5' : 'var(--text)',
+                                      bg: (scoreData?.snowfall24hIn ?? 0) > 3 ? 'var(--blue-light)' : 'var(--bg)',
+                                      border: (scoreData?.snowfall24hIn ?? 0) > 3 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
+                                    },
+                                    {
+                                      val: scoreData?.snowfall48hIn != null ? `${fmt(scoreData.snowfall48hIn,1)}"` : '—',
+                                      label: 'Last 48h',
+                                      sub: 'actual',
+                                      color: (scoreData?.snowfall48hIn ?? 0) > 6 ? '#1d6ef5' : 'var(--text)',
+                                      bg: (scoreData?.snowfall48hIn ?? 0) > 6 ? 'var(--blue-light)' : 'var(--bg)',
+                                      border: (scoreData?.snowfall48hIn ?? 0) > 6 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
+                                    },
+                                    {
+                                      val: scoreData?.snowfall72hIn != null ? `${fmt(scoreData.snowfall72hIn,1)}"` : '—',
+                                      label: 'Last 72h',
+                                      sub: 'actual',
+                                      color: (scoreData?.snowfall72hIn ?? 0) > 9 ? '#1d6ef5' : 'var(--text)',
+                                      bg: (scoreData?.snowfall72hIn ?? 0) > 9 ? 'var(--blue-light)' : 'var(--bg)',
+                                      border: (scoreData?.snowfall72hIn ?? 0) > 9 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
+                                    },
+                                    {
+                                      val: scoreData?.forecastSnow24hIn != null ? `${fmt(scoreData.forecastSnow24hIn,1)}"` : '—',
+                                      label: 'Next 24h',
+                                      sub: 'forecast',
+                                      color: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? '#22c55e' : 'var(--text)',
+                                      bg: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? '#f0fdf4' : 'var(--bg)',
+                                      border: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? 'rgba(34,197,94,0.2)' : 'var(--border-2)',
+                                    },
+                                  ].map(s => (
+                                    <div key={s.label} style={{
+                                      background:s.bg, border:`1px solid ${s.border}`,
+                                      borderRadius:10, padding:'10px 10px 8px', textAlign:'center',
+                                    }}>
+                                      <div style={{fontSize:20,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
+                                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-2)',marginTop:3}}>{s.label}</div>
+                                      <div style={{fontSize:10,color:'var(--text-3)',marginTop:1,fontStyle:'italic'}}>{s.sub}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
 
