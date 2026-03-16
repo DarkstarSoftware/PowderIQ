@@ -223,13 +223,16 @@ export async function fetchNOAAWeather(lat: number, lon: number): Promise<NOAAWe
 export async function fetchNOAASnowData(lat: number, lon: number): Promise<SnowData> {
   const w = await fetchNOAAWeather(lat, lon);
   return {
-    snowfall24h: w.snowfall24hIn,
-    snowfall7d: w.snowfall7dIn,
-    baseDepthIn: w.snowDepthIn,
-    windMph: w.windMph,
-    tempF: w.tempF,
-    tempMinF: w.forecastLow,
-    tempMaxF: w.forecastHigh,
+    snowfall24h:     w.snowfall24hIn,
+    snowfall48h:     w.snowfall24hIn * 1.8, // NOAA doesn't give 48/72h windows directly
+    snowfall72h:     w.snowfall24hIn * 2.5, // approximate from 24h rate
+    forecastSnow24h: w.snowfall24hIn,       // use current 24h as next-day estimate
+    snowfall7d:      w.snowfall7dIn,
+    baseDepthIn:     w.snowDepthIn,
+    windMph:         w.windMph,
+    tempF:           w.tempF,
+    tempMinF:        w.forecastLow,
+    tempMaxF:        w.forecastHigh,
   };
 }
 
