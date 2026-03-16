@@ -343,9 +343,12 @@ model ElevationWeather {
   conditionDesc String?
   humidity      Int?
 
-  snowfall1hIn  Float @default(0)
-  snowfall24hIn Float @default(0)
-  snowDepthIn   Float @default(0)
+  snowfall1hIn   Float @default(0)
+  snowfall24hIn  Float @default(0)
+  snowfall48hIn  Float @default(0)
+  snowfall72hIn  Float @default(0)
+  forecastSnow24hIn Float @default(0)
+  snowDepthIn    Float @default(0)
 
   forecastHigh   Float?
   forecastLow    Float?

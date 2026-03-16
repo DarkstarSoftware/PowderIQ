@@ -45,6 +45,9 @@ export interface ZoneWeather {
   humidity: number;
   snowfall1hIn: number;
   snowfall24hIn: number;
+  snowfall48hIn: number;
+  snowfall72hIn: number;
+  forecastSnow24hIn: number;  // predicted snowfall next 24h
   snowDepthIn: number;
   forecastHigh: number;
   forecastLow: number;
@@ -135,7 +138,10 @@ interface OpenMeteoResult {
   windGustMph: number;
   windDir: string;
   snowfall1hIn: number;   // mm/hr → inches (FIXED)
-  snowfall24hIn: number;  // sum of last 24 hourly mm → inches (FIXED)
+  snowfall24hIn: number;  // past 24h in inches (FIXED)
+  snowfall48hIn: number;  // past 48h in inches
+  snowfall72hIn: number;  // past 72h in inches
+  forecastSnow24hIn: number; // next 24h predicted snowfall in inches
   snowDepthIn: number;    // meters → inches
   forecastHigh: number;
   forecastLow: number;
@@ -162,6 +168,7 @@ async function fetchOpenMeteo(lat: number, lon: number, elevFt: number): Promise
     // Hourly snowfall is always mm — we handle the conversion explicitly below
     `&precipitation_unit=inch` +
     `&timezone=auto&forecast_days=7` +
+    `&past_days=3` +   // gives us 72h of historical hourly data
     `&elevation=${elevM}`;
 
   // FIX: no Next.js cache — let our DB TTL control freshness
@@ -172,49 +179,82 @@ async function fetchOpenMeteo(lat: number, lon: number, elevFt: number): Promise
   const c     = d.current;
   const daily = d.daily;
 
-  // FIX: Hourly snowfall from Open-Meteo is in mm (not inches).
-  // Find current hour index and sum the PAST 24 hourly values.
+  // With past_days=3, hourly array now starts 72h ago.
+  // Find the index of the current hour.
   const now = new Date();
   const hourlyTimes: string[] = d.hourly?.time ?? [];
   const nowIdx = hourlyTimes.findIndex(t => new Date(t) >= now);
   const safeIdx = nowIdx > 0 ? nowIdx : hourlyTimes.length;
 
-  // Sum past 24 hours of snowfall (values are in mm) → convert to inches
+  // Hourly snowfall is in mm regardless of precipitation_unit setting
   const hourlySnowMm: number[] = d.hourly?.snowfall ?? [];
-  const snow24hMm = hourlySnowMm
-    .slice(Math.max(0, safeIdx - 24), safeIdx)
+
+  function sumHoursMm(hoursBack: number): number {
+    return hourlySnowMm
+      .slice(Math.max(0, safeIdx - hoursBack), safeIdx)
+      .reduce((s, v) => s + (v ?? 0), 0);
+  }
+
+  // Past snowfall windows — convert mm → inches
+  const snow24hFromHourly = Math.round(sumHoursMm(24) * MM_TO_IN * 10) / 10;
+  const snow48hFromHourly = Math.round(sumHoursMm(48) * MM_TO_IN * 10) / 10;
+  const snow72hFromHourly = Math.round(sumHoursMm(72) * MM_TO_IN * 10) / 10;
+
+  // daily.snowfall_sum is in INCHES (precipitation_unit=inch applies to daily)
+  // Use daily totals as a sanity check — they're more reliable for large storms
+  // daily[0] = today, daily[-1] = 3 days ago when past_days=3
+  // daily array with past_days=3: indices 0,1,2 are past days, 3+ are forecast
+  // Actually with past_days=3 the daily array starts from 3 days ago:
+  //   daily[0] = 3 days ago, daily[1] = 2 days ago, daily[2] = yesterday,
+  //   daily[3] = today, daily[4..] = forecast
+  const dailySnow: number[] = daily?.snowfall_sum ?? [];
+  const todayDailyIn    = dailySnow[3] ?? dailySnow[dailySnow.length - 4] ?? 0;
+  const yesterdayDailyIn = dailySnow[2] ?? 0;
+  const twoDaysAgoIn     = dailySnow[1] ?? 0;
+
+  // 24h: max of hourly sum vs today's daily total (catches storms that started before window)
+  const snow24hIn = Math.max(snow24hFromHourly, todayDailyIn);
+  // 48h: max of hourly sum vs today + yesterday daily
+  const snow48hIn = Math.max(snow48hFromHourly, todayDailyIn + yesterdayDailyIn);
+  // 72h: max of hourly sum vs 3-day daily total
+  const snow72hIn = Math.max(snow72hFromHourly, todayDailyIn + yesterdayDailyIn + twoDaysAgoIn);
+
+  // Next 24h predicted snowfall: sum hourly forecast for next 24 slots (in mm → inches)
+  const next24hSnowMm = hourlySnowMm
+    .slice(safeIdx, safeIdx + 24)
     .reduce((s, v) => s + (v ?? 0), 0);
-  const snow24hFromHourly = Math.round(snow24hMm * MM_TO_IN * 10) / 10;
+  // Also check daily[4] (tomorrow) as backup
+  const forecastTomorrowIn = dailySnow[4] ?? 0;
+  const forecastSnow24hIn = Math.max(
+    Math.round(next24hSnowMm * MM_TO_IN * 10) / 10,
+    forecastTomorrowIn,
+  );
 
-  // daily.snowfall_sum[0] is today's total in INCHES (precipitation_unit=inch applies to daily)
-  // Use the larger of the two — hourly sum can undercount if the storm started before the
-  // forecast window, daily total is more reliable for "how much fell today"
-  const snow24hFromDaily = daily?.snowfall_sum?.[0] ?? 0;
-  const snow24hIn = Math.max(snow24hFromHourly, snow24hFromDaily);
-
-  // 7-day forecast snow: daily snowfall_sum is in INCHES (precipitation_unit=inch works for daily)
-  const snow7dIn = (daily?.snowfall_sum ?? [])
-    .slice(0, 7)
+  // 7-day forecast total
+  const snow7dIn = dailySnow
+    .slice(3, 10) // forecast days only
     .reduce((s: number, v: number) => s + (v ?? 0), 0);
 
-  // Current snowfall rate: c.snowfall is mm/hr → convert to in/hr
-  // FIX: was treating this as already in inches
+  // Current snowfall rate: c.snowfall is mm/hr → in/hr
   const snow1hIn = Math.round((c?.snowfall ?? 0) * MM_TO_IN * 10) / 10;
 
   const weatherCode: number = c?.weather_code ?? 0;
 
   return {
-    tempF:           c?.temperature_2m ?? 32,
-    windMph:         c?.windspeed_10m ?? 0,
-    windGustMph:     c?.windgusts_10m ?? 0,
-    windDir:         windDegToDir(c?.winddirection_10m ?? 0),
-    snowfall1hIn:    snow1hIn,
-    snowfall24hIn:   snow24hIn,
-    snowDepthIn:     Math.round((c?.snow_depth ?? 0) * 39.3701 * 10) / 10, // m → in
-    precipMm:        c?.precipitation ?? 0,
-    forecastHigh:    daily?.temperature_2m_max?.[0] ?? ((c?.temperature_2m ?? 30) + 5),
-    forecastLow:     daily?.temperature_2m_min?.[0] ?? ((c?.temperature_2m ?? 30) - 8),
-    forecastSnow7dIn: Math.round(snow7dIn * 10) / 10,
+    tempF:             c?.temperature_2m ?? 32,
+    windMph:           c?.windspeed_10m ?? 0,
+    windGustMph:       c?.windgusts_10m ?? 0,
+    windDir:           windDegToDir(c?.winddirection_10m ?? 0),
+    snowfall1hIn:      snow1hIn,
+    snowfall24hIn:     Math.round(snow24hIn * 10) / 10,
+    snowfall48hIn:     Math.round(snow48hIn * 10) / 10,
+    snowfall72hIn:     Math.round(snow72hIn * 10) / 10,
+    forecastSnow24hIn: Math.round(forecastSnow24hIn * 10) / 10,
+    snowDepthIn:       Math.round((c?.snow_depth ?? 0) * 39.3701 * 10) / 10,
+    precipMm:          c?.precipitation ?? 0,
+    forecastHigh:      daily?.temperature_2m_max?.[3] ?? ((c?.temperature_2m ?? 30) + 5),
+    forecastLow:       daily?.temperature_2m_min?.[3] ?? ((c?.temperature_2m ?? 30) - 8),
+    forecastSnow7dIn:  Math.round(snow7dIn * 10) / 10,
     weatherCode,
   };
 }
@@ -413,9 +453,12 @@ function blendZone(
 
   // Snowfall: Open-Meteo is authoritative
   // Summit gets a slight amplification (orographic lift)
-  const snowMult     = zone === 'summit' ? 1.2 : zone === 'mid' ? 1.1 : 1.0;
-  const snowfall24hIn = Math.round(om.snowfall24hIn * snowMult * 10) / 10;
-  const snowfall1hIn  = Math.round(om.snowfall1hIn  * snowMult * 10) / 10;
+  const snowMult        = zone === 'summit' ? 1.2 : zone === 'mid' ? 1.1 : 1.0;
+  const snowfall1hIn    = Math.round(om.snowfall1hIn    * snowMult * 10) / 10;
+  const snowfall24hIn   = Math.round(om.snowfall24hIn   * snowMult * 10) / 10;
+  const snowfall48hIn   = Math.round(om.snowfall48hIn   * snowMult * 10) / 10;
+  const snowfall72hIn   = Math.round(om.snowfall72hIn   * snowMult * 10) / 10;
+  const forecastSnow24hIn = Math.round(om.forecastSnow24hIn * snowMult * 10) / 10;
 
   // FIX: conditionDesc — use WMO code for accurate description when OWM is unavailable.
   // Previous version defaulted to "partly cloudy" even during active blizzard.
@@ -442,17 +485,20 @@ function blendZone(
 
   return {
     zone, elevFt, tempF, feelsLikeF, windMph, windGustMph,
-    windDir:       owm ? windDegToDir(owm.windDeg) : om.windDir,
-    visibilityMi:  owm?.visibilityMi ?? (snowfall1hIn > 0.5 ? 1 : snowfall1hIn > 0.1 ? 3 : 10),
+    windDir:          owm ? windDegToDir(owm.windDeg) : om.windDir,
+    visibilityMi:     owm?.visibilityMi ?? (snowfall1hIn > 0.5 ? 1 : snowfall1hIn > 0.1 ? 3 : 10),
     conditionDesc,
     conditionCode,
-    humidity:      owm?.humidity ?? 80,
+    humidity:         owm?.humidity ?? 80,
     snowfall1hIn,
     snowfall24hIn,
+    snowfall48hIn,
+    snowfall72hIn,
+    forecastSnow24hIn,
     snowDepthIn,
-    forecastHigh:  Math.round(lapseAdj(om.forecastHigh, baseElevFt, elevFt) * 10) / 10,
-    forecastLow:   Math.round(lapseAdj(om.forecastLow,  baseElevFt, elevFt) * 10) / 10,
-    forecastSnowIn: Math.round((om.forecastSnow7dIn / 7) * 10) / 10,
+    forecastHigh:     Math.round(lapseAdj(om.forecastHigh, baseElevFt, elevFt) * 10) / 10,
+    forecastLow:      Math.round(lapseAdj(om.forecastLow,  baseElevFt, elevFt) * 10) / 10,
+    forecastSnowIn:   Math.round((om.forecastSnow7dIn / 7) * 10) / 10,
   };
 }
 
@@ -471,6 +517,8 @@ function mockZone(zone: 'base' | 'mid' | 'summit', elevFt: number, seed: number)
     conditionDesc: ['light snow','overcast clouds','moderate snow','clear sky'][seed % 4],
     conditionCode: 600 + (seed % 10), humidity: r(55, 90, 5),
     snowfall1hIn: r(0, 2, 6), snowfall24hIn: r(0, 8, 7),
+    snowfall48hIn: r(0, 14, 12), snowfall72hIn: r(0, 20, 13),
+    forecastSnow24hIn: r(0, 6, 14),
     snowDepthIn: r(20, 80, 8), forecastHigh: t + r(2, 8, 9),
     forecastLow: t - r(5, 12, 10), forecastSnowIn: r(0, 4, 11),
   };
@@ -497,6 +545,8 @@ export async function getResortElevationWeather(
         visibilityMi: r.visibilityMi ?? 10, conditionDesc: r.conditionDesc ?? '',
         conditionCode: r.conditionCode ?? 0, humidity: r.humidity ?? 0,
         snowfall1hIn: r.snowfall1hIn ?? 0, snowfall24hIn: r.snowfall24hIn ?? 0,
+        snowfall48hIn: r.snowfall48hIn ?? 0, snowfall72hIn: r.snowfall72hIn ?? 0,
+        forecastSnow24hIn: r.forecastSnow24hIn ?? 0,
         snowDepthIn: r.snowDepthIn ?? 0, forecastHigh: r.forecastHigh ?? 35,
         forecastLow: r.forecastLow ?? 20, forecastSnowIn: r.forecastSnowIn ?? 0,
       });
