@@ -43,9 +43,9 @@ async function getSnowFromElevationWeather(mountainId: string): Promise<SnowData
 
   return {
     snowfall24h:      best.snowfall24hIn ?? 0,
-    snowfall48h:      (best as any).snowfall48hIn ?? best.snowfall24hIn * 1.8 ?? 0,
-    snowfall72h:      (best as any).snowfall72hIn ?? best.snowfall24hIn * 2.5 ?? 0,
-    forecastSnow24h:  (best as any).forecastSnow24hIn ?? best.forecastSnowIn ?? 0,
+    snowfall48h:      (best as any).snowfall48hIn ?? (best.snowfall24hIn * 1.8),
+    snowfall72h:      (best as any).snowfall72hIn ?? (best.snowfall24hIn * 2.5),
+    forecastSnow24h:  (best as any).forecastSnow24hIn ?? (best.forecastSnowIn ?? 0),
     snowfall7d:       (best.forecastSnowIn ?? 0) * 7,
     baseDepthIn:      base?.snowDepthIn ?? best.snowDepthIn ?? 0,
     windMph:          summit?.windMph ?? best.windMph ?? 0,
