@@ -184,7 +184,13 @@ async function fetchOpenMeteo(lat: number, lon: number, elevFt: number): Promise
   const snow24hMm = hourlySnowMm
     .slice(Math.max(0, safeIdx - 24), safeIdx)
     .reduce((s, v) => s + (v ?? 0), 0);
-  const snow24hIn = Math.round(snow24hMm * MM_TO_IN * 10) / 10;
+  const snow24hFromHourly = Math.round(snow24hMm * MM_TO_IN * 10) / 10;
+
+  // daily.snowfall_sum[0] is today's total in INCHES (precipitation_unit=inch applies to daily)
+  // Use the larger of the two — hourly sum can undercount if the storm started before the
+  // forecast window, daily total is more reliable for "how much fell today"
+  const snow24hFromDaily = daily?.snowfall_sum?.[0] ?? 0;
+  const snow24hIn = Math.max(snow24hFromHourly, snow24hFromDaily);
 
   // 7-day forecast snow: daily snowfall_sum is in INCHES (precipitation_unit=inch works for daily)
   const snow7dIn = (daily?.snowfall_sum ?? [])
