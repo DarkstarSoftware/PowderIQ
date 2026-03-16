@@ -51,13 +51,16 @@ async function fetchOnTheSnowData(lat: number, lon: number): Promise<SnowData> {
   const data = await res.json();
 
   return {
-    snowfall24h: data.snowfall?.last24Hours?.inches ?? 0,
-    snowfall7d: data.snowfall?.last7Days?.inches ?? 0,
-    baseDepthIn: data.snowDepth?.base?.inches ?? 0,
-    windMph: data.wind?.speed ?? 0,
-    tempF: data.temperature?.current ?? 32,
-    tempMinF: data.temperature?.low ?? 25,
-    tempMaxF: data.temperature?.high ?? 35,
+    snowfall24h:     data.snowfall?.last24Hours?.inches ?? 0,
+    snowfall48h:     data.snowfall?.last48Hours?.inches ?? (data.snowfall?.last24Hours?.inches ?? 0) * 1.8,
+    snowfall72h:     data.snowfall?.last72Hours?.inches ?? (data.snowfall?.last24Hours?.inches ?? 0) * 2.5,
+    forecastSnow24h: data.snowfall?.next24Hours?.inches ?? data.snowfall?.last24Hours?.inches ?? 0,
+    snowfall7d:      data.snowfall?.last7Days?.inches ?? 0,
+    baseDepthIn:     data.snowDepth?.base?.inches ?? 0,
+    windMph:         data.wind?.speed ?? 0,
+    tempF:           data.temperature?.current ?? 32,
+    tempMinF:        data.temperature?.low ?? 25,
+    tempMaxF:        data.temperature?.high ?? 35,
   };
 }
 
