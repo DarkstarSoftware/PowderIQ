@@ -13,8 +13,11 @@ import type { RiderProfile } from '@prisma/client';
 import type { WeatherAlert } from './elevationWeatherService';
 
 export interface SnowData {
-  snowfall24h: number; // inches
-  snowfall7d: number;  // inches
+  snowfall24h: number;      // inches — past 24h actual
+  snowfall48h: number;      // inches — past 48h actual
+  snowfall72h: number;      // inches — past 72h actual
+  forecastSnow24h: number;  // inches — next 24h predicted
+  snowfall7d: number;       // inches — 7-day total
   baseDepthIn: number;
   windMph: number;
   tempF: number;
