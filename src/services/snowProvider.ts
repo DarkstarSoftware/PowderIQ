@@ -50,8 +50,8 @@ async function getSnowFromElevationWeather(mountainId: string): Promise<SnowData
     baseDepthIn:      base?.snowDepthIn ?? best.snowDepthIn ?? 0,
     windMph:          summit?.windMph ?? best.windMph ?? 0,
     tempF:            best.tempF ?? 28,
-    tempMinF:         best.forecastLow  ?? (best.tempF - 8) ?? 20,
-    tempMaxF:         best.forecastHigh ?? (best.tempF + 5) ?? 35,
+    tempMinF:         best.forecastLow  ?? (best.tempF - 8),
+    tempMaxF:         best.forecastHigh ?? (best.tempF + 5),
   };
 }
 
