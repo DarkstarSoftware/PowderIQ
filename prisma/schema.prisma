@@ -254,6 +254,9 @@ model Resort {
   mapGeoJSON          Json?     // Cached OSM trail/lift geometry (24h TTL)
   mapCacheExpiresAt   DateTime?
 
+  noaaGridUrl         String?   // Cached NOAA NWS grid URL (survives serverless cold starts)
+  noaaGridExpiresAt   DateTime?
+
   // Custom trail map image overlay (overrides satellite base when set)
   // Resort uploads their official trail map PDF/PNG; we georegister it using corner coords.
   customMapImageUrl   String?   // publicly accessible image URL
