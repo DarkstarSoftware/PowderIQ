@@ -149,9 +149,9 @@ export async function POST(req: NextRequest) {
       // ── Payment succeeded → refresh period end ─────────────────────────
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice;
-        if (!invoice.subscription) break;
+        if (!invoice.parent?.subscription_details?.subscription) break;
 
-        const subId = invoice.subscription as string;
+        const subId = invoice.parent?.subscription_details?.subscription as string;
         const sub   = await stripe.subscriptions.retrieve(subId);
         const periodEnd = new Date((sub.items.data[0]?.current_period_end ?? 0) * 1000);
 
@@ -169,9 +169,9 @@ export async function POST(req: NextRequest) {
       // ── Payment failed → mark past_due ────────────────────────────────
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
-        if (!invoice.subscription) break;
+        if (!invoice.parent?.subscription_details?.subscription) break;
 
-        const subId = invoice.subscription as string;
+        const subId = invoice.parent?.subscription_details?.subscription as string;
 
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: subId },
