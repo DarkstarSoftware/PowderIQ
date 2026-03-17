@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
           where: { id: dbSub.id },
           data: {
             status: sub.status,
-            currentPeriodEnd: new Date(sub.current_period_end * 1000),
+            currentPeriodEnd: new Date((sub.items.data[0]?.current_period_end ?? 0) * 1000),
           },
         });
 
