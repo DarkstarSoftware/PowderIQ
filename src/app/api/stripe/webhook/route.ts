@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         const { userId, resortId, track, priceId } = sub.metadata ?? {};
-        const periodEnd = new Date(sub.current_period_end * 1000);
+        const periodEnd = new Date((sub.items.data[0]?.current_period_end ?? 0) * 1000);
         const resolvedPriceId = priceId || sub.items.data[0]?.price?.id || '';
 
         const status = sub.status === 'trialing' ? 'trialing'
@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
 
         const subId = invoice.subscription as string;
         const sub   = await stripe.subscriptions.retrieve(subId);
-        const periodEnd = new Date(sub.current_period_end * 1000);
+        const periodEnd = new Date((sub.items.data[0]?.current_period_end ?? 0) * 1000);
 
         await prisma.subscription.updateMany({
           where: { stripeSubscriptionId: subId },
