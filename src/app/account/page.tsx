@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
@@ -157,7 +157,7 @@ html,body{height:100%;background:#f0f5fb !important;font-family:'Inter',sans-ser
 @keyframes spin{to{transform:rotate(360deg)}}
 `;
 
-export default function AccountPage() {
+function AccountPageInner() {
   const router      = useRouter();
   const searchParams = useSearchParams();
   const fileRef     = useRef<HTMLInputElement>(null);
@@ -498,5 +498,13 @@ export default function AccountPage() {
         </div>
       </div>
     </>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={<div style={{minHeight:'100vh',background:'#f0f5fb'}}/>}>
+      <AccountPageInner />
+    </Suspense>
   );
 }
