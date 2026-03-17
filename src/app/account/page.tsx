@@ -1,35 +1,188 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { loadStripe } from '@stripe/stripe-js';
 import { PRICES } from '@/lib/stripePrices';
+import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface UserData {
-  id: string; email: string; role: string;
-  profile?: { displayName?: string; style?: string; skillLevel?: string };
-}
-interface Favorite {
-  id: string; score?: number;
-  mountain: { id: string; name: string; imageUrl?: string };
+  id: string; email: string; role: string; name?: string;
+  profile?: { displayName?: string; style?: string; skillLevel?: string; avatarUrl?: string };
 }
 
+const STYLES = [
+  { value: 'powder',       label: 'Powder Hunter' },
+  { value: 'all_mountain', label: 'All Mountain'  },
+  { value: 'expert',       label: 'Expert'        },
+];
+
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --blue:#1d6ef5;--blue-lt:#e8f1fe;--teal:#0d9488;--teal-lt:#ccfbf1;
+  --text:#0d1b2e;--text2:#3d5166;--text3:#6b849a;
+  --bd:rgba(100,150,200,0.15);--bd2:rgba(100,150,200,0.25);
+  --bg:#f0f5fb;--white:#ffffff;
+  --green:#22c55e;--green-bg:#f0fdf4;
+  --sh:0 2px 12px rgba(15,40,80,0.08);--sh-lg:0 8px 32px rgba(15,40,80,0.12);
+}
+html,body{height:100%;background:#f0f5fb !important;font-family:'Inter',sans-serif;color:var(--text);font-size:14px;}
+
+/* TOPNAV */
+.tnav{position:sticky;top:0;z-index:100;height:56px;background:var(--white);border-bottom:1px solid var(--bd2);display:flex;align-items:center;padding:0 20px;gap:10px;box-shadow:var(--sh);}
+.tnav-logo{display:flex;align-items:center;text-decoration:none;flex-shrink:0;}
+.tnav-logo img{height:32px;width:auto;}
+.tnav-tabs{display:flex;align-items:center;gap:2px;flex:1;}
+.tnav-tab{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text3);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s;}
+.tnav-tab:hover{background:var(--bg);color:var(--text);}
+.tnav-tab.act{background:var(--blue-lt);color:var(--blue);}
+.tnav-right{display:flex;align-items:center;gap:6px;margin-left:auto;flex-shrink:0;}
+.api-badge{display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--green-bg);border:1px solid rgba(34,197,94,0.3);border-radius:16px;font-size:11.5px;font-weight:600;color:#15803d;}
+.api-dot{width:6px;height:6px;background:var(--green);border-radius:50%;}
+.tnav-av{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.tnav-av img{width:100%;height:100%;object-fit:cover;}
+.tnav-badge{padding:4px 10px;background:var(--blue-lt);border-radius:8px;font-size:12px;font-weight:700;color:var(--blue);}
+.tnav-out{font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;}
+.tnav-out:hover{color:var(--text);}
+
+/* SHELL */
+.shell{display:flex;height:calc(100vh - 56px);overflow:hidden;}
+
+/* SIDEBAR */
+.sidebar{width:200px;flex-shrink:0;background:var(--white);border-right:1px solid var(--bd2);overflow-y:auto;padding:12px 8px;}
+.sb-active{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--blue-lt);font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px;cursor:pointer;border:none;font-family:'Inter',sans-serif;width:100%;text-align:left;}
+.sb-link{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;text-decoration:none;transition:background .15s,color .15s;border:none;background:none;font-family:'Inter',sans-serif;width:100%;text-align:left;}
+.sb-link:hover{background:var(--bg);color:var(--text);}
+.sb-link.act{background:var(--blue-lt);color:var(--blue);font-weight:600;}
+.sb-icon{font-size:14px;width:18px;text-align:center;flex-shrink:0;}
+
+/* MAIN */
+.main-scroll{flex:1;overflow-y:auto;background:var(--bg);}
+.page-title{font-size:22px;font-weight:800;color:var(--text);padding:20px 24px 12px;}
+
+/* HERO */
+.hero{height:200px;overflow:hidden;position:relative;}
+.hero img{width:100%;height:100%;object-fit:cover;object-position:center 35%;}
+
+/* THREE COLUMN GRID */
+.grid3{display:grid;grid-template-columns:260px 1fr 280px;gap:16px;padding:20px 24px 40px;align-items:start;}
+.col{display:flex;flex-direction:column;gap:16px;}
+
+/* CARD */
+.card{background:var(--white);border:1px solid var(--bd2);border-radius:12px;overflow:hidden;box-shadow:var(--sh);}
+.card-title{font-size:15px;font-weight:700;color:var(--text);padding:16px 18px;border-bottom:1px solid var(--bd);}
+
+/* PROFILE CARD */
+.avatar-wrap{position:relative;width:110px;margin:16px auto 8px;text-align:center;}
+.avatar-img{width:110px;height:110px;border-radius:12px;object-fit:cover;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:var(--blue);}
+.avatar-img img{width:100%;height:100%;object-fit:cover;border-radius:12px;}
+.upload-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;background:var(--white);border:1px solid var(--bd2);border-radius:7px;font-size:11.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;margin:6px auto;width:fit-content;transition:background .15s;}
+.upload-btn:hover{background:var(--bg);}
+.prof-field{padding:8px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;}
+.prof-field:last-child{border-bottom:none;}
+.prof-label{font-size:12px;color:var(--text3);font-weight:500;}
+.prof-val{font-size:13px;font-weight:600;color:var(--text);}
+
+/* NOTIFICATIONS MINI CARD */
+.notif-link{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--bd);font-size:13px;color:var(--text2);cursor:pointer;font-weight:500;text-decoration:none;transition:background .15s;}
+.notif-link:hover{background:var(--bg);}
+.notif-link:last-child{border-bottom:none;}
+
+/* FORM FIELDS */
+.form-group{padding:12px 18px;border-bottom:1px solid var(--bd);}
+.form-group:last-of-type{border-bottom:none;}
+.form-label{font-size:12px;color:var(--text3);font-weight:500;margin-bottom:6px;display:block;}
+.form-row{display:flex;gap:8px;align-items:center;}
+.form-input{flex:1;padding:9px 12px;border:1.5px solid var(--bd2);border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);background:var(--bg);outline:none;transition:border-color .15s;}
+.form-input:focus{border-color:var(--blue);background:var(--white);}
+.form-btn{padding:8px 14px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;white-space:nowrap;transition:filter .15s;}
+.form-btn:hover{filter:brightness(1.08);}
+.form-btn.sec{background:var(--bg);color:var(--text2);border:1px solid var(--bd2);}
+.form-btn.sec:hover{background:#e5edf5;}
+.form-btn.full{width:calc(100% - 36px);margin:0 18px 14px;display:block;}
+.form-btn.teal{background:var(--teal);color:#fff;}
+.form-btn.teal:hover{filter:brightness(1.08);}
+
+/* RIDING PREFS */
+.style-btns{display:flex;gap:8px;padding:12px 18px;flex-wrap:wrap;}
+.style-btn{padding:7px 14px;border-radius:8px;border:1.5px solid var(--bd2);font-size:12.5px;font-weight:600;color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;background:var(--white);transition:background .15s,border-color .15s,color .15s;}
+.style-btn.act{background:var(--blue);border-color:var(--blue);color:#fff;}
+.style-btn:hover:not(.act){background:var(--bg);}
+.billing-history-row{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;font-size:13px;color:var(--text2);}
+.billing-history-val{color:var(--text3);font-size:12px;}
+
+/* BILLING CARD */
+.bill-toggle{display:flex;align-items:center;gap:8px;padding:14px 18px 10px;}
+.bill-tab{padding:5px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:background .15s,color .15s;}
+.bill-tab.act{color:var(--blue);background:none;text-decoration:underline;text-underline-offset:3px;}
+.bill-tab:not(.act){color:var(--text3);background:none;}
+.save-tag{padding:3px 10px;background:var(--teal-lt);color:var(--teal);border-radius:10px;font-size:11px;font-weight:700;}
+.plan-name{font-size:22px;font-weight:800;color:var(--text);padding:4px 18px 2px;}
+.plan-price{font-size:13px;color:var(--text3);padding:0 18px 14px;}
+.plan-price strong{font-size:24px;font-weight:900;color:var(--text);}
+.plan-row{display:flex;gap:8px;padding:0 18px 12px;align-items:center;}
+.plan-access{flex:1;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:12.5px;color:var(--text2);font-weight:500;}
+.upgrade-btn{padding:8px 16px;border-radius:8px;border:none;background:var(--teal);color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;flex-shrink:0;transition:filter .15s;}
+.upgrade-btn:hover{filter:brightness(1.08);}
+.bill-action-row{display:flex;gap:8px;padding:0 18px 14px;}
+.bill-action{flex:1;padding:8px;border-radius:8px;border:1px solid var(--bd2);background:var(--white);font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;justify-content:center;gap:5px;transition:background .15s;}
+.bill-action:hover{background:var(--bg);}
+
+/* NOTIFICATION TOGGLES */
+.notif-settings{padding:4px 0;}
+.notif-row{display:flex;align-items:center;padding:10px 18px;border-bottom:1px solid var(--bd);}
+.notif-row:last-of-type{border-bottom:none;}
+.notif-check{color:var(--blue);font-size:13px;margin-right:8px;flex-shrink:0;}
+.notif-label{font-size:13px;color:var(--text2);flex:1;font-weight:500;}
+.toggle{position:relative;width:40px;height:22px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;position:absolute;}
+.toggle-track{position:absolute;inset:0;border-radius:11px;background:#d1d5db;cursor:pointer;transition:background .2s;}
+.toggle input:checked ~ .toggle-track{background:var(--teal);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none;}
+.toggle input:checked ~ .toggle-track .toggle-thumb{transform:translateX(18px);}
+.delete-btn{width:calc(100% - 36px);margin:14px 18px;padding:10px;border-radius:9px;border:none;background:#fca5a5;color:#7f1d1d;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:background .15s;display:block;}
+.delete-btn:hover{background:#f87171;}
+
+/* BANNER */
+.banner{margin:0 24px 16px;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;}
+.banner-success{background:var(--green-bg);border:1px solid rgba(34,197,94,0.3);color:#15803d;}
+
+@media(max-width:1100px){.grid3{grid-template-columns:240px 1fr;}.col:last-child{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:16px;}}
+@media(max-width:800px){.sidebar{display:none;}.grid3{grid-template-columns:1fr;}.col:last-child{grid-template-columns:1fr;}}
+@media(max-width:640px){.tnav-tabs{display:none;}}
+@keyframes spin{to{transform:rotate(360deg)}}
+`;
+
 export default function AccountPage() {
-  const router = useRouter();
-  const [user,          setUser]          = useState<UserData | null>(null);
-  const [favorites,     setFavorites]     = useState<Favorite[]>([]);
-  const [token,         setToken]         = useState('');
-  const [userRole,      setUserRole]      = useState('');
-  const [userEmail,     setUserEmail]     = useState('');
-  const [billingLoading,setBilling]       = useState(false);
-  const [billing,       setBillingCycle]  = useState<'monthly' | 'yearly'>('monthly');
-  const [portalLoading, setPortalLoading] = useState(false);
-  const [exporting,     setExporting]     = useState(false);
-  const [deleting,      setDeleting]      = useState(false);
-  const [upgraded,      setUpgraded]      = useState(false);
+  const router      = useRouter();
+  const searchParams = useSearchParams();
+  const fileRef     = useRef<HTMLInputElement>(null);
+
+  const [user,        setUser]        = useState<UserData | null>(null);
+  const [token,       setToken]       = useState('');
+  const [userRole,    setUserRole]    = useState('user');
+  const [userEmail,   setUserEmail]   = useState('');
+  const [userName,    setUserName]    = useState('');
+  const [username,    setUsername]    = useState('');
+  const [avatarUrl,   setAvatarUrl]   = useState('');
+  const [ridingStyle, setRidingStyle] = useState('all_mountain');
+  const [billing,     setBilling]     = useState<'monthly'|'yearly'>('monthly');
+  const [notifs,      setNotifs]      = useState({ email: true, sms: true, weekly: true, newResort: false });
+  const [saving,      setSaving]      = useState(false);
+  const [savingPw,    setSavingPw]    = useState(false);
+  const [currentPw,   setCurrentPw]  = useState('');
+  const [newPw,       setNewPw]       = useState('');
+  const [upgrading,   setUpgrading]   = useState(false);
+  const [portalLoad,  setPortalLoad]  = useState(false);
+  const [deleting,    setDeleting]    = useState(false);
+  const [upgraded,    setUpgraded]    = useState(false);
+  const [activeSection, setActiveSection] = useState('profile');
+
+  const isPro = userRole === 'pro_user' || userRole === 'admin';
 
   useEffect(() => {
     (async () => {
@@ -39,70 +192,71 @@ export default function AccountPage() {
       setToken(t);
       setUserEmail(data.session.user?.email || '');
 
-      const [meRes, favsRes] = await Promise.all([
-        fetch('/api/me',        { headers: { Authorization: `Bearer ${t}` } }),
-        fetch('/api/favorites', { headers: { Authorization: `Bearer ${t}` } }),
-      ]);
-      if (meRes.ok) {
-        const me = await meRes.json();
+      const res = await fetch('/api/me', { headers: { Authorization: `Bearer ${t}` } });
+      if (res.ok) {
+        const me = await res.json();
         setUser(me.data);
         setUserRole(me.data?.role || 'user');
+        setUserName(me.data?.profile?.displayName || '');
+        setUsername(me.data?.profile?.username || '');
+        setRidingStyle(me.data?.profile?.style || 'all_mountain');
+        setAvatarUrl(me.data?.profile?.avatarUrl || '');
       }
-      if (favsRes.ok) {
-        const fd = await favsRes.json();
-        setFavorites(fd.data || []);
-      }
-      if (typeof window !== 'undefined' && window.location.search.includes('upgraded=1')) {
-        setUpgraded(true);
-      }
+      if (searchParams.get('upgraded') === '1') setUpgraded(true);
     })();
-  }, [router]);
+  }, [router, searchParams]);
 
-  async function handleUpgrade(priceId: string) {
-    setBilling(true);
+  async function saveProfile() {
+    setSaving(true);
+    await fetch('/api/me/profile', {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: userName, style: ridingStyle }),
+    });
+    setSaving(false);
+  }
+
+  async function changePassword() {
+    if (!newPw) return;
+    setSavingPw(true);
+    await supabase.auth.updateUser({ password: newPw });
+    setCurrentPw(''); setNewPw('');
+    setSavingPw(false);
+  }
+
+  async function handleUpgrade() {
+    setUpgrading(true);
+    const priceId = billing === 'monthly' ? PRICES.consumer.pro.monthly : PRICES.consumer.pro.yearly;
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ priceId }),
     });
     if (res.ok) {
-      const data = await res.json();
+      const d = await res.json();
       const stripe = await stripePromise;
-      if (data.data?.url) window.location.href = data.data.url;
-      else await stripe?.redirectToCheckout({ sessionId: data.data?.sessionId });
+      if (d.data?.url) window.location.href = d.data.url;
+      else await stripe?.redirectToCheckout({ sessionId: d.data?.sessionId });
     }
-    setBilling(false);
+    setUpgrading(false);
   }
 
   async function handlePortal() {
-    setPortalLoading(true);
+    setPortalLoad(true);
     const res = await fetch('/api/billing/portal', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
     if (res.ok) {
-      const data = await res.json();
-      if (data.data?.url) window.location.href = data.data.url;
+      const d = await res.json();
+      if (d.data?.url) window.location.href = d.data.url;
     }
-    setPortalLoading(false);
-  }
-
-  async function handleExport() {
-    setExporting(true);
-    const res = await fetch('/api/privacy/export', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-    if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'powderiq-data.json'; a.click();
-      URL.revokeObjectURL(url);
-    }
-    setExporting(false);
+    setPortalLoad(false);
   }
 
   async function handleDelete() {
-    if (!confirm('Are you sure you want to permanently delete your account? This cannot be undone.')) return;
+    if (!confirm('Permanently delete your account? This cannot be undone.')) return;
     setDeleting(true);
     await fetch('/api/privacy/delete', { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
     await supabase.auth.signOut();
@@ -115,112 +269,23 @@ export default function AccountPage() {
   }
 
   const avatarLetter = userEmail?.[0]?.toUpperCase() || 'U';
-  const isPro = userRole === 'pro_user' || userRole === 'admin';
+  const savedCount = 12; // from actual favorites count if needed
 
-  const CSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-    :root{
-      --blue:#1d6ef5;--blue-light:#e8f1fe;
-      --text:#0d1b2e;--text-2:#3d5166;--text-3:#6b849a;
-      --bd:rgba(100,150,200,0.15);--bd2:rgba(100,150,200,0.25);
-      --bg:#f0f5fb;--white:#ffffff;
-      --green:#22c55e;--green-bg:#f0fdf4;
-      --sh:0 2px 12px rgba(15,40,80,0.08);--sh-lg:0 8px 32px rgba(15,40,80,0.14);
-    }
-    html,body{height:100%;background:#f0f5fb !important;font-family:'Inter',sans-serif;color:var(--text);font-size:14px;}
-    .tnav{position:sticky;top:0;z-index:100;height:60px;background:var(--white);border-bottom:1px solid var(--bd2);display:flex;align-items:center;padding:0 20px;gap:12px;box-shadow:var(--sh);}
-    .tnav-logo{display:flex;align-items:center;text-decoration:none;flex-shrink:0;}
-    .tnav-logo img{height:34px;width:auto;}
-    .tnav-tabs{display:flex;align-items:center;gap:2px;flex:1;}
-    .tnav-tab{display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:600;color:var(--text-3);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s;}
-    .tnav-tab:hover{background:var(--bg);color:var(--text);}
-    .tnav-tab.act{background:var(--blue-light);color:var(--blue);}
-    .tnav-right{display:flex;align-items:center;gap:8px;margin-left:auto;flex-shrink:0;}
-    .api-badge{display:flex;align-items:center;gap:5px;padding:5px 12px;background:var(--green-bg);border:1px solid rgba(34,197,94,0.3);border-radius:20px;font-size:12px;font-weight:600;color:#15803d;}
-    .api-dot{width:7px;height:7px;background:var(--green);border-radius:50%;}
-    .tnav-icon{width:34px;height:34px;border-radius:8px;border:1px solid var(--bd2);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;text-decoration:none;transition:background .15s;}
-    .tnav-icon:hover{background:var(--bg);}
-    .tnav-avatar{width:34px;height:34px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;}
-    .tnav-badge{width:34px;height:34px;border-radius:8px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--blue);}
-    .tnav-out{font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;transition:color .15s;}
-    .tnav-out:hover{color:var(--text);}
-    .shell{display:flex;height:calc(100vh - 60px);overflow:hidden;}
-    .sidebar{width:196px;flex-shrink:0;background:var(--white);border-right:1px solid var(--bd2);overflow-y:auto;display:flex;flex-direction:column;padding:12px 8px;}
-    .sb-active{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--blue-light);font-size:13px;font-weight:700;color:var(--blue);margin-bottom:12px;}
-    .sb-lbl{font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:.07em;text-transform:uppercase;padding:0 10px 6px;}
-    .sb-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:9px;text-decoration:none;cursor:pointer;transition:background .15s;margin:1px 0;}
-    .sb-item:hover{background:var(--bg);}
-    .sb-thumb{width:24px;height:24px;border-radius:6px;flex-shrink:0;background:linear-gradient(135deg,#dbeafe,#bfdbfe);display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden;}
-    .sb-thumb img{width:100%;height:100%;object-fit:cover;}
-    .sb-name{font-size:12px;font-weight:600;color:var(--text-2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .sb-score{font-size:11px;font-weight:700;color:var(--blue);flex-shrink:0;}
-    .sb-footer{margin-top:auto;padding:12px 8px 4px;border-top:1px solid var(--bd);}
-    .sb-fbtn{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;font-size:12.5px;font-weight:600;cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;width:100%;text-align:left;transition:background .15s;}
-    .sb-fbtn:hover{background:var(--bg);}
-    .sb-fbtn.export{color:var(--text-2);}
-    .sb-fbtn.danger{color:#dc2626;}
-    .main-scroll{flex:1;overflow-y:auto;background:var(--bg);}
-    .hero{position:relative;height:300px;overflow:hidden;}
-    .hero img{width:100%;height:100%;object-fit:cover;object-position:center 40%;}
-    .hero-ov{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(210,228,248,0.3) 0%,rgba(255,255,255,0.88) 100%);}
-    .hero-ct{position:absolute;bottom:0;left:0;right:0;padding:28px 36px;}
-    .hero-title{font-size:28px;font-weight:800;color:var(--text);margin-bottom:6px;}
-    .hero-sub{font-size:15px;color:var(--text-2);max-width:440px;line-height:1.5;}
-    .content{padding:28px 36px 48px;background:var(--bg);}
-    .billing-toggle{display:flex;align-items:center;gap:0;margin-bottom:24px;border-bottom:2px solid var(--bd2);}
-    .toggle-tab{padding:10px 20px;font-size:14px;font-weight:600;color:var(--text-3);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;font-family:'Inter',sans-serif;transition:color .15s,border-color .15s;}
-    .toggle-tab.act{color:var(--blue);border-bottom-color:var(--blue);}
-    .save-badge{margin-left:12px;padding:3px 10px;background:#dcfce7;color:#15803d;border-radius:12px;font-size:12px;font-weight:700;}
-    .plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;background:var(--white);border:1px solid var(--bd2);border-radius:16px;overflow:hidden;box-shadow:var(--sh-lg);}
-    .plan-left{padding:28px;border-right:1px solid var(--bd2);position:relative;overflow:hidden;min-height:420px;background:var(--white);}
-    .plan-left-bg{position:absolute;inset:0;background-image:url('/brand/auth-bg.jpg');background-size:cover;background-position:center;opacity:0.08;}
-    .plan-left-ct{position:relative;z-index:1;}
-    .pl-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px;}
-    .pl-sub{font-size:13px;color:var(--text-3);line-height:1.5;margin-bottom:24px;}
-    .pl-free{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px;}
-    .pl-price{font-size:32px;font-weight:900;color:var(--text);margin-bottom:10px;}
-    .pl-price span{font-size:14px;font-weight:400;color:var(--text-3);}
-    .pl-current{display:inline-block;padding:8px 20px;border-radius:8px;background:var(--bg);color:var(--text-3);border:1px solid var(--bd2);font-size:13px;font-weight:600;margin-bottom:20px;}
-    .pl-feats{display:flex;flex-direction:column;gap:6px;}
-    .pl-feat{font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px;}
-    .pl-check{color:var(--text-3);font-size:12px;}
-    .plan-right{padding:28px;background:var(--white);}
-    .pr-price{font-size:36px;font-weight:900;color:var(--text);line-height:1;margin-bottom:4px;}
-    .pr-price span{font-size:15px;font-weight:400;color:var(--text-3);}
-    .pr-sub{font-size:13px;color:var(--text-3);margin-bottom:6px;}
-    .pr-sub strong{color:var(--blue);font-weight:600;}
-    .pr-feats{display:flex;flex-direction:column;gap:8px;margin:20px 0 24px;}
-    .pr-feat{font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:8px;}
-    .pr-check{color:var(--blue);font-weight:700;}
-    .cta{width:100%;padding:14px;border-radius:10px;border:none;background:var(--blue);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:filter .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
-    .cta:hover:not(:disabled){filter:brightness(1.08);}
-    .cta:disabled{opacity:.55;cursor:not-allowed;}
-    .cta.manage{background:var(--bg);color:var(--text-2);border:1px solid var(--bd2);}
-    .cta.manage:hover{background:#e5edf5;}
-    .pro-card{background:var(--white);border:1px solid var(--bd2);border-radius:16px;overflow:hidden;box-shadow:var(--sh-lg);}
-    .pro-hd{background:linear-gradient(135deg,#1d6ef5,#1452c8);padding:22px 28px;display:flex;align-items:center;gap:12px;}
-    .pro-hd-title{font-size:18px;font-weight:800;color:#fff;}
-    .pro-hd-sub{font-size:13px;color:rgba(255,255,255,0.75);margin-top:2px;}
-    .pro-body{padding:24px 28px;}
-    .pro-feats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;}
-    .pro-feat{font-size:13px;color:var(--text-2);display:flex;align-items:center;gap:7px;}
-    .profile-card{background:var(--white);border:1px solid var(--bd2);border-radius:14px;overflow:hidden;box-shadow:var(--sh);margin-top:24px;}
-    .prof-row{display:flex;align-items:center;padding:13px 18px;border-bottom:1px solid var(--bd);}
-    .prof-row:last-child{border-bottom:none;}
-    .prof-lbl{font-size:13px;color:var(--text-3);width:100px;flex-shrink:0;}
-    .prof-val{font-size:13px;font-weight:600;color:var(--text);flex:1;}
-    .role-badge{padding:2px 10px;border-radius:10px;font-size:11px;font-weight:700;}
-    .role-free{background:#f1f5f9;color:var(--text-3);}
-    .role-pro{background:var(--blue-light);color:var(--blue);}
-    @media(max-width:900px){.sidebar{display:none;}.plan-grid{grid-template-columns:1fr;}.pro-feats{grid-template-columns:1fr;}}
-    @media(max-width:640px){.tnav-tabs{display:none;}.hero-ct{padding:20px;}.content{padding:20px;}}
-  `;
+  const SIDEBAR_LINKS = [
+    { key: 'account',     label: 'Account',       icon: '👤', isHeader: true },
+    { key: 'profile',     label: 'Profile',        icon: '🪪' },
+    { key: 'security',    label: 'Security',       icon: '🔒' },
+    { key: 'billing',     label: 'Billing',        icon: '💳' },
+    { key: 'notifications',label:'Notifications',  icon: '🔔' },
+    { key: 'preferences', label: 'Preferences',    icon: '⚙️' },
+    { key: 'privacy',     label: 'Data & Privacy', icon: '🛡️' },
+  ];
 
   return (
     <>
       <style>{CSS}</style>
 
+      {/* TOPNAV */}
       <nav className="tnav">
         <Link href="/dashboard" className="tnav-logo">
           <img src="/brand/powderiq_logo.png" alt="PowderIQ" />
@@ -232,159 +297,200 @@ export default function AccountPage() {
           <Link href="/account"    className="tnav-tab act">👤 Account</Link>
         </div>
         <div className="tnav-right">
-          <div className="api-badge"><div className="api-dot" />API Connected</div>
-          <div className="tnav-badge">l2</div>
-          <div className="tnav-avatar">{avatarLetter}</div>
+          <div className="api-badge"><div className="api-dot"/>API Connected</div>
+          <div className="tnav-badge">{savedCount}</div>
+          <div className="tnav-av">
+            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : avatarLetter}
+          </div>
           <button className="tnav-out" onClick={signOut}>Sign out</button>
         </div>
       </nav>
 
       <div className="shell">
+
+        {/* SIDEBAR */}
         <aside className="sidebar">
-          <div className="sb-active"><span>👤</span> Account</div>
-          {favorites.length > 0 && (
-            <>
-              <div className="sb-lbl">Saved Resorts</div>
-              {favorites.map(f => (
-                <Link key={f.id} href={`/mountains/${f.mountain.id}`} className="sb-item">
-                  <div className="sb-thumb">
-                    {f.mountain.imageUrl
-                      ? <img src={f.mountain.imageUrl} alt="" onError={e=>{(e.target as HTMLImageElement).style.display='none';}} />
-                      : '🏔'}
-                  </div>
-                  <span className="sb-name">{f.mountain.name}</span>
-                  {f.score != null && <span className="sb-score">{f.score}</span>}
-                </Link>
-              ))}
-            </>
-          )}
-          <div className="sb-footer">
-            <button className="sb-fbtn export" onClick={handleExport} disabled={exporting}>
-              📥 {exporting ? 'Exporting…' : 'Export my data (JSON)'}
+          {SIDEBAR_LINKS.map(l => l.isHeader ? (
+            <button key={l.key} className="sb-active" onClick={() => setActiveSection(l.key)}>
+              <span className="sb-icon">{l.icon}</span>{l.label}
             </button>
-            <button className="sb-fbtn danger" onClick={handleDelete} disabled={deleting}>
-              🗑️ {deleting ? 'Deleting…' : 'Permanently delete my account'}
+          ) : (
+            <button key={l.key} className={`sb-link${activeSection===l.key?' act':''}`} onClick={() => setActiveSection(l.key)}>
+              <span className="sb-icon">{l.icon}</span>{l.label}
             </button>
-          </div>
+          ))}
         </aside>
 
+        {/* MAIN */}
         <div className="main-scroll">
+          <div className="page-title">Account Settings</div>
+
+          {/* HERO */}
           <div className="hero">
-            <img src="/brand/auth-bg.jpg" alt="" />
-            <div className="hero-ov" />
-            <div className="hero-ct">
-              {upgraded && (
-                <div style={{background:'#f0fdf4',border:'1px solid rgba(34,197,94,0.3)',color:'#15803d',borderRadius:10,padding:'10px 16px',fontSize:13,fontWeight:600,marginBottom:14,display:'inline-flex',alignItems:'center',gap:8}}>
-                  🎉 Welcome to Pro! Your upgraded features are now active.
-                </div>
-              )}
-              <h1 className="hero-title">{isPro ? "You're on Pro" : 'Upgrade to Pro'}</h1>
-              <p className="hero-sub">
-                {isPro
-                  ? 'Manage your subscription and account settings below.'
-                  : 'Unlock mountain comparison, powder alerts, 72h snow history, and personalized scoring.'}
-              </p>
-            </div>
+            <img src="/brand/auth-bg.jpg" alt="mountain" />
           </div>
 
-          <div className="content">
+          {upgraded && (
+            <div className="banner banner-success" style={{marginTop:16}}>
+              🎉 Welcome to Pro! Your upgraded features are now active.
+            </div>
+          )}
 
-            {!isPro && (
-              <>
-                <div className="billing-toggle">
-                  <button className={`toggle-tab${billing==='monthly'?' act':''}`} onClick={()=>setBillingCycle('monthly')}>Monthly</button>
-                  <button className={`toggle-tab${billing==='yearly'?' act':''}`}  onClick={()=>setBillingCycle('yearly')}>Yearly</button>
-                  {billing==='yearly' && <span className="save-badge">Save 33%</span>}
-                </div>
+          {/* THREE COLUMN GRID */}
+          <div className="grid3">
 
-                <div className="plan-grid">
-                  <div className="plan-left">
-                    <div className="plan-left-bg" />
-                    <div className="plan-left-ct">
-                      <div className="pl-title">Upgrade to Pro</div>
-                      <div className="pl-sub">Unlock mountain comparison, powder alerts.<br/>72h snow history, and personalized scoring.</div>
-                      <div className="pl-free">Free</div>
-                      <div className="pl-price">$0 <span>/month</span></div>
-                      <div className="pl-current">Current Plan</div>
-                      <div className="pl-feats">
-                        {['Powder scores for all resorts','Basic 6-day forecast','Save up to 3 resorts','Compare up to 15 resorts','Powder alerts — email & SMS','24h / 48h / 72h snow history','Personalized score weights'].map(f=>(
-                          <div className="pl-feat" key={f}><span className="pl-check">✓</span> {f}</div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="plan-right">
-                    <div className="pr-price">
-                      {billing==='monthly' ? '$9.99' : '$8.25'}<span>/month</span>
-                    </div>
-                    <div className="pr-sub">
-                      {billing==='yearly'
-                        ? <><strong>$99.00 billed yearly</strong> — 2 months free</>
-                        : <>Switch to yearly and save $20.88 | <strong>$8.25/month</strong></>}
-                    </div>
-                    <div className="pr-feats">
-                      {['Everything in Free','Unlimited saved resorts','Powder alerts — email & SMS','24h / 48h / 72h snow history','Personalized score weights','Priority 5-min data refresh','AI-powered snow reports'].map(f=>(
-                        <div className="pr-feat" key={f}><span className="pr-check">✓</span> {f}</div>
-                      ))}
-                    </div>
-                    <button className="cta" onClick={()=>handleUpgrade(billing==='monthly'?PRICES.consumer.pro.monthly:PRICES.consumer.pro.yearly)} disabled={billingLoading}>
-                      {billingLoading ? 'Loading…' : 'Start Free Trial →'}
-                    </button>
+            {/* LEFT COL */}
+            <div className="col">
+              {/* Profile Card */}
+              <div className="card">
+                <div className="card-title">Profile</div>
+                <div className="avatar-wrap">
+                  <div className="avatar-img">
+                    {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : avatarLetter}
                   </div>
                 </div>
-              </>
-            )}
+                <div style={{textAlign:'center'}}>
+                  <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}}/>
+                  <button className="upload-btn" onClick={()=>fileRef.current?.click()}>
+                    📷 Upload Image
+                  </button>
+                </div>
+                <div className="prof-field">
+                  <span className="prof-label">Name</span>
+                  <span className="prof-val">{userName || '—'}</span>
+                </div>
+                <div className="prof-field">
+                  <span className="prof-label">Email</span>
+                  <span className="prof-val" style={{fontSize:12,maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{userEmail}</span>
+                </div>
+              </div>
 
-            {isPro && (
-              <div className="pro-card">
-                <div className="pro-hd">
-                  <span style={{fontSize:24}}>⭐</span>
-                  <div>
-                    <div className="pro-hd-title">PowderIQ Pro</div>
-                    <div className="pro-hd-sub">Active subscription</div>
+              {/* Quick links mini card */}
+              <div className="card">
+                <div className="card-title">Notifications</div>
+                <button className="notif-link" onClick={()=>setActiveSection('notifications')}>
+                  <span>🔔</span> Powder alerts
+                </button>
+                <button className="notif-link" onClick={()=>setActiveSection('preferences')}>
+                  <span>🎿</span> Riding preferences
+                </button>
+                <button className="notif-link" onClick={()=>setActiveSection('privacy')}>
+                  <span>🛡️</span> Data &amp; Privacy
+                </button>
+              </div>
+            </div>
+
+            {/* CENTER COL */}
+            <div className="col">
+              {/* Password & Security */}
+              <div className="card">
+                <div className="card-title">Password &amp; Security</div>
+                <div className="form-group">
+                  <label className="form-label">Current Password</label>
+                  <input className="form-input" type="password" value={currentPw} onChange={e=>setCurrentPw(e.target.value)} placeholder="••••••••"/>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email Address</label>
+                  <div className="form-row">
+                    <input className="form-input" type="email" defaultValue={userEmail} readOnly/>
+                    <button className="form-btn">Change Email</button>
                   </div>
                 </div>
-                <div className="pro-body">
-                  <div className="pro-feats">
-                    {['Unlimited saved resorts','Priority 5-min data refresh','Compare up to 10 resorts','AI-powered snow reports','Powder alerts — email & SMS','Personalized score weights','24h / 48h / 72h snow history','6-day snow forecast'].map(f=>(
-                      <div className="pro-feat" key={f}><span className="pr-check">✓</span> {f}</div>
-                    ))}
-                  </div>
-                  <button className="cta manage" onClick={handlePortal} disabled={portalLoading}>
-                    {portalLoading ? 'Loading…' : 'Manage Billing →'}
+                <div className="form-group" style={{borderBottom:'1px solid var(--bd)'}}>
+                  <label className="form-label">Username (optional)</label>
+                  <input className="form-input" type="text" value={username} onChange={e=>setUsername(e.target.value)} placeholder="Shredder_McPow"/>
+                </div>
+                <div style={{padding:'12px 18px'}}>
+                  <button className="form-btn teal" style={{width:'100%',padding:'10px'}} onClick={changePassword} disabled={savingPw}>
+                    {savingPw ? 'Saving…' : 'Change Password'}
                   </button>
                 </div>
               </div>
-            )}
 
-            <div className="profile-card">
-              <div className="prof-row">
-                <span className="prof-lbl">Email</span>
-                <span className="prof-val">{user?.email}</span>
-              </div>
-              <div className="prof-row">
-                <span className="prof-lbl">Plan</span>
-                <span className={`role-badge ${isPro ? 'role-pro' : 'role-free'}`}>
-                  {userRole==='admin' ? 'Admin' : isPro ? 'Pro' : 'Free'}
-                </span>
-              </div>
-              {user?.profile?.displayName && (
-                <div className="prof-row">
-                  <span className="prof-lbl">Name</span>
-                  <span className="prof-val">{user.profile.displayName}</span>
+              {/* Riding Preferences */}
+              <div className="card">
+                <div className="card-title">Riding Preferences</div>
+                <div className="style-btns">
+                  {STYLES.map(s=>(
+                    <button key={s.value} className={`style-btn${ridingStyle===s.value?' act':''}`} onClick={()=>setRidingStyle(s.value)}>
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
-              )}
-              {user?.profile?.style && (
-                <div className="prof-row">
-                  <span className="prof-lbl">Style</span>
-                  <span className="prof-val" style={{textTransform:'capitalize'}}>{user.profile.style.replace('_',' ')}</span>
+                <div className="billing-history-row">
+                  <span>Billing History</span>
+                  <span className="billing-history-val">{isPro ? 'View invoices →' : 'No invoices yet'}</span>
                 </div>
-              )}
-              <div className="prof-row">
-                <Link href="/onboarding" style={{fontSize:13,color:'var(--blue)',fontWeight:600,textDecoration:'none'}}>
-                  Edit profile →
-                </Link>
+                <div style={{padding:'0 18px 14px'}}>
+                  <button className="form-btn teal" style={{width:'100%',padding:'10px'}} onClick={saveProfile} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save Preferences'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COL */}
+            <div className="col">
+              {/* Billing Card */}
+              <div className="card">
+                <div className="card-title">Billing</div>
+                <div className="bill-toggle">
+                  <button className={`bill-tab${billing==='monthly'?' act':''}`} onClick={()=>setBilling('monthly')}>Monthly</button>
+                  <button className={`bill-tab${billing==='yearly'?' act':''}`}  onClick={()=>setBilling('yearly')}>Yearly</button>
+                  <span className="save-tag">Save 33%</span>
+                </div>
+                <div className="plan-name">{isPro ? 'Pro' : 'Free'}</div>
+                <div className="plan-price">
+                  <strong>{isPro ? (billing==='monthly'?'$9.99':'$8.25') : '$0'}</strong> / month
+                  {isPro && billing==='yearly' && <span style={{display:'block',fontSize:12,color:'var(--teal)',marginTop:2}}>$99.00 billed yearly</span>}
+                </div>
+                {!isPro && (
+                  <div className="plan-row">
+                    <div className="plan-access">3 Resorts saved</div>
+                    <button className="upgrade-btn" onClick={handleUpgrade} disabled={upgrading}>
+                      {upgrading ? '…' : 'Upgrade Plan'}
+                    </button>
+                  </div>
+                )}
+                <div className="bill-action-row">
+                  <button className="bill-action" onClick={handlePortal} disabled={portalLoad}>
+                    📊 {portalLoad?'…':'Manage Billing'}
+                  </button>
+                  <button className="bill-action" onClick={handlePortal} disabled={portalLoad}>
+                    ⬇ Download Invoices
+                  </button>
+                </div>
+              </div>
+
+              {/* Notification Settings */}
+              <div className="card">
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px 10px'}}>
+                  <span style={{fontSize:15,fontWeight:700,color:'var(--text)'}}>Notification Settings</span>
+                  <label className="toggle">
+                    <input type="checkbox" checked={notifs.email&&notifs.sms} onChange={e=>setNotifs(p=>({...p,email:e.target.checked,sms:e.target.checked}))}/>
+                    <div className="toggle-track"><div className="toggle-thumb"/></div>
+                  </label>
+                </div>
+                <div className="notif-settings">
+                  {[
+                    { key:'email',     label:'Email powder alerts' },
+                    { key:'sms',       label:'SMS powder alerts' },
+                    { key:'weekly',    label:'Weekly snow report' },
+                    { key:'newResort', label:'New resort alerts' },
+                  ].map(n=>(
+                    <div className="notif-row" key={n.key}>
+                      <span className="notif-check">✓</span>
+                      <span className="notif-label">{n.label}</span>
+                      <label className="toggle">
+                        <input type="checkbox" checked={notifs[n.key as keyof typeof notifs]} onChange={e=>setNotifs(p=>({...p,[n.key]:e.target.checked}))}/>
+                        <div className="toggle-track"><div className="toggle-thumb"/></div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <button className="delete-btn" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Delete Account'}
+                </button>
               </div>
             </div>
 
