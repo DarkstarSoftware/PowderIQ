@@ -5,7 +5,7 @@ export const PRICES = {
   consumer: {
     pro: {
       monthly: 'price_1TBoTfBQF80h6BXMKPq90eqC', // $9.99/mo
-      yearly:  'price_1TBoUyBQF80h6BXMmUpv0p3T', // $99.00/yr
+      yearly:  'price_1TBoUyBQF80h6BXMmUpv0p3T', // $79.99/yr
     },
   },
   resort: {
@@ -24,7 +24,7 @@ export const PRICES = {
   },
 } as const;
 
-export const ALL_PRICE_IDS = new Set([
+export const ALL_PRICE_IDS = new Set<string>([
   PRICES.consumer.pro.monthly,
   PRICES.consumer.pro.yearly,
   PRICES.resort.starter.monthly,
