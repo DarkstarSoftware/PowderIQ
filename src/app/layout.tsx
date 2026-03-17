@@ -19,7 +19,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -29,7 +29,7 @@ export default function RootLayout({
       </head>
       <body
         style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
-        className="bg-gray-950 text-gray-100 antialiased"
+        className="antialiased"
       >
         {children}
       </body>
