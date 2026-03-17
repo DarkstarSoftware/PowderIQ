@@ -225,7 +225,7 @@ export default function AccountPage() {
                   <span className="text-base font-normal text-gray-400">/mo</span>
                 </div>
                 <div className="text-xs text-gray-400 mb-4">
-                  {billing === 'yearly' ? '$79.99 billed yearly — 2 months free' : 'Switch to yearly and save $39.89'}
+                  {billing === 'yearly' ? '$99.00 billed yearly — 2 months free' : 'Switch to yearly and save $20.88'}
                 </div>
                 <ul className="text-sm text-gray-300 space-y-1.5 my-4">
                   <li>✓ Everything in Free</li>
