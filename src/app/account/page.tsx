@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import { loadStripe } from '@stripe/stripe-js';
+import { PRICES } from '@/lib/stripePrices';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
@@ -17,6 +18,8 @@ export default function AccountPage() {
   const [user, setUser]             = useState<UserData | null>(null);
   const [token, setToken]           = useState('');
   const [billingLoading, setBilling] = useState(false);
+  const [billing,        setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [portalLoading,  setPortalLoading] = useState(false);
   const [exporting, setExporting]   = useState(false);
   const [deleting, setDeleting]     = useState(false);
   const [upgraded, setUpgraded]     = useState(false);
@@ -37,11 +40,12 @@ export default function AccountPage() {
     })();
   }, [router]);
 
-  async function handleUpgrade() {
+  async function handleUpgrade(priceId: string) {
     setBilling(true);
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ priceId }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -53,6 +57,20 @@ export default function AccountPage() {
       }
     }
     setBilling(false);
+  }
+
+  async function handlePortal() {
+    setPortalLoading(true);
+    const res = await fetch('/api/billing/portal', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.data?.url) window.location.href = data.data.url;
+    }
+    setPortalLoading(false);
   }
 
   async function handleExport() {
@@ -149,26 +167,108 @@ export default function AccountPage() {
           </Link>
         </section>
 
-        {/* Billing */}
+        {/* Billing — show upgrade if free, manage if pro */}
         {user?.role === 'user' && (
           <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6" aria-labelledby="billing-heading">
             <h2 id="billing-heading" className="text-xl font-semibold text-white mb-2">
               Upgrade to Pro
             </h2>
-            <p className="text-gray-400 text-sm mb-4">
-              Unlock mountain comparison, powder alerts, and personalized scoring weights.
+            <p className="text-gray-400 text-sm mb-5">
+              Unlock mountain comparison, powder alerts, 72h snow history, and personalized scoring.
             </p>
-            <ul className="text-sm text-gray-300 space-y-1 mb-5">
-              <li>✓ Compare up to 4 mountains side-by-side</li>
-              <li>✓ Powder alerts with email notifications</li>
-              <li>✓ Personalized score weights for your riding style</li>
+
+            {/* Billing cycle toggle */}
+            <div className="flex items-center gap-3 mb-5">
+              <button
+                onClick={() => setBillingCycle('monthly')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${billing === 'monthly' ? 'bg-brand-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+              >
+                Monthly
+              </button>
+              <button
+                onClick={() => setBillingCycle('yearly')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${billing === 'yearly' ? 'bg-brand-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}
+              >
+                Yearly
+              </button>
+              {billing === 'yearly' && (
+                <span className="text-xs font-bold text-emerald-400 bg-emerald-900/30 border border-emerald-700/40 px-2 py-0.5 rounded-full">
+                  Save 33%
+                </span>
+              )}
+            </div>
+
+            {/* Plan cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Free */}
+              <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
+                <div className="text-white font-bold mb-1">Free</div>
+                <div className="text-3xl font-black text-white mb-1">$0<span className="text-base font-normal text-gray-400">/mo</span></div>
+                <ul className="text-sm text-gray-400 space-y-1.5 my-4">
+                  <li>✓ Powder scores for all resorts</li>
+                  <li>✓ Basic 6-day forecast</li>
+                  <li>✓ Save up to 3 resorts</li>
+                </ul>
+                <div className="w-full text-center py-2 rounded-lg text-sm font-semibold text-gray-500 bg-gray-700 cursor-default">
+                  Current Plan
+                </div>
+              </div>
+
+              {/* Pro */}
+              <div className="bg-brand-900/30 border border-brand-700/50 rounded-xl p-5 relative">
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-brand-600 text-white text-xs font-bold px-3 py-0.5 rounded-full whitespace-nowrap">
+                  Most Popular
+                </div>
+                <div className="text-white font-bold mb-1">Pro</div>
+                <div className="text-3xl font-black text-white mb-1">
+                  {billing === 'monthly' ? '$9.99' : '$6.67'}
+                  <span className="text-base font-normal text-gray-400">/mo</span>
+                </div>
+                <div className="text-xs text-gray-400 mb-4">
+                  {billing === 'yearly' ? '$79.99 billed yearly — 2 months free' : 'Switch to yearly and save $39.89'}
+                </div>
+                <ul className="text-sm text-gray-300 space-y-1.5 my-4">
+                  <li>✓ Everything in Free</li>
+                  <li>✓ Unlimited saved resorts</li>
+                  <li>✓ Compare up to 10 resorts</li>
+                  <li>✓ Powder alerts — email &amp; SMS</li>
+                  <li>✓ 24h / 48h / 72h snow history</li>
+                  <li>✓ Personalized score weights</li>
+                  <li>✓ Priority 5-min data refresh</li>
+                </ul>
+                <button
+                  onClick={() => handleUpgrade(billing === 'monthly' ? PRICES.consumer.pro.monthly : PRICES.consumer.pro.yearly)}
+                  disabled={billingLoading}
+                  className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors focus-ring"
+                >
+                  {billingLoading ? 'Loading…' : 'Start Free Trial →'}
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Already pro — show manage billing */}
+        {user?.role === 'pro_user' && (
+          <section className="bg-gray-900 border border-gray-800 rounded-2xl p-6" aria-labelledby="billing-heading">
+            <h2 id="billing-heading" className="text-xl font-semibold text-white mb-2">Billing</h2>
+            <p className="text-gray-400 text-sm mb-4">
+              Manage your subscription, update payment method, or download invoices.
+            </p>
+            <ul className="text-sm text-gray-300 space-y-1.5 mb-5">
+              <li>✓ Unlimited saved resorts</li>
+              <li>✓ Compare up to 10 resorts side-by-side</li>
+              <li>✓ Powder alerts via email &amp; SMS</li>
+              <li>✓ 24h / 48h / 72h snow history</li>
+              <li>✓ Personalized score weights</li>
+              <li>✓ Priority 5-min data refresh</li>
             </ul>
             <button
-              onClick={handleUpgrade}
-              disabled={billingLoading}
-              className="bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-ring"
+              onClick={handlePortal}
+              disabled={portalLoading}
+              className="bg-gray-800 hover:bg-gray-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition-colors focus-ring"
             >
-              {billingLoading ? 'Loading…' : 'Upgrade to Pro — $9.99/month'}
+              {portalLoading ? 'Loading…' : 'Manage Billing →'}
             </button>
           </section>
         )}
