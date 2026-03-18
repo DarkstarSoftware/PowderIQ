@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const [loading,      setLoading]      = useState(true);
   const [userRole,     setUserRole]     = useState<string>('user');
   const [userName,     setUserName]     = useState<string>('');
+  const [avatarUrl,    setAvatarUrl]    = useState<string>('');
   const [hasResort,    setHasResort]    = useState<boolean>(false);
   const [token,        setToken]        = useState<string>('');
   const [activeTab,    setActiveTab]    = useState<string>('dashboard');
@@ -119,6 +120,7 @@ export default function DashboardPage() {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
+        setAvatarUrl(me.data?.profile?.avatarUrl || '');
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -498,8 +500,8 @@ export default function DashboardPage() {
 
           <div className="topnav-right">
             <Link href="/account/profile" className="topnav-avatar" aria-label="Account settings"
-              style={{textDecoration:'none'}}>
-              {userName ? userName[0].toUpperCase() : '👤'}
+              style={{textDecoration:'none',overflow:'hidden'}}>
+              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : (userName ? userName[0].toUpperCase() : '👤')}
             </Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>

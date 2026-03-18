@@ -135,6 +135,7 @@ export default function ForecastsPage() {
   const router = useRouter();
   const [token,     setToken]     = useState('');
   const [userName,  setUserName]  = useState('');
+  const [avatarUrl,  setAvatarUrl]  = useState<string>('');
   const [userRole,  setUserRole]  = useState('user');
   const [hasResort, setHasResort] = useState(false);
   const [resorts,   setResorts]   = useState<ResortForecast[]>([]);
@@ -157,6 +158,7 @@ export default function ForecastsPage() {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
+        setAvatarUrl(me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl || '');
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -249,7 +251,9 @@ export default function ForecastsPage() {
             {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span aria-hidden="true">⚙️</span>Admin</Link>}
           </nav>
           <div className="topnav-right">
-            <Link href="/account/profile" className="topnav-avatar" style={{textDecoration:'none'}} aria-label="Account settings">{userName ? userName[0].toUpperCase() : '👤'}</Link>
+            <Link href="/account/profile" className="topnav-avatar" style={{textDecoration:'none',overflow:'hidden'}} aria-label="Account settings">
+            {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : (userName ? userName[0].toUpperCase() : '👤')}
+          </Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>

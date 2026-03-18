@@ -52,15 +52,17 @@ const CSS = `
 export default function ProfilePage() {
   const router  = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [token,   setToken]   = useState('');
-  const [email,   setEmail]   = useState('');
-  const [name,    setName]    = useState('');
-  const [username,setUsername]= useState('');
-  const [style,   setStyle]   = useState('all_mountain');
-  const [skill,   setSkill]   = useState('intermediate');
-  const [avatar,  setAvatar]  = useState('');
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
+  const [token,    setToken]    = useState('');
+  const [email,    setEmail]    = useState('');
+  const [name,     setName]     = useState('');
+  const [username, setUsername] = useState('');
+  const [style,    setStyle]    = useState('all_mountain');
+  const [skill,    setSkill]    = useState('intermediate');
+  const [avatar,   setAvatar]   = useState('');
+  const [saving,   setSaving]   = useState(false);
+  const [saved,    setSaved]    = useState(false);
+  const [uploading,setUploading]= useState(false);
+  const [uploadErr,setUploadErr]= useState('');
 
   useEffect(() => {
     (async () => {
@@ -79,9 +81,6 @@ export default function ProfilePage() {
       }
     })();
   }, [router]);
-
-  const [uploading, setUploading] = useState(false);
-  const [uploadErr, setUploadErr] = useState('');
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -135,13 +134,16 @@ export default function ProfilePage() {
 
   async function save() {
     setSaving(true);
-    await fetch('/api/me/profile', {
+    const res = await fetch('/api/me/profile', {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ displayName: name, style, skillLevel: skill }),
+      body: JSON.stringify({ displayName: name, style, skillLevel: skill, avatarUrl: avatar || undefined }),
     });
-    setSaving(false); setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    setSaving(false);
+    if (res.ok) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    }
   }
 
   const avatarLetter = email?.[0]?.toUpperCase() || 'U';
