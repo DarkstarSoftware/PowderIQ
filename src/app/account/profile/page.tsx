@@ -132,6 +132,8 @@ export default function ProfilePage() {
     // Reset input so same file can be re-selected
     if (fileRef.current) fileRef.current.value = '';
   }
+
+  async function save() {
     setSaving(true);
     await fetch('/api/me/profile', {
       method: 'PUT',
