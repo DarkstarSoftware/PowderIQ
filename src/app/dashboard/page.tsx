@@ -333,9 +333,8 @@ export default function DashboardPage() {
         .topnav-tab:hover { background:var(--blue-light); color:var(--text); }
         .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
         .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
-        .topnav-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--bg); border:1px solid var(--border-2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; transition:background .15s; text-decoration:none; }
-        .topnav-icon-btn:hover { background:var(--blue-light); }
-        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; cursor:pointer; border:2px solid var(--border-2); }
+        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; cursor:pointer; border:2px solid var(--border-2); transition:box-shadow .15s; }
+        .topnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
         .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; transition:background .15s,color .15s; }
         .topnav-signout:hover { background:var(--bg); color:var(--text); }
 
@@ -498,11 +497,10 @@ export default function DashboardPage() {
           </nav>
 
           <div className="topnav-right">
-            <Link href="/account" className="topnav-icon-btn" aria-label="Account settings">⚙️</Link>
-            <div className="topnav-icon-btn" aria-label="Notifications" role="button" tabIndex={0}>🔔</div>
-            <div className="topnav-avatar" aria-label={`Signed in as ${userName || 'user'}`}>
+            <Link href="/account/profile" className="topnav-avatar" aria-label="Account settings"
+              style={{textDecoration:'none'}}>
               {userName ? userName[0].toUpperCase() : '👤'}
-            </div>
+            </Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>
