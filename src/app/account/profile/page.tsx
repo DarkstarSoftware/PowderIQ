@@ -113,6 +113,9 @@ export default function ProfilePage() {
 
       const publicUrl = urlData.publicUrl;
       setAvatar(publicUrl);
+      // Persist to localStorage so topnav updates immediately across all pages
+      localStorage.setItem('powderiq_avatar', publicUrl);
+      window.dispatchEvent(new Event('powderiq_avatar_changed'));
 
       // Save to profile
       await fetch('/api/me/profile', {
@@ -141,8 +144,15 @@ export default function ProfilePage() {
     });
     setSaving(false);
     if (res.ok) {
+      // Persist avatar to localStorage so topnav reflects it immediately
+      if (avatar) {
+        localStorage.setItem('powderiq_avatar', avatar);
+        window.dispatchEvent(new Event('powderiq_avatar_changed'));
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    }
+  }
     }
   }
 

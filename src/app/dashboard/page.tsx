@@ -105,6 +105,10 @@ export default function DashboardPage() {
   // ── Initial load ────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
+      // Show cached avatar instantly
+      const cachedAvatar = localStorage.getItem('powderiq_avatar');
+      if (cachedAvatar) setAvatarUrl(cachedAvatar);
+
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       const tok = data.session.access_token;
@@ -121,6 +125,10 @@ export default function DashboardPage() {
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
         setAvatarUrl(me.data?.profile?.avatarUrl || '');
+        // Also cache in localStorage for instant display
+        if (me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl) {
+          localStorage.setItem('powderiq_avatar', me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl || '');
+        }
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -150,6 +158,13 @@ export default function DashboardPage() {
       }
       setLoading(false);
     })();
+    // Listen for avatar updates from profile page
+    function onAvatarChanged() {
+      const url = localStorage.getItem('powderiq_avatar') || '';
+      setAvatarUrl(url);
+    }
+    window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
+    return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
   }, [router]);
 
   // ── Load detail data when selected resort changes ───────────────────────────

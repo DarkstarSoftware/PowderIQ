@@ -75,13 +75,30 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       setEmail(data.session.user?.email || '');
+
+      // Check localStorage first for instant display
+      const cached = localStorage.getItem('powderiq_avatar');
+      if (cached) setAvatar(cached);
+
       const res = await fetch('/api/me', { headers: { Authorization: `Bearer ${data.session.access_token}` } });
       if (res.ok) {
         const me = await res.json();
         setRole(me.data?.role || 'user');
-        setAvatar(me.data?.profile?.avatarUrl || '');
+        const url = me.data?.profile?.avatarUrl || '';
+        if (url) {
+          setAvatar(url);
+          localStorage.setItem('powderiq_avatar', url);
+        }
       }
     })();
+
+    // Listen for avatar changes triggered by profile page
+    function onAvatarChanged() {
+      const url = localStorage.getItem('powderiq_avatar') || '';
+      setAvatar(url);
+    }
+    window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
+    return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
   }, [router]);
 
   async function signOut() {
