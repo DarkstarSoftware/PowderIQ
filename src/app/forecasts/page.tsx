@@ -104,7 +104,7 @@ const SHARED_CSS = `
   a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:6px; }
   .app-shell { display:flex; flex-direction:column; min-height:100vh; }
   .topnav { background:var(--white); border-bottom:1px solid var(--border-2); height:60px; display:flex; align-items:center; padding:0 20px; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(15,40,80,0.06); position:sticky; top:0; z-index:40; }
-  .topnav-logo { display:flex; align-items:center; gap:8px; text-decoration:none; flex-shrink:0; }
+  .topnav-logo { display:flex; align-items:center; gap:8px; flex-shrink:0; }
   .topnav-logo-icon { width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:17px; }
   .topnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
   .topnav-tabs { display:flex; gap:2px; margin-left:8px; flex:1; overflow-x:auto; }
@@ -113,7 +113,7 @@ const SHARED_CSS = `
   .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
   .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
   .topnav-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--bg); border:1px solid var(--border-2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; transition:background .15s; text-decoration:none; }
-  .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); }
+  .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); cursor:pointer; transition:box-shadow .15s; } .topnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
   .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; transition:background .15s,color .15s; }
   .topnav-signout:hover { background:var(--bg); color:var(--text); }
   .page-body { flex:1; background:var(--bg); }
@@ -235,10 +235,10 @@ export default function ForecastsPage() {
       `}</style>
       <div className="app-shell">
         <header className="topnav" role="banner">
-          <Link href="/" className="topnav-logo" aria-label="PowderIQ home">
-            <div className="topnav-logo-icon" aria-hidden="true">❄️</div>
+          <div className="topnav-logo">
+            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:34,width:'auto'}} />
             <span className="topnav-brand">PowderIQ</span>
-          </Link>
+          </div>
           <nav className="topnav-tabs" aria-label="Main navigation">
             <Link href="/dashboard" className="topnav-tab"><span aria-hidden="true">📊</span>Dashboard</Link>
             <Link href="/mountains" className="topnav-tab"><span aria-hidden="true">🏔️</span>Resorts</Link>
@@ -249,8 +249,7 @@ export default function ForecastsPage() {
             {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span aria-hidden="true">⚙️</span>Admin</Link>}
           </nav>
           <div className="topnav-right">
-            <Link href="/account" className="topnav-icon-btn" aria-label="Account">⚙️</Link>
-            <div className="topnav-avatar">{userName ? userName[0].toUpperCase() : '👤'}</div>
+            <Link href="/account/profile" className="topnav-avatar" style={{textDecoration:'none'}} aria-label="Account settings">{userName ? userName[0].toUpperCase() : '👤'}</Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>

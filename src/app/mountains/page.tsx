@@ -122,7 +122,7 @@ export default function MountainsPage() {
         body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
         a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:6px; }
         .topnav { background:var(--white); border-bottom:1px solid var(--border-2); height:60px; display:flex; align-items:center; padding:0 20px; gap:12px; position:sticky; top:0; z-index:40; box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .topnav-logo { display:flex; align-items:center; gap:8px; text-decoration:none; flex-shrink:0; }
+        .topnav-logo { display:flex; align-items:center; gap:8px; flex-shrink:0; }
         .topnav-logo-icon { width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:17px; }
         .topnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
         .topnav-tabs { display:flex; gap:2px; margin-left:8px; flex:1; overflow-x:auto; }
@@ -131,7 +131,7 @@ export default function MountainsPage() {
         .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
         .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
         .topnav-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--bg); border:1px solid var(--border-2); display:flex; align-items:center; justify-content:center; font-size:15px; text-decoration:none; }
-        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); }
+        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); cursor:pointer; transition:box-shadow .15s; } .topnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
         .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; }
         .topnav-signout:hover { background:var(--bg); color:var(--text); }
         .page-body { background:var(--bg); min-height:calc(100vh - 60px); }
@@ -177,10 +177,10 @@ export default function MountainsPage() {
 
       <div style={{minHeight:'100vh',background:'var(--bg)'}}>
         <header className="topnav" role="banner">
-          <Link href="/" className="topnav-logo" aria-label="PowderIQ home">
-            <div className="topnav-logo-icon" aria-hidden="true">❄️</div>
+          <div className="topnav-logo">
+            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:34,width:'auto'}} />
             <span className="topnav-brand">PowderIQ</span>
-          </Link>
+          </div>
           <nav className="topnav-tabs" aria-label="Main navigation">
             <Link href="/dashboard" className="topnav-tab"><span>📊</span>Dashboard</Link>
             <Link href="/mountains" className="topnav-tab active" aria-current="page"><span>🏔️</span>Resorts</Link>
@@ -191,8 +191,7 @@ export default function MountainsPage() {
             {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span>⚙️</span>Admin</Link>}
           </nav>
           <div className="topnav-right">
-            <Link href="/account" className="topnav-icon-btn" aria-label="Account">⚙️</Link>
-            <div className="topnav-avatar">{userName ? userName[0].toUpperCase() : '👤'}</div>
+            <Link href="/account/profile" className="topnav-avatar" style={{textDecoration:'none'}} aria-label="Account settings">{userName ? userName[0].toUpperCase() : '👤'}</Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>
