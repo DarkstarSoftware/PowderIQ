@@ -80,7 +80,58 @@ export default function ProfilePage() {
     })();
   }, [router]);
 
-  async function save() {
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState('');
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate
+    if (!['image/jpeg','image/png','image/gif','image/webp'].includes(file.type)) {
+      setUploadErr('Please select a JPG, PNG, GIF or WebP image.'); return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setUploadErr('Image must be under 2MB.'); return;
+    }
+
+    setUploading(true); setUploadErr('');
+
+    try {
+      // Upload to Supabase Storage
+      const ext      = file.name.split('.').pop();
+      const fileName = `avatars/${token.slice(-12)}-${Date.now()}.${ext}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('user-avatars')
+        .upload(fileName, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) throw new Error(uploadError.message);
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('user-avatars')
+        .getPublicUrl(fileName);
+
+      const publicUrl = urlData.publicUrl;
+      setAvatar(publicUrl);
+
+      // Save to profile
+      await fetch('/api/me/profile', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: publicUrl }),
+      });
+    } catch (err: any) {
+      // Fallback: show local preview even if storage upload fails
+      const localUrl = URL.createObjectURL(file);
+      setAvatar(localUrl);
+      setUploadErr('Photo saved locally. Storage upload failed: ' + (err.message || 'unknown error'));
+    }
+
+    setUploading(false);
+    // Reset input so same file can be re-selected
+    if (fileRef.current) fileRef.current.value = '';
+  }
     setSaving(true);
     await fetch('/api/me/profile', {
       method: 'PUT',
@@ -113,9 +164,12 @@ export default function ProfilePage() {
                 {avatar ? <img src={avatar} alt="avatar"/> : avatarLetter}
               </div>
               <div>
-                <input ref={fileRef} type="file" accept="image/*" style={{display:'none'}}/>
-                <button className="upload-btn" onClick={()=>fileRef.current?.click()}>📷 Upload Photo</button>
-                <div className="avatar-hint">JPG, PNG or GIF. Max 2MB.</div>
+                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/gif,image/webp" style={{display:'none'}} onChange={handleFileChange}/>
+                <button className="upload-btn" onClick={()=>fileRef.current?.click()} disabled={uploading}>
+                  {uploading ? '⏳ Uploading…' : '📷 Upload Photo'}
+                </button>
+                <div className="avatar-hint">JPG, PNG, GIF or WebP. Max 2MB.</div>
+                {uploadErr && <div style={{fontSize:12,color:'#dc2626',marginTop:4}}>{uploadErr}</div>}
               </div>
             </div>
 
