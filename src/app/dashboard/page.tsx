@@ -325,7 +325,7 @@ export default function DashboardPage() {
 
         /* TOP NAV */
         .topnav { background:var(--white); border-bottom:1px solid var(--border-2); height:60px; display:flex; align-items:center; padding:0 20px; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .topnav-logo { display:flex; align-items:center; gap:8px; text-decoration:none; flex-shrink:0; }
+        .topnav-logo { display:flex; align-items:center; gap:8px; flex-shrink:0; }
         .topnav-logo-icon { width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:17px; box-shadow:0 2px 6px rgba(29,110,245,0.3); }
         .topnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
         .topnav-tabs { display:flex; gap:2px; margin-left:8px; flex:1; overflow-x:auto; }
@@ -459,10 +459,10 @@ export default function DashboardPage() {
 
         {/* ── TOP NAV ── */}
         <header className="topnav" role="banner">
-          <Link href="/" className="topnav-logo" aria-label="PowderIQ home">
-            <div className="topnav-logo-icon" aria-hidden="true">❄️</div>
+          <div className="topnav-logo">
+            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:34,width:'auto'}} />
             <span className="topnav-brand">PowderIQ</span>
-          </Link>
+          </div>
 
           <nav className="topnav-tabs" aria-label="Main navigation">
             <Link href="/dashboard" className="topnav-tab active" aria-current="page">
