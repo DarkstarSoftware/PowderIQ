@@ -21,8 +21,9 @@ const CSS = `
 }
 html,body{height:100%;background:#f0f5fb !important;font-family:'Inter',sans-serif;color:var(--text);font-size:14px;}
 .tnav{position:sticky;top:0;z-index:100;height:56px;background:var(--white);border-bottom:1px solid var(--bd2);display:flex;align-items:center;padding:0 20px;gap:10px;box-shadow:var(--sh);}
-.tnav-logo{display:flex;align-items:center;text-decoration:none;flex-shrink:0;}
+.tnav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;}
 .tnav-logo img{height:32px;width:auto;}
+.tnav-brand{font-size:17px;font-weight:800;color:#0d1b2e;letter-spacing:-0.03em;}
 .tnav-tabs{display:flex;align-items:center;gap:2px;flex:1;}
 .tnav-tab{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text3);text-decoration:none;white-space:nowrap;transition:background .15s,color .15s;}
 .tnav-tab:hover{background:var(--bg);color:var(--text);}
@@ -96,6 +97,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
       <nav className="tnav">
         <Link href="/dashboard" className="tnav-logo">
           <img src="/brand/powderiq_logo.png" alt="PowderIQ" />
+          <span className="tnav-brand">PowderIQ</span>
         </Link>
         <div className="tnav-tabs">
           <Link href="/dashboard" className="tnav-tab">📊 Dashboard</Link>
