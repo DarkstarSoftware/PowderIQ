@@ -153,8 +153,6 @@ export default function ProfilePage() {
       setTimeout(() => setSaved(false), 3000);
     }
   }
-    }
-  }
 
   const avatarLetter = email?.[0]?.toUpperCase() || 'U';
 
