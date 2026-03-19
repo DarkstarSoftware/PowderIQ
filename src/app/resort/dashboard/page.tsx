@@ -910,7 +910,6 @@ export default function ResortDashboardPage() {
                   {[
                     {label:'Resort Name',   val: resort?.mountain?.name || '—'},
                     {label:'Location',      val: resort?.mountain?.state ? `${resort.mountain.state}, US` : '—'},
-                    {label:'Summit Elev.',  val: resort?.mountain?.topElevFt ? `${resort.mountain.topElevFt.toLocaleString()} ft` : '—'},
                     {label:'Plan',          val: resort?.plan ? resort.plan.charAt(0).toUpperCase()+resort.plan.slice(1) : 'Starter'},
                     {label:'Plan Status',   val: resort?.planStatus || 'Active'},
                   ].map(row=>(
