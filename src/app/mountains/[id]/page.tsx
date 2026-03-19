@@ -106,6 +106,7 @@ export default function MountainDetailPage() {
   const [isFav,     setIsFav]     = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [userRole,  setUserRole]  = useState('');
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [token,     setToken]     = useState('');
   const [loading,   setLoading]   = useState(true);
 
@@ -138,6 +139,15 @@ export default function MountainDetailPage() {
       if (meRes?.ok) {
         const me = await meRes.json();
         setUserRole(me.data?.role || '');
+        const url = me.data?.profile?.avatarUrl || '';
+        if (url) { setAvatarUrl(url); localStorage.setItem('powderiq_avatar', url); }
+        else {
+          const cached = localStorage.getItem('powderiq_avatar');
+          if (cached) setAvatarUrl(cached);
+        }
+      } else {
+        const cached = localStorage.getItem('powderiq_avatar');
+        if (cached) setAvatarUrl(cached);
       }
 
       if (fRes?.ok) {
@@ -151,6 +161,13 @@ export default function MountainDetailPage() {
 
       setLoading(false);
     })();
+
+    // Show cached avatar instantly + listen for updates
+    const cached = localStorage.getItem('powderiq_avatar');
+    if (cached) setAvatarUrl(cached);
+    function onAvatarChanged() { setAvatarUrl(localStorage.getItem('powderiq_avatar') || ''); }
+    window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
+    return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
   }, [id]);
 
   async function toggleFav() {
@@ -234,8 +251,9 @@ export default function MountainDetailPage() {
           display:flex; align-items:center; padding:0 20px; gap:10px;
           box-shadow:var(--shadow); backdrop-filter:blur(8px);
         }
-        .tnav-logo { display:flex; align-items:center; text-decoration:none; flex-shrink:0; }
+        .tnav-logo { display:flex; align-items:center; gap:8px; text-decoration:none; flex-shrink:0; }
         .tnav-logo img { height:34px; width:auto; }
+        .tnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
         .tnav-tabs { display:flex; align-items:center; gap:2px; margin-left:8px; flex:1; overflow:hidden; }
         .tnav-tab {
           display:flex; align-items:center; gap:6px; padding:7px 14px;
@@ -255,7 +273,11 @@ export default function MountainDetailPage() {
           width:34px; height:34px; border-radius:50%; background:var(--blue);
           color:#fff; font-size:13px; font-weight:700;
           display:flex; align-items:center; justify-content:center;
+          overflow:hidden; text-decoration:none; flex-shrink:0;
+          transition:box-shadow .15s; cursor:pointer;
         }
+        .tnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
+        .tnav-avatar img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
         .tnav-signout {
           padding:6px 14px; border-radius:8px; border:none; background:none;
           font-size:13px; font-weight:600; color:var(--text-2);
@@ -430,6 +452,7 @@ export default function MountainDetailPage() {
       <nav className="tnav">
         <Link href="/dashboard" className="tnav-logo">
           <img src="/brand/powderiq_logo.png" alt="PowderIQ" />
+          <span className="tnav-brand">PowderIQ</span>
         </Link>
 
         <div className="tnav-tabs">
@@ -454,9 +477,9 @@ export default function MountainDetailPage() {
         </div>
 
         <div className="tnav-right">
-          <Link href="/account" className="tnav-icon" aria-label="Settings">⚙️</Link>
-          <Link href="/account" className="tnav-icon" aria-label="Notifications">🔔</Link>
-          <div className="tnav-avatar">{avatarLetter}</div>
+          <Link href="/account/profile" className="tnav-avatar" aria-label="Account settings">
+            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : avatarLetter}
+          </Link>
           <button className="tnav-signout" onClick={signOut}>Sign out</button>
         </div>
       </nav>
