@@ -888,7 +888,7 @@ export default function ResortDashboardPage() {
                   <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:16}}>🌨️ Snow Performance</div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
                     {[
-                      {label:'Snowfall This Season', val: weather?.snowfall24hIn != null ? `${weather.snowfall24hIn.toFixed(1)}"` : '—', sub:'Total accumulation'},
+                      {label:'Snowfall This Season', val:'—', sub:'Connect ticketing system'},
                       {label:'Days Open',             val:'—', sub:'This season'},
                       {label:'Powder Days',           val:'—', sub:'Score ≥ 80'},
                     ].map(s=>(
