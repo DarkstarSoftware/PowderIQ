@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase/client';
 
 const TrailMap = dynamic(() => import('@/components/resort/TrailMap'), { ssr: false });
 
-type Tab = 'overview' | 'map' | 'lifts' | 'trails' | 'report' | 'analytics' | 'settings';
+type Tab = 'overview' | 'map' | 'lifts' | 'trails' | 'report' | 'analytics' | 'settings' | 'api';
 
 interface ZoneWeather {
   zone: 'base' | 'mid' | 'summit';
@@ -85,8 +85,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 
 /* TOPNAV */
 .tnav{position:sticky;top:0;z-index:100;height:56px;background:var(--white);border-bottom:1px solid var(--bd2);display:flex;align-items:center;padding:0 20px;gap:12px;box-shadow:var(--sh);}
-.tnav-logo{display:flex;align-items:center;text-decoration:none;flex-shrink:0;min-width:160px;}
+.tnav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;flex-shrink:0;min-width:160px;}
 .tnav-logo img{height:30px;width:auto;}
+.tnav-brand{font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em;}
 .tnav-tabs{display:flex;align-items:center;gap:2px;flex:1;}
 .tnav-tab{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text3);cursor:pointer;transition:background .15s,color .15s;border:none;background:none;font-family:'Inter',sans-serif;white-space:nowrap;}
 .tnav-tab:hover{background:var(--bg);color:var(--text);}
@@ -96,7 +97,9 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .api-dot{width:7px;height:7px;background:var(--green);border-radius:50%;}
 .tnav-icn{width:32px;height:32px;border-radius:8px;border:1px solid var(--bd2);background:var(--white);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;text-decoration:none;transition:background .15s;}
 .tnav-icn:hover{background:var(--bg);}
-.tnav-av{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.tnav-av{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;text-decoration:none;transition:box-shadow .15s;}
+.tnav-av:hover{box-shadow:0 0 0 3px rgba(29,110,245,0.25);}
+.tnav-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
 .tnav-out{font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;background:none;border:none;font-family:'Inter',sans-serif;transition:color .15s;}
 .tnav-out:hover{color:var(--text);}
 
@@ -250,6 +253,7 @@ export default function ResortDashboardPage() {
   const [generating,   setGenerating]   = useState(false);
   const [narrative,    setNarrative]    = useState('');
   const [userEmail,    setUserEmail]    = useState('');
+  const [avatarUrl,    setAvatarUrl]    = useState('');
 
   const fetchAll = useCallback(async (tok: string, id: string) => {
     const h = { Authorization: `Bearer ${tok}` };
@@ -266,12 +270,25 @@ export default function ResortDashboardPage() {
   }, []);
 
   useEffect(() => {
+    // Show cached avatar instantly
+    const cached = localStorage.getItem('powderiq_avatar');
+    if (cached) setAvatarUrl(cached);
+
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       const tok = data.session.access_token;
       setToken(tok);
       setUserEmail(data.session.user?.email || '');
+
+      // Load avatar from profile
+      const meRes = await fetch('/api/me', { headers: { Authorization: `Bearer ${tok}` } });
+      if (meRes.ok) {
+        const me = await meRes.json();
+        const url = me.data?.profile?.avatarUrl || '';
+        if (url) { setAvatarUrl(url); localStorage.setItem('powderiq_avatar', url); }
+      }
+
       const res = await fetch('/api/resort', { headers: { Authorization: `Bearer ${tok}` } });
       if (!res.ok) { router.push('/resort/onboard'); return; }
       const json = await res.json();
@@ -281,6 +298,10 @@ export default function ResortDashboardPage() {
       await fetchAll(tok, r.id);
       setLoading(false);
     })();
+
+    function onAvatarChanged() { setAvatarUrl(localStorage.getItem('powderiq_avatar') || ''); }
+    window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
+    return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
   }, [router, fetchAll]);
 
   useEffect(() => {
@@ -362,7 +383,7 @@ export default function ResortDashboardPage() {
   const SUB_TABS: {key:Tab;label:string;icon:string}[] = [
     {key:'overview',label:'Overview',icon:'📊'},{key:'map',label:'Trail Map',icon:'🗺️'},
     {key:'lifts',label:'Lifts',icon:'🚡'},{key:'trails',label:'Trails',icon:'⛷️'},
-    {key:'report',label:'Snow Report',icon:'❄️'},{key:'analytics',label:'Analytics',icon:'📈'},
+    {key:'report',label:'Snow Report',icon:'❄️'},{key:'analytics',label:'Analytics',icon:'📈'},{key:'settings',label:'Settings',icon:'⚙️'},{key:'api',label:'API Access',icon:'🔑'},
   ];
   const SIDEBAR_SECS = [
     { label:'RESORT MANAGEMENT', items:[
@@ -384,7 +405,7 @@ export default function ResortDashboardPage() {
       {key:'api',label:'API Access',icon:'🔑'},
     ]},
   ];
-  const VALID_TABS = new Set(['overview','map','lifts','trails','report','analytics','settings']);
+  const VALID_TABS = new Set(['overview','map','lifts','trails','report','analytics','settings','api']);
 
   // Lift/trail placeholders when no data
   const displayLifts = lifts.length > 0 ? lifts : [
@@ -406,6 +427,7 @@ export default function ResortDashboardPage() {
       <nav className="tnav">
         <Link href="/dashboard" className="tnav-logo">
           <img src="/brand/powderiq_logo.png" alt="PowderIQ" />
+          <span className="tnav-brand">PowderIQ</span>
         </Link>
         <div className="tnav-tabs">
           {NAV_TABS.map(t => (
@@ -416,8 +438,9 @@ export default function ResortDashboardPage() {
         </div>
         <div className="tnav-right">
           <div className="api-badge"><div className="api-dot"/>API Connected</div>
-          <div className="tnav-icn">🔔</div>
-          <div className="tnav-av">{avatarLetter}</div>
+          <Link href="/account/profile" className="tnav-av" aria-label="Account settings">
+            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : avatarLetter}
+          </Link>
           <button className="tnav-out" onClick={signOut}>Sign out</button>
         </div>
       </nav>
@@ -443,7 +466,9 @@ export default function ResortDashboardPage() {
                     (item.key==='lifts'&&tab==='lifts')||
                     (item.key==='trails'&&tab==='trails')||
                     (item.key==='report'&&tab==='report')||
-                    (item.key==='analytics'&&tab==='analytics'))?
+                    (item.key==='analytics'&&tab==='analytics')||
+                    (item.key==='settings'&&tab==='settings')||
+                    (item.key==='api'&&tab==='api'))?
                     ' act':''}`}
                   onClick={()=>{ if(VALID_TABS.has(item.key)) setTab(item.key as Tab); }}
                 >
@@ -836,13 +861,197 @@ export default function ResortDashboardPage() {
             )}
 
             {/* ── ANALYTICS / SETTINGS ── */}
-            {(tab==='analytics'||tab==='settings')&&(
-              <div className="card" style={{padding:40,textAlign:'center',color:'var(--text3)'}}>
-                <div style={{fontSize:32,marginBottom:12}}>{tab==='analytics'?'📈':'⚙️'}</div>
-                <div style={{fontSize:15,fontWeight:600,color:'var(--text2)',marginBottom:6}}>
-                  {tab==='analytics'?'Analytics':'Settings'}
+            {tab==='analytics' && (
+              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:16}}>📈 Resort Analytics</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12,marginBottom:20}}>
+                    {[
+                      {label:'Visitors This Week',  val:'—',  sub:'Real-time tracking'},
+                      {label:'Avg Daily Visitors',  val:'—',  sub:'Last 30 days'},
+                      {label:'Peak Day',            val:'—',  sub:'This season'},
+                    ].map(s=>(
+                      <div key={s.label} style={{background:'var(--bg)',borderRadius:10,padding:'14px 16px',border:'1px solid var(--bd2)'}}>
+                        <div style={{fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>{s.label}</div>
+                        <div style={{fontSize:24,fontWeight:900,color:'var(--text)',marginBottom:2}}>{s.val}</div>
+                        <div style={{fontSize:12,color:'var(--text3)'}}>{s.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{background:'var(--bg)',borderRadius:10,padding:20,textAlign:'center',border:'1px solid var(--bd2)'}}>
+                    <div style={{fontSize:28,marginBottom:8}}>📊</div>
+                    <div style={{fontSize:14,fontWeight:600,color:'var(--text2)',marginBottom:4}}>Visitor Analytics</div>
+                    <div style={{fontSize:13,color:'var(--text3)'}}>Connect your ticketing system or use our visitor tracking API to populate this dashboard.</div>
+                  </div>
                 </div>
-                <div style={{fontSize:13}}>Coming soon</div>
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:16}}>🌨️ Snow Performance</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+                    {[
+                      {label:'Snowfall This Season', val: `${weather?.snowfall24h?.toFixed(1) ?? '—'}"`, sub:'Total accumulation'},
+                      {label:'Days Open',             val:'—', sub:'This season'},
+                      {label:'Powder Days',           val:'—', sub:'Score ≥ 80'},
+                    ].map(s=>(
+                      <div key={s.label} style={{background:'var(--bg)',borderRadius:10,padding:'14px 16px',border:'1px solid var(--bd2)'}}>
+                        <div style={{fontSize:11,fontWeight:700,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:6}}>{s.label}</div>
+                        <div style={{fontSize:24,fontWeight:900,color:'var(--text)',marginBottom:2}}>{s.val}</div>
+                        <div style={{fontSize:12,color:'var(--text3)'}}>{s.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {tab==='settings' && (
+              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:16}}>🏔️ Resort Profile</div>
+                  {[
+                    {label:'Resort Name',   val: resort?.mountain?.name || '—'},
+                    {label:'Location',      val: resort?.mountain?.state ? `${resort.mountain.state}, US` : '—'},
+                    {label:'Summit Elev.',  val: resort?.mountain?.topElevFt ? `${resort.mountain.topElevFt.toLocaleString()} ft` : '—'},
+                    {label:'Plan',          val: resort?.plan ? resort.plan.charAt(0).toUpperCase()+resort.plan.slice(1) : 'Starter'},
+                    {label:'Plan Status',   val: resort?.planStatus || 'Active'},
+                  ].map(row=>(
+                    <div key={row.label} style={{display:'flex',alignItems:'center',padding:'11px 0',borderBottom:'1px solid var(--bd)'}}>
+                      <span style={{fontSize:13,color:'var(--text3)',width:140,flexShrink:0}}>{row.label}</span>
+                      <span style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{row.val}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:4}}>💳 Billing &amp; Plan</div>
+                  <div style={{fontSize:13,color:'var(--text3)',marginBottom:16}}>Manage your resort subscription and billing details.</div>
+                  <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+                    <Link href="/account/billing" style={{padding:'9px 18px',background:'var(--blue)',color:'#fff',borderRadius:9,fontSize:13,fontWeight:700,textDecoration:'none'}}>
+                      Manage Billing →
+                    </Link>
+                    <Link href="/account/billing" style={{padding:'9px 18px',background:'var(--bg)',color:'var(--text2)',border:'1px solid var(--bd2)',borderRadius:9,fontSize:13,fontWeight:600,textDecoration:'none'}}>
+                      Upgrade Plan
+                    </Link>
+                  </div>
+                </div>
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:4}}>👤 Account Settings</div>
+                  <div style={{fontSize:13,color:'var(--text3)',marginBottom:16}}>Update your profile, password, and notification preferences.</div>
+                  <Link href="/account/profile" style={{padding:'9px 18px',background:'var(--bg)',color:'var(--text2)',border:'1px solid var(--bd2)',borderRadius:9,fontSize:13,fontWeight:600,textDecoration:'none',display:'inline-block'}}>
+                    Go to Account Settings →
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {tab==='api' && (
+              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                {/* Hero */}
+                <div className="card" style={{padding:'24px',background:'linear-gradient(135deg,#1d6ef5,#1452c8)',color:'#fff',border:'none'}}>
+                  <div style={{fontSize:13,fontWeight:700,letterSpacing:'.06em',opacity:.75,marginBottom:6}}>POWDERIQ API</div>
+                  <div style={{fontSize:22,fontWeight:900,marginBottom:8}}>Embed Live Snow Data on Your Website</div>
+                  <div style={{fontSize:14,opacity:.85,lineHeight:1.6,maxWidth:600}}>
+                    Add your resort's real-time powder scores, snow conditions, and lift/trail status to your website, app, or integration with a single API key.
+                  </div>
+                </div>
+
+                {/* API Key */}
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:4}}>🔑 Your API Key</div>
+                  <div style={{fontSize:13,color:'var(--text3)',marginBottom:14}}>Use this key to authenticate all API requests for your resort.</div>
+                  <div style={{display:'flex',gap:8,alignItems:'center',background:'var(--bg)',border:'1px solid var(--bd2)',borderRadius:9,padding:'10px 14px',marginBottom:12,fontFamily:'monospace',fontSize:13,color:'var(--text2)'}}>
+                    <span style={{flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {resort?.id ? `piq_live_${resort.id.slice(0,8)}xxxxxxxxxxxxxxxxxxxx` : 'piq_live_xxxxxxxxxxxxxxxxxxxxxxxx'}
+                    </span>
+                    <button
+                      onClick={()=>navigator.clipboard.writeText(`piq_live_${resort?.id || 'your_resort_id'}`)}
+                      style={{padding:'4px 10px',background:'var(--blue)',color:'#fff',border:'none',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'Inter,sans-serif',flexShrink:0}}>
+                      Copy
+                    </button>
+                  </div>
+                  <div style={{fontSize:12,color:'#dc2626',fontWeight:600}}>⚠ Keep this key secret — do not expose it in client-side code.</div>
+                </div>
+
+                {/* Endpoints */}
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:16}}>📡 Available Endpoints</div>
+                  {[
+                    {method:'GET', path:'/v1/resort/{id}/score',      desc:'Current powder score (0–100) with breakdown'},
+                    {method:'GET', path:'/v1/resort/{id}/conditions',  desc:'Snow depth, recent snowfall, temperature, wind'},
+                    {method:'GET', path:'/v1/resort/{id}/lifts',       desc:'Real-time lift status (open/closed/on hold)'},
+                    {method:'GET', path:'/v1/resort/{id}/trails',      desc:'Trail status by zone with grooming info'},
+                    {method:'GET', path:'/v1/resort/{id}/forecast',    desc:'6-day hourly snow forecast'},
+                    {method:'GET', path:'/v1/resort/{id}/snow-report', desc:'Latest published snow report narrative'},
+                  ].map(ep=>(
+                    <div key={ep.path} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'10px 0',borderBottom:'1px solid var(--bd)'}}>
+                      <span style={{padding:'2px 8px',background:'var(--blue-lt)',color:'var(--blue)',borderRadius:5,fontSize:11,fontWeight:700,flexShrink:0,marginTop:1}}>{ep.method}</span>
+                      <div>
+                        <div style={{fontFamily:'monospace',fontSize:13,color:'var(--text)',marginBottom:2}}>{ep.path}</div>
+                        <div style={{fontSize:12,color:'var(--text3)'}}>{ep.desc}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Example */}
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:12}}>💻 Example Request</div>
+                  <pre style={{background:'#0d1b2e',color:'#e2e8f0',borderRadius:10,padding:'16px',fontSize:12,overflow:'auto',lineHeight:1.6}}>{`curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  https://powderiq.com/v1/resort/${resort?.id || 'YOUR_RESORT_ID'}/score
+
+# Response
+{
+  "score": 84,
+  "label": "Epic Powder",
+  "breakdown": {
+    "snowfall24h": 9,
+    "snowDepth": 42,
+    "temp": 28,
+    "wind": 12
+  },
+  "updatedAt": "2026-03-19T08:00:00Z"
+}`}</pre>
+                </div>
+
+                {/* Integrations */}
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:4}}>🔗 Platform Integrations</div>
+                  <div style={{fontSize:13,color:'var(--text3)',marginBottom:16}}>Connect PowderIQ data directly to these platforms.</div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+                    {[
+                      {name:'Your Website',   icon:'🌐', desc:'Embed a powder score widget via JavaScript snippet'},
+                      {name:'Ikonpass App',    icon:'🎿', desc:'Display live conditions in the Ikon Pass app feed'},
+                      {name:'Epic Pass App',   icon:'⛷️', desc:'Push snow reports to your Epic Pass resort listing'},
+                      {name:'Liftie',          icon:'🚡', desc:'Sync lift status with Liftie.info in real time'},
+                      {name:'REST API',        icon:'🔌', desc:'Any platform via standard REST JSON API'},
+                      {name:'Webhook Events',  icon:'⚡', desc:'Push notifications on powder events to your systems'},
+                    ].map(i=>(
+                      <div key={i.name} style={{background:'var(--bg)',border:'1px solid var(--bd2)',borderRadius:10,padding:'14px',textAlign:'center'}}>
+                        <div style={{fontSize:24,marginBottom:6}}>{i.icon}</div>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--text)',marginBottom:4}}>{i.name}</div>
+                        <div style={{fontSize:11.5,color:'var(--text3)',lineHeight:1.4}}>{i.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Widget embed */}
+                <div className="card" style={{padding:'20px 24px'}}>
+                  <div style={{fontSize:15,fontWeight:700,color:'var(--text)',marginBottom:4}}>🧩 Website Widget</div>
+                  <div style={{fontSize:13,color:'var(--text3)',marginBottom:12}}>Add this snippet to your website to display a live powder score badge.</div>
+                  <pre style={{background:'#0d1b2e',color:'#e2e8f0',borderRadius:10,padding:'16px',fontSize:12,overflow:'auto',lineHeight:1.6}}>{`<script src="https://powderiq.com/widget.js"
+  data-resort="${resort?.id || 'YOUR_RESORT_ID'}"
+  data-api-key="YOUR_API_KEY"
+  data-theme="light">
+</script>`}</pre>
+                  <div style={{fontSize:12,color:'var(--text3)',marginTop:8}}>The widget auto-updates every 15 minutes and is mobile responsive.</div>
+                </div>
+
+                {/* Docs link */}
+                <div style={{textAlign:'center',padding:'8px 0'}}>
+                  <a href="https://docs.powderiq.com/api" target="_blank" rel="noopener noreferrer"
+                    style={{fontSize:13,fontWeight:600,color:'var(--blue)',textDecoration:'none'}}>
+                    View full API documentation →
+                  </a>
+                </div>
               </div>
             )}
 
