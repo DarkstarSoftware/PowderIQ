@@ -3,83 +3,74 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
-import ScoreBadge from '@/components/ScoreBadge';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Mountain { id: string; name: string; state: string; imageUrl?: string; slug?: string }
+interface Mountain {
+  id: string; name: string; state: string; slug?: string;
+  baseElevFt?: number; topElevFt?: number; totalTrails?: number; totalLifts?: number;
+  latitude?: number; longitude?: number;
+}
 interface FavoriteItem { id: string; mountain: Mountain; score?: number }
-
 interface MountainScore {
   score: number;
-  snowfall24hIn?: number;
-  snowfall48hIn?: number;
-  snowfall72hIn?: number;
-  forecastSnow24hIn?: number;
-  windMph?: number;
-  tempF?: number;
-  snowDepthIn?: number;
-  conditionDesc?: string;
-  fetchedAt?: string;
+  snowfall24hIn?: number; snowfall48hIn?: number; snowfall72hIn?: number;
+  forecastSnow24hIn?: number; windMph?: number; tempF?: number;
+  snowDepthIn?: number; conditionDesc?: string; fetchedAt?: string;
 }
-
 interface ForecastPeriod {
-  date: string;
-  dayLabel?: string;
-  icon?: string;
-  snowIn: number;
-  tempHighF?: number;
-  tempLowF?: number;
-  conditionDesc?: string;
-  precipPct?: number;
+  date: string; dayLabel: string; snowIn: number;
+  tempHighF?: number; tempLowF?: number;
+  conditionDesc?: string; precipPct?: number;
 }
+interface Lift { id: string; liftName: string; status: string; liftType?: string; waitMinutes?: number }
+interface Trail { id: string; trailName: string; difficulty: string; status: string; snowDepthIn?: number }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MOUNTAIN_IMAGES: Record<string, string> = {
-  'Alta':             'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=800&q=70',
-  'Kirkwood':         'https://images.unsplash.com/photo-1548777123-e216912df7d8?w=800&q=70',
-  'Snowbird':         'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&q=70',
-  'Jackson Hole':     'https://images.unsplash.com/photo-1453872302360-eed3c5f8ff66?w=800&q=70',
-  'Mt. Bachelor':     'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=70',
-  'Stevens Pass':     'https://images.unsplash.com/photo-1546961342-ea5f73e193f9?w=800&q=70',
-  'Sugar Bowl':       'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800&q=70',
-  'Crystal Mountain': 'https://images.unsplash.com/photo-1478827536114-da961b7f86d2?w=800&q=70',
-};
-const FALLBACK_IMG = 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&q=70';
-function getMountainImage(m: Mountain): string {
-  return m.imageUrl || MOUNTAIN_IMAGES[m.name] || FALLBACK_IMG;
+function getScoreColor(s: number) {
+  if (s >= 80) return '#22c55e';
+  if (s >= 60) return '#3b82f6';
+  if (s >= 40) return '#f59e0b';
+  return '#ef4444';
 }
 
-function getScoreLabel(s: number): string {
-  if (s >= 90) return 'Powder Star';
-  if (s >= 80) return 'Great';
-  if (s >= 65) return 'Good';
-  if (s >= 50) return 'Decent';
-  return 'Low';
-}
-function getScoreColor(s: number): string {
-  if (s >= 85) return '#1d6ef5';
-  if (s >= 70) return '#22c55e';
-  if (s >= 55) return '#f59e0b';
-  return '#94a3b8';
-}
-
-function weatherIcon(desc?: string, snow?: number): string {
-  if (!desc && !snow) return '⛅';
-  if ((snow ?? 0) > 6) return '🌨';
-  if ((snow ?? 0) > 0) return '🌦';
-  const d = (desc ?? '').toLowerCase();
-  if (d.includes('clear') || d.includes('sunny')) return '☀️';
-  if (d.includes('cloud')) return '☁️';
-  if (d.includes('snow')) return '🌨';
-  if (d.includes('rain')) return '🌧';
-  return '⛅';
+function getMtnImg(m: Mountain): string {
+  const imgs: Record<string, string> = {
+    'pine-knob':       'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=800&q=80',
+    'steamboat':       'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=800&q=80',
+    'snowmass':        'https://images.unsplash.com/photo-1542202229-7d93c33f5d07?w=800&q=80',
+    'park-city':       'https://images.unsplash.com/photo-1519980600796-9e9e0a7e29b8?w=800&q=80',
+    'mammoth':         'https://images.unsplash.com/photo-1548777123-e216912df7d8?w=800&q=80',
+    'jackson-hole':    'https://images.unsplash.com/photo-1612464999684-3e3d2cf78aec?w=800&q=80',
+    'breckenridge':    'https://images.unsplash.com/photo-1453090927415-5f45085b65c0?w=800&q=80',
+    'vail':            'https://images.unsplash.com/photo-1574434312429-a3f8ead2b7a4?w=800&q=80',
+  };
+  const slug = m.slug || m.name.toLowerCase().replace(/[^a-z0-9]+/g,'-');
+  for (const k of Object.keys(imgs)) if (slug.includes(k)) return imgs[k];
+  return 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=800&q=80';
 }
 
-function fmt(n?: number, decimals = 0): string {
-  if (n == null) return '—';
-  return n.toFixed(decimals);
+const DIFF_ICON: Record<string,string> = { green:'●', blue:'◆', black:'◆', double_black:'◆◆', terrain_park:'▲', backcountry:'⬡' };
+const DIFF_COLOR: Record<string,string> = { green:'#22c55e', blue:'#60a5fa', black:'#e2e8f0', double_black:'#f1f5f9', terrain_park:'#fb923c', backcountry:'#fbbf24' };
+const LIFT_COLOR: Record<string,string> = { open:'#22c55e', on_hold:'#f59e0b', closed:'#ef4444', scheduled:'#3b82f6' };
+const LIFT_LABEL: Record<string,string> = { open:'Open', on_hold:'Hold', closed:'Closed', scheduled:'Sched.' };
+
+// Powder score ring SVG
+function ScoreRing({ score }: { score: number }) {
+  const r = 54, circ = 2 * Math.PI * r;
+  const pct = score / 100;
+  const color = getScoreColor(score);
+  return (
+    <svg width={130} height={130} viewBox="0 0 130 130">
+      <circle cx={65} cy={65} r={r} fill="none" stroke="rgba(100,150,200,0.1)" strokeWidth={10}/>
+      <circle cx={65} cy={65} r={r} fill="none" stroke={color} strokeWidth={10}
+        strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
+        strokeLinecap="round" transform="rotate(-90 65 65)" style={{transition:'stroke-dashoffset .6s ease'}}/>
+      <text x={65} y={60} textAnchor="middle" fill={color} fontSize={28} fontWeight={800} fontFamily="Inter,sans-serif">{score}</text>
+      <text x={65} y={78} textAnchor="middle" fill="rgba(100,150,200,0.6)" fontSize={11} fontFamily="Inter,sans-serif">/ 100</text>
+    </svg>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -89,26 +80,26 @@ export default function DashboardPage() {
 
   const [favorites,    setFavorites]    = useState<FavoriteItem[]>([]);
   const [loading,      setLoading]      = useState(true);
-  const [userRole,     setUserRole]     = useState<string>('user');
-  const [userName,     setUserName]     = useState<string>('');
-  const [avatarUrl,    setAvatarUrl]    = useState<string>('');
-  const [hasResort,    setHasResort]    = useState<boolean>(false);
-  const [token,        setToken]        = useState<string>('');
-  const [activeTab,    setActiveTab]    = useState<string>('dashboard');
+  const [userRole,     setUserRole]     = useState('user');
+  const [userName,     setUserName]     = useState('');
+  const [avatarUrl,    setAvatarUrl]    = useState('');
+  const [hasResort,    setHasResort]    = useState(false);
+  const [token,        setToken]        = useState('');
   const [selectedFav,  setSelectedFav]  = useState<FavoriteItem | null>(null);
-
-  // Per-selected-resort data
   const [scoreData,    setScoreData]    = useState<MountainScore | null>(null);
   const [forecast,     setForecast]     = useState<ForecastPeriod[]>([]);
   const [scoreLoading, setScoreLoading] = useState(false);
+  const [mapMode,      setMapMode]      = useState<'trail'|'satellite'|'hybrid'>('satellite');
+  const [diffFilter,   setDiffFilter]   = useState<string[]>([]);
+  const [lifts,        setLifts]        = useState<Lift[]>([]);
+  const [trails,       setTrails]       = useState<Trail[]>([]);
+  const [activePanel,  setActivePanel]  = useState<'lifts'|'trails'>('lifts');
 
-  // ── Initial load ────────────────────────────────────────────────────────────
+  // ── Auth + data load ────────────────────────────────────────────────────────
   useEffect(() => {
+    const cached = localStorage.getItem('powderiq_avatar');
+    if (cached) setAvatarUrl(cached);
     (async () => {
-      // Show cached avatar instantly
-      const cachedAvatar = localStorage.getItem('powderiq_avatar');
-      if (cachedAvatar) setAvatarUrl(cachedAvatar);
-
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       const tok = data.session.access_token;
@@ -124,11 +115,8 @@ export default function DashboardPage() {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
-        setAvatarUrl(me.data?.profile?.avatarUrl || '');
-        // Also cache in localStorage for instant display
-        if (me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl) {
-          localStorage.setItem('powderiq_avatar', me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl || '');
-        }
+        const url = me.data?.profile?.avatarUrl || '';
+        if (url) { setAvatarUrl(url); localStorage.setItem('powderiq_avatar', url); }
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -137,190 +125,109 @@ export default function DashboardPage() {
       if (favRes.ok) {
         const favData = await favRes.json();
         const items: FavoriteItem[] = favData.data || [];
-
-        // Fetch scores for all favorites in parallel
-        const withScores = await Promise.all(
-          items.map(async (f) => {
-            try {
-              const sRes = await fetch(`/api/mountains/${f.mountain.id}/score`, {
-                headers: { Authorization: `Bearer ${tok}` },
-              });
-              if (sRes.ok) {
-                const s = await sRes.json();
-                return { ...f, score: s.data?.score };
-              }
-            } catch {}
-            return f;
-          })
-        );
-        setFavorites(withScores);
-        if (withScores.length > 0) setSelectedFav(withScores[0]);
+        setFavorites(items);
+        if (items.length > 0) setSelectedFav(items[0]);
       }
       setLoading(false);
     })();
-    // Listen for avatar updates from profile page
-    function onAvatarChanged() {
-      const url = localStorage.getItem('powderiq_avatar') || '';
-      setAvatarUrl(url);
-    }
+    function onAvatarChanged() { setAvatarUrl(localStorage.getItem('powderiq_avatar') || ''); }
     window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
     return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Load detail data when selected resort changes ───────────────────────────
-  const loadResortDetail = useCallback(async (fav: FavoriteItem, tok: string) => {
+  // ── Load detail when resort selected ────────────────────────────────────────
+  const loadDetail = useCallback(async (fav: FavoriteItem, tok: string) => {
     if (!fav || !tok) return;
     setScoreLoading(true);
-    setScoreData(null);
-    setForecast([]);
-
+    setScoreData(null); setForecast([]); setLifts([]); setTrails([]);
     try {
+      const h = { Authorization: `Bearer ${tok}` };
       const [scoreRes, forecastRes] = await Promise.allSettled([
-        fetch(`/api/mountains/${fav.mountain.id}/score`,    { headers: { Authorization: `Bearer ${tok}` } }),
-        fetch(`/api/mountains/${fav.mountain.id}/forecast`, { headers: { Authorization: `Bearer ${tok}` } }),
+        fetch(`/api/mountains/${fav.mountain.id}/score`,    { headers: h }),
+        fetch(`/api/mountains/${fav.mountain.id}/forecast`, { headers: h }),
       ]);
-
-      // ── Score API: returns { data: { score, breakdown, explanation } }
-      // ── Forecast API: returns { data: { mountain, snow: SnowData } }
-      //    SnowData = { snowfall24h, snowfall7d, baseDepthIn, windMph, tempF, tempMinF, tempMaxF }
-
-      let mountainLat: number | null = null;
-      let mountainLon: number | null = null;
-      let mountainBaseElev = 4000;
-      let mountainSummitElev = 8000;
 
       if (forecastRes.status === 'fulfilled' && forecastRes.value.ok) {
         const fd = await forecastRes.value.json();
-        // snow is the SnowData flat object
-        const snow = fd.data?.snow ?? fd.data ?? {};
+        const snow = fd.data?.snow ?? {};
         const mountain = fd.data?.mountain ?? {};
-
-        mountainLat         = mountain.latitude  ?? null;
-        mountainLon         = mountain.longitude ?? null;
-        mountainBaseElev    = mountain.baseElevFt   ?? 4000;
-        mountainSummitElev  = mountain.topElevFt    ?? 8000;
-
-        // Derive a condition description from SnowData fields
         const snow24h = snow.snowfall24h ?? 0;
-        const snow48h = snow.snowfall48h ?? 0;
-        const wind    = snow.windMph ?? 0;
-        const temp    = snow.tempF ?? 28;
-        let condDesc = '';
-        if (snow24h > 6)       condDesc = 'Heavy snow';
-        else if (snow24h > 2)  condDesc = 'Snow showers';
-        else if (snow24h > 0)  condDesc = 'Light snow';
-        else if (snow48h > 4)  condDesc = 'Recent snowfall';
-        else if (wind > 35)    condDesc = 'Windy';
-        else if (temp > 34)    condDesc = 'Partly cloudy';
-        else                   condDesc = 'Clear & cold';
-
-        // Use score from scoreRes if available, else fav.score
+        const wind = snow.windMph ?? 0;
+        const temp = snow.tempF ?? 28;
+        let condDesc = snow24h > 6 ? 'Heavy snow' : snow24h > 2 ? 'Snow showers' : snow24h > 0 ? 'Light snow' : wind > 35 ? 'Windy' : temp > 34 ? 'Partly cloudy' : 'Clear & cold';
         let scoreVal = fav.score ?? 0;
         if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
           const sd = await scoreRes.value.json();
           scoreVal = sd.data?.score ?? scoreVal;
         }
+        setScoreData({ score: scoreVal, snowfall24hIn: snow.snowfall24h, snowfall48hIn: snow.snowfall48h, windMph: snow.windMph, tempF: snow.tempF, snowDepthIn: snow.baseDepthIn, conditionDesc: condDesc });
 
-        setScoreData({
-          score:             scoreVal,
-          snowfall24hIn:     snow.snowfall24h,
-          snowfall48hIn:     snow.snowfall48h,
-          snowfall72hIn:     snow.snowfall72h,
-          forecastSnow24hIn: snow.forecastSnow24h,
-          windMph:           snow.windMph,
-          tempF:             snow.tempF,
-          snowDepthIn:       snow.baseDepthIn,
-          conditionDesc:     condDesc,
-          fetchedAt:         undefined,
-        });
-      } else if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
-        // Score-only fallback if forecast failed
-        const sd = await scoreRes.value.json();
-        setScoreData({
-          score:         sd.data?.score ?? fav.score ?? 0,
-          snowfall24hIn: undefined,
-          windMph:       undefined,
-          tempF:         undefined,
-          snowDepthIn:   undefined,
-          conditionDesc: undefined,
-          fetchedAt:     undefined,
-        });
-      }
-
-      // ── 6-day forecast: fetch Open-Meteo directly using mountain lat/lon
-      if (mountainLat !== null && mountainLon !== null) {
-        try {
-          const summitElevM = Math.round(mountainSummitElev * 0.3048);
-          const omUrl =
-            `https://api.open-meteo.com/v1/forecast?latitude=${mountainLat}&longitude=${mountainLon}` +
-            `&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode` +
-            `&temperature_unit=fahrenheit&precipitation_unit=inch` +
-            `&timezone=auto&forecast_days=7&elevation=${summitElevM}`;
-
+        // Open-Meteo forecast
+        const lat = mountain.latitude, lon = mountain.longitude;
+        if (lat && lon) {
+          const summitElevM = Math.round((mountain.topElevFt ?? 8000) * 0.3048);
+          const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7&elevation=${summitElevM}`;
           const omRes = await fetch(omUrl);
           if (omRes.ok) {
             const om = await omRes.json();
             const daily = om.daily ?? {};
-            const WMO: Record<number, string> = {
-              0:'Clear sky', 1:'Mainly clear', 2:'Partly cloudy', 3:'Overcast',
-              45:'Fog', 48:'Icy fog',
-              51:'Light drizzle', 53:'Drizzle', 55:'Heavy drizzle',
-              61:'Light rain', 63:'Rain', 65:'Heavy rain',
-              71:'Light snow', 73:'Snow', 75:'Heavy snow',
-              77:'Snow grains', 80:'Rain showers', 81:'Rain showers', 82:'Heavy showers',
-              85:'Snow showers', 86:'Heavy snow showers',
-              95:'Thunderstorm', 96:'Thunderstorm w/ hail', 99:'Heavy thunderstorm',
-            };
-            const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-            const periods: ForecastPeriod[] = (daily.time ?? []).slice(0, 7).map((dateStr: string, i: number) => {
-              const d = new Date(dateStr + 'T12:00:00');
-              const wcode = daily.weathercode?.[i] ?? 0;
-              return {
-                date:         dateStr,
-                dayLabel:     i === 0 ? 'Today' : dayNames[d.getDay()],
-                snowIn:       daily.snowfall_sum?.[i] ?? 0,
-                tempHighF:    daily.temperature_2m_max?.[i],
-                tempLowF:     daily.temperature_2m_min?.[i],
-                conditionDesc:WMO[wcode] ?? 'Mixed',
-                precipPct:    daily.precipitation_probability_max?.[i],
-              };
-            });
-            setForecast(periods);
+            const WMO: Record<number,string> = { 0:'Clear',1:'Clear',2:'Partly cloudy',3:'Overcast',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',85:'Snow showers',86:'Heavy snow' };
+            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            setForecast((daily.time ?? []).slice(0,7).map((d: string, i: number) => ({
+              date: d, dayLabel: i === 0 ? 'Today' : days[new Date(d+'T12:00:00').getDay()],
+              snowIn: daily.snowfall_sum?.[i] ?? 0,
+              tempHighF: daily.temperature_2m_max?.[i], tempLowF: daily.temperature_2m_min?.[i],
+              conditionDesc: WMO[daily.weathercode?.[i]] ?? 'Mixed',
+              precipPct: daily.precipitation_probability_max?.[i],
+            })));
           }
-        } catch (omErr) {
-          console.warn('Open-Meteo forecast fetch failed:', omErr);
         }
       }
-    } catch (e) {
-      console.error('Failed to load resort detail', e);
-    }
+
+      // Try to load lifts/trails from resort API
+      const resortRes = await fetch(`/api/resort?mountainId=${fav.mountain.id}`, { headers: h });
+      if (resortRes.ok) {
+        const rj = await resortRes.json();
+        const resort = Array.isArray(rj.data) ? rj.data[0] : rj.data;
+        if (resort) {
+          const [lRes, tRes] = await Promise.allSettled([
+            fetch(`/api/resort/${resort.id}/lifts`,  { headers: h }),
+            fetch(`/api/resort/${resort.id}/trails`, { headers: h }),
+          ]);
+          if (lRes.status === 'fulfilled' && lRes.value.ok) { const lj = await lRes.value.json(); setLifts(lj.data?.lifts ?? []); }
+          if (tRes.status === 'fulfilled' && tRes.value.ok) { const tj = await tRes.value.json(); setTrails(tj.data?.trails ?? []); }
+        }
+      }
+    } catch (e) { console.error(e); }
     setScoreLoading(false);
   }, []);
 
   useEffect(() => {
-    if (selectedFav && token) loadResortDetail(selectedFav, token);
-  }, [selectedFav, token, loadResortDetail]);
+    if (selectedFav && token) loadDetail(selectedFav, token);
+  }, [selectedFav, token, loadDetail]);
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push('/');
-  }
+  async function handleLogout() { await supabase.auth.signOut(); router.push('/'); }
 
-  // ── Derived display values ───────────────────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────────────────────────
   const activeFav   = selectedFav ?? favorites[0] ?? null;
-  const heroImg     = activeFav ? getMountainImage(activeFav.mountain) : FALLBACK_IMG;
   const score       = scoreData?.score ?? activeFav?.score ?? 0;
   const scoreColor  = getScoreColor(score);
-  const scoreLabel  = getScoreLabel(score);
-  const updatedTime = scoreData?.fetchedAt
-    ? new Date(scoreData.fetchedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : null;
+  const openLifts   = lifts.filter(l => l.status === 'open').length;
+  const openTrails  = trails.filter(t => t.status === 'open' || t.status === 'groomed').length;
+  const groomedCount = trails.filter(t => t.status === 'groomed').length;
+  const heroImg     = activeFav ? getMtnImg(activeFav.mountain) : 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80';
+  const allDiffs    = [...new Set(trails.map(t => t.difficulty))];
+  const filteredTrails = diffFilter.length > 0 ? trails.filter(t => diffFilter.includes(t.difficulty)) : trails;
 
-  // Build chart data from forecast snowfall
-  const chartData = forecast.length > 0
-    ? forecast.map(f => ({ val: f.snowIn, label: f.dayLabel ?? '' }))
-    : [];
-  const chartMax = Math.max(...chartData.map(d => d.val), 1);
+  if (loading) return (
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');body{margin:0;background:#f0f5fb;font-family:'Inter',sans-serif;}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:12}}>
+        <div style={{width:32,height:32,border:'3px solid #dbeafe',borderTopColor:'#1d6ef5',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+        <p style={{fontSize:13,color:'#6b849a',fontFamily:'Inter,sans-serif'}}>Loading…</p>
+      </div>
+    </>
+  );
 
   return (
     <>
@@ -328,503 +235,385 @@ export default function DashboardPage() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         :root {
-          --blue:#1d6ef5; --blue-dark:#1558d6; --blue-light:#e8f1fe; --blue-mid:#3b82f6;
+          --blue:#1d6ef5; --blue-light:#e8f1fe;
           --text:#0d1b2e; --text-2:#3d5166; --text-3:#6b849a;
           --border:rgba(100,150,200,0.15); --border-2:rgba(100,150,200,0.25);
-          --bg:#f0f5fb; --bg-2:#e8f2fb; --white:#ffffff;
-          --green:#16a34a; --amber:#d97706;
-          --shadow:0 2px 12px rgba(15,40,80,0.08); --shadow-lg:0 8px 32px rgba(15,40,80,0.14);
+          --bg:#f0f5fb; --white:#ffffff;
+          --shadow:0 1px 4px rgba(15,40,80,0.08);
         }
-        body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
-        a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:6px; }
+        html,body,#__next { height:100%; font-family:'Inter',sans-serif; background:var(--bg); }
 
-        .app-shell { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+        /* ── TOPNAV ── */
+        .tnav { position:sticky;top:0;z-index:100;height:56px;background:var(--white);border-bottom:1px solid var(--border-2);display:flex;align-items:center;padding:0 20px;gap:16px;box-shadow:var(--shadow); }
+        .tnav-logo { display:flex;align-items:center;gap:8px;flex-shrink:0; }
+        .tnav-logo img { height:32px;width:auto; }
+        .tnav-brand { font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
+        .tnav-tabs { display:flex;align-items:center;gap:2px;flex:1; }
+        .tnav-tab { display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-3);text-decoration:none;white-space:nowrap;transition:all .15s; }
+        .tnav-tab:hover { background:var(--bg);color:var(--text); }
+        .tnav-tab.act { background:var(--blue-light);color:var(--blue); }
+        .tnav-right { display:flex;align-items:center;gap:10px;margin-left:auto; }
+        .ar-badge { display:flex;align-items:center;gap:6px;padding:5px 12px;background:#f0fdf4;border:1px solid rgba(34,197,94,0.3);border-radius:20px;font-size:12px;font-weight:600;color:#15803d; }
+        .ar-dot { width:7px;height:7px;background:#22c55e;border-radius:50%; }
+        .tnav-av { width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#3b82f6);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;border:2px solid var(--border-2);overflow:hidden;text-decoration:none;flex-shrink:0; }
+        .tnav-av img { width:100%;height:100%;object-fit:cover; }
+        .score-badge { display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--blue-light);border-radius:20px;font-size:12px;font-weight:700;color:var(--blue); }
 
-        /* TOP NAV */
-        .topnav { background:var(--white); border-bottom:1px solid var(--border-2); height:60px; display:flex; align-items:center; padding:0 20px; gap:12px; flex-shrink:0; box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .topnav-logo { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-        .topnav-logo-icon { width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:17px; box-shadow:0 2px 6px rgba(29,110,245,0.3); }
-        .topnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
-        .topnav-tabs { display:flex; gap:2px; margin-left:8px; flex:1; overflow-x:auto; }
-        .topnav-tab { padding:7px 14px; border-radius:8px 8px 0 0; font-size:13px; font-weight:600; color:var(--text-3); cursor:pointer; border:none; border-bottom:2px solid transparent; background:transparent; font-family:'Inter',sans-serif; display:flex; align-items:center; gap:5px; text-decoration:none; transition:color .15s,border-color .15s,background .15s; white-space:nowrap; }
-        .topnav-tab:hover { background:var(--blue-light); color:var(--text); }
-        .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
-        .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
-        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; cursor:pointer; border:2px solid var(--border-2); transition:box-shadow .15s; }
-        .topnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
-        .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; transition:background .15s,color .15s; }
-        .topnav-signout:hover { background:var(--bg); color:var(--text); }
+        /* ── LAYOUT ── */
+        .shell { display:flex;height:calc(100vh - 56px);overflow:hidden; }
 
-        /* BODY */
-        .app-body { display:flex; flex:1; overflow:hidden; }
+        /* ── SIDEBAR ── */
+        .sidebar { width:200px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column; }
+        .sb-section-lbl { font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:.07em;text-transform:uppercase;padding:14px 14px 6px; }
+        .sb-resort { display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;transition:background .15s;margin:2px 6px; }
+        .sb-resort:hover { background:var(--bg); }
+        .sb-resort.act { background:var(--blue-light); }
+        .sb-resort-icon { width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0; }
+        .sb-resort-icon img { width:100%;height:100%;object-fit:cover; }
+        .sb-resort-name { font-size:12.5px;font-weight:600;color:var(--text);line-height:1.2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .sb-resort-score { font-size:11px;font-weight:700;flex-shrink:0; }
+        .sb-resort.act .sb-resort-name { color:var(--blue); }
 
-        /* SIDEBAR */
-        .sidebar { width:196px; background:var(--white); border-right:1px solid var(--border-2); display:flex; flex-direction:column; overflow-y:auto; flex-shrink:0; }
-        .sidebar-section { padding:12px 8px 4px; }
+        /* ── MAIN ── */
+        .main { flex:1;overflow:hidden;display:flex;flex-direction:column; }
 
-        .sidebar-label { font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.06em; text-transform:uppercase; padding:8px 10px 4px; }
-        .sidebar-resort-item { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:9px; cursor:pointer; transition:background .15s; margin:1px 4px; }
-        .sidebar-resort-item:hover { background:var(--bg); }
-        .sidebar-resort-item.active { background:var(--blue-light); }
-        .sidebar-resort-thumb { width:24px; height:24px; border-radius:6px; object-fit:cover; background:var(--bg-2); flex-shrink:0; }
-        .sidebar-resort-name { font-size:12px; font-weight:600; color:var(--text-2); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .sidebar-resort-score { font-size:11px; font-weight:700; color:var(--blue); flex-shrink:0; }
+        /* ── MAP AREA ── */
+        .map-wrap { flex:1;position:relative;overflow:hidden; }
+        .map-img { width:100%;height:100%;object-fit:cover;display:block; }
+        .map-toolbar { position:absolute;top:12px;left:12px;display:flex;gap:6px;z-index:10; }
+        .map-mode-btn { padding:6px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif; }
+        .map-mode-btn.act { background:var(--blue);color:#fff;border-color:var(--blue); }
+        .diff-toolbar { position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:10; }
+        .diff-btn { display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.25);background:rgba(255,255,255,0.92);backdrop-filter:blur(8px);font-size:11px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif; }
+        .diff-btn.act { background:rgba(29,110,245,0.15);border-color:rgba(29,110,245,0.4);color:var(--blue); }
 
-        /* MAIN */
-        .main-content { flex:1; overflow-y:auto; background:var(--bg); }
-        .main-inner { max-width:1060px; margin:0 auto; padding:20px 22px 48px; }
+        /* ── RIGHT PANEL ── */
+        .rpanel { width:280px;flex-shrink:0;background:var(--white);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column; }
+        .rpanel-section { border-bottom:1px solid var(--border); }
+        .rpanel-hdr { padding:12px 14px 8px;font-size:12px;font-weight:700;color:var(--text-2);display:flex;align-items:center;justify-content:space-between; }
+        .weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0; }
+        .weather-zone { padding:10px 10px 12px;border-right:1px solid var(--border);text-align:center; }
+        .weather-zone:last-child { border-right:none; }
+        .wz-label { font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px; }
+        .wz-temp { font-size:22px;font-weight:800;color:var(--text);line-height:1; }
+        .wz-unit { font-size:11px;color:var(--text-3);font-weight:400; }
+        .wz-wind { font-size:10px;color:var(--text-3);margin-top:2px; }
+        .lift-row { display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border); }
+        .lift-row:last-child { border-bottom:none; }
+        .lift-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+        .lift-name { font-size:12.5px;font-weight:500;color:var(--text-2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .lift-wait { font-size:11px;color:#f59e0b;font-weight:600; }
+        .lift-status { font-size:11px;font-weight:600;margin-left:auto; }
+        .trail-summary-row { display:flex;align-items:center;justify-content:space-between;padding:7px 14px; }
+        .ts-label { display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-2); }
+        .ts-dot { width:8px;height:8px;border-radius:50%; }
+        .ts-val { font-size:12.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:4px; }
+        .ts-check { font-size:11px;color:#22c55e; }
+        .score-section { padding:16px 14px;display:flex;flex-direction:column;align-items:center;gap:6px; }
+        .score-cond { font-size:12px;color:var(--text-3);text-align:center; }
+        .score-snow { display:flex;gap:16px;margin-top:4px; }
+        .score-snow-item { text-align:center; }
+        .score-snow-val { font-size:15px;font-weight:800;color:var(--text); }
+        .score-snow-lbl { font-size:10px;color:var(--text-3);margin-top:1px; }
+        .logo-footer { padding:12px 14px;display:flex;align-items:center;gap:6px;margin-top:auto; }
+        .logo-footer img { height:24px;width:auto; }
+        .logo-footer-brand { font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
 
-        /* HERO */
-        .hero-card { border-radius:18px; overflow:hidden; position:relative; margin-bottom:16px; box-shadow:var(--shadow-lg); }
-        .hero-img { width:100%; height:190px; object-fit:cover; display:block; }
-        .hero-overlay { position:absolute; inset:0; background:linear-gradient(to bottom,rgba(0,0,0,0.05) 0%,rgba(0,0,0,0.52) 100%); }
-        .hero-label { position:absolute; bottom:14px; left:16px; }
-        .hero-resort-name { font-size:22px; font-weight:900; color:#fff; letter-spacing:-0.02em; text-shadow:0 2px 8px rgba(0,0,0,0.4); }
-        .hero-state { font-size:13px; color:rgba(255,255,255,0.8); margin-top:2px; font-weight:500; }
-        .hero-updated { position:absolute; top:12px; right:12px; background:rgba(255,255,255,0.15); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.25); border-radius:100px; padding:4px 11px; font-size:11px; font-weight:600; color:#fff; }
+        /* ── BOTTOM STRIP ── */
+        .bottom-strip { height:240px;flex-shrink:0;background:var(--white);border-top:1px solid var(--border-2);display:flex;flex-direction:column; }
+        .bs-header { display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border); }
+        .bs-title { font-size:13px;font-weight:700;color:var(--text); }
+        .bs-tab { padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-3);border:none;background:none;font-family:'Inter',sans-serif;transition:all .15s; }
+        .bs-tab.act { background:var(--blue-light);color:var(--blue); }
+        .bs-sort { margin-left:auto;font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:4px;cursor:pointer; }
+        .bs-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:0;overflow-y:auto;flex:1; }
+        .bs-row { display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);border-right:1px solid var(--border); }
+        .bs-row:nth-child(even) { border-right:none; }
+        .bs-diff { width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
+        .bs-name { font-size:12.5px;font-weight:500;color:var(--text-2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .bs-badge { display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600; }
+        .bs-badge.open    { background:#f0fdf4;color:#15803d; }
+        .bs-badge.groomed { background:#f0fdfa;color:#0f766e; }
+        .bs-badge.closed  { background:#fef2f2;color:#991b1b; }
+        .bs-badge.hold    { background:#fffbeb;color:#92400e; }
+        .bs-check { width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0; }
 
-        /* GRID */
-        .content-grid { display:grid; grid-template-columns:1fr 268px; gap:14px; }
-        @media(max-width:860px){ .content-grid{grid-template-columns:1fr;} }
+        /* ── FORECAST STRIP ── */
+        .forecast-strip { display:flex;gap:0;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--border); }
+        .fc-day { display:flex;flex-direction:column;align-items:center;gap:2px;min-width:60px;padding:4px 8px;border-right:1px solid var(--border);flex-shrink:0; }
+        .fc-day:last-child { border-right:none; }
+        .fc-label { font-size:10px;font-weight:600;color:var(--text-3); }
+        .fc-snow { font-size:13px;font-weight:800;color:#3b82f6; }
+        .fc-snow.zero { color:var(--text-3); }
+        .fc-temp { font-size:10px;color:var(--text-3); }
 
-        /* CARDS */
-        .card { background:var(--white); border:1px solid var(--border-2); border-radius:16px; padding:16px; box-shadow:var(--shadow); }
-        .card + .card { margin-top:14px; }
-        .card-title { font-size:12px; font-weight:700; color:var(--text-3); margin-bottom:12px; display:flex; align-items:center; gap:5px; letter-spacing:0.02em; text-transform:uppercase; }
-
-        /* SCORE */
-        .score-big { font-size:64px; font-weight:900; line-height:1; letter-spacing:-0.04em; }
-        .score-label-text { font-size:20px; font-weight:800; margin-top:4px; }
-        .score-sub { font-size:12px; color:var(--text-3); margin-top:3px; }
-        .metrics-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
-        .metric-box { background:var(--bg); border-radius:10px; padding:10px 6px; text-align:center; border:1px solid var(--border); }
-        .metric-val { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; }
-        .metric-key { font-size:10px; color:var(--text-3); margin-top:2px; }
-        .metric-loading { height:14px; border-radius:4px; }
-
-        /* FORECAST STRIP */
-        .forecast-strip { display:flex; gap:7px; }
-        .fc-day { flex:1; background:var(--bg); border-radius:10px; padding:10px 5px; text-align:center; border:1px solid var(--border); min-width:0; }
-        .fc-day-name { font-size:11px; font-weight:600; color:var(--text-3); margin-bottom:5px; }
-        .fc-icon { font-size:20px; }
-        .fc-snow-val { font-size:14px; font-weight:800; color:var(--text); margin-top:4px; }
-        .fc-snow-unit { font-size:10px; color:var(--text-3); font-weight:500; }
-        .fc-temp { font-size:10px; color:var(--text-3); margin-top:2px; }
-
-        /* FORECAST SIDEBAR */
-        .fc-sidebar-row { display:flex; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); }
-        .fc-sidebar-row:last-child { border-bottom:none; padding-bottom:0; }
-        .fc-sidebar-day { font-size:13px; font-weight:600; color:var(--text-2); width:36px; flex-shrink:0; }
-        .fc-sidebar-icon { font-size:17px; margin:0 8px; flex-shrink:0; }
-        .fc-sidebar-desc { font-size:11px; color:var(--text-3); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .fc-sidebar-snow { font-size:16px; font-weight:900; color:var(--text); flex-shrink:0; }
-        .fc-sidebar-unit { font-size:10px; color:var(--text-3); margin-left:2px; }
-
-        /* CHART */
-        .chart-wrap { background:var(--bg); border-radius:10px; padding:12px 8px 6px; margin-top:12px; }
-        .chart-bars { display:flex; align-items:flex-end; gap:4px; height:72px; }
-        .chart-bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; height:100%; justify-content:flex-end; }
-        .chart-bar { width:100%; border-radius:3px 3px 0 0; background:linear-gradient(180deg,var(--blue),#93c5fd); min-height:3px; transition:height .3s; }
-        .chart-bar-lbl { font-size:8px; color:var(--text-3); }
-        .chart-empty { height:72px; display:flex; align-items:center; justify-content:center; font-size:12px; color:var(--text-3); }
-
-        /* FAVS GRID */
-        .section-heading { font-size:13px; font-weight:700; color:var(--text-3); letter-spacing:0.02em; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:5px; }
-        .fav-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
-        .fav-card { background:var(--white); border:1px solid var(--border-2); border-radius:14px; overflow:hidden; text-decoration:none; color:inherit; box-shadow:var(--shadow); transition:transform .2s,box-shadow .2s,border-color .2s; display:flex; flex-direction:column; }
-        .fav-card:hover { transform:translateY(-3px); box-shadow:var(--shadow-lg); border-color:rgba(29,110,245,0.3); }
-        .fav-img { width:100%; height:130px; object-fit:cover; display:block; }
-        .fav-img-placeholder { width:100%; height:130px; background:linear-gradient(135deg,#bfdbfe,#93c5fd); display:flex; align-items:center; justify-content:center; font-size:28px; }
-        .fav-body { padding:12px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        .fav-name { font-size:14px; font-weight:800; color:var(--text); }
-        .fav-state { font-size:12px; color:var(--text-3); margin-top:1px; }
-
-        /* UPGRADE */
-        .upgrade-banner { background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1px solid rgba(29,110,245,0.2); border-radius:14px; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
-        .upgrade-title { font-size:14px; font-weight:700; color:var(--text); }
-        .upgrade-sub { font-size:12px; color:var(--text-2); margin-top:2px; }
-        .upgrade-btn { padding:8px 18px; border-radius:9px; font-size:13px; font-weight:700; color:#fff; background:var(--blue); text-decoration:none; white-space:nowrap; box-shadow:0 2px 8px rgba(29,110,245,0.3); }
-        .upgrade-btn:hover { filter:brightness(1.1); }
-
-        /* EMPTY */
-        .empty-state { text-align:center; padding:60px 20px; }
-        .empty-icon { font-size:44px; margin-bottom:12px; }
-        .empty-title { font-size:18px; font-weight:700; color:var(--text-2); margin-bottom:6px; }
-        .empty-sub { font-size:14px; color:var(--text-3); margin-bottom:20px; }
-        .empty-btn { display:inline-block; padding:11px 24px; border-radius:10px; font-size:14px; font-weight:700; color:#fff; background:var(--blue); text-decoration:none; box-shadow:0 2px 8px rgba(29,110,245,0.3); }
-
-        /* SKELETON */
-        .skeleton { background:linear-gradient(90deg,#e8f0f8 25%,#d4e4f0 50%,#e8f0f8 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; border-radius:10px; }
-        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
-
-        /* QUICK LINKS */
-        .quick-link { display:flex; align-items:center; gap:8px; padding:9px 10px; border-radius:9px; background:var(--bg); text-decoration:none; font-size:13px; font-weight:600; color:var(--text-2); border:1px solid var(--border); transition:background .15s,color .15s; }
-        .quick-link:hover { background:var(--blue-light); color:var(--blue); }
-        .quick-link.highlight { background:var(--blue-light); color:var(--blue); border-color:rgba(29,110,245,0.2); }
-
-        /* SCORE LOADING */
-        .data-loading { opacity:0.5; pointer-events:none; }
-
-        @media(max-width:700px){
-          .sidebar{display:none;}
-          .topnav-tabs{display:none;}
-          .metrics-row{grid-template-columns:repeat(2,1fr);}
-        }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        @media(max-width:1024px) { .rpanel { display:none; } }
+        @media(max-width:768px) { .sidebar { display:none; } .diff-toolbar { display:none; } }
       `}</style>
 
-      <div className="app-shell">
+      {/* ── TOPNAV ── */}
+      <nav className="tnav">
+        <div className="tnav-logo">
+          <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
+          <span className="tnav-brand">PowderIQ</span>
+        </div>
+        <div className="tnav-tabs">
+          <Link href="/dashboard" className="tnav-tab act">📊 Dashboard</Link>
+          <Link href="/mountains" className="tnav-tab">🏔️ Resorts</Link>
+          <Link href="/forecasts" className="tnav-tab">🌨️ Forecasts</Link>
+          <Link href="/account/profile" className="tnav-tab">👤 Account</Link>
+          {hasResort && <Link href="/resort/dashboard" className="tnav-tab">⛷️ Resort</Link>}
+        </div>
+        <div className="tnav-right">
+          <div className="ar-badge"><div className="ar-dot"/>AR Connected</div>
+          <Link href="/mountains" className="tnav-tab" style={{fontSize:18,padding:'4px 8px'}}>🏔️</Link>
+          <Link href="/account/profile" className="tnav-av" aria-label="Account">
+            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : (userName ? userName[0].toUpperCase() : '👤')}
+          </Link>
+          {score > 0 && <div className="score-badge">{score}</div>}
+        </div>
+      </nav>
 
-        {/* ── TOP NAV ── */}
-        <header className="topnav" role="banner">
-          <div className="topnav-logo">
-            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:34,width:'auto'}} />
-            <span className="topnav-brand">PowderIQ</span>
-          </div>
+      {/* ── SHELL ── */}
+      <div className="shell">
 
-          <nav className="topnav-tabs" aria-label="Main navigation">
-            <Link href="/dashboard" className="topnav-tab active" aria-current="page">
-              <span aria-hidden="true">📊</span>Dashboard
-            </Link>
-            <Link href="/mountains" className="topnav-tab">
-              <span aria-hidden="true">🏔️</span>Resorts
-            </Link>
-            <Link href="/forecasts" className="topnav-tab">
-              <span aria-hidden="true">📅</span>Forecasts
-            </Link>
-            {(userRole==='pro_user'||userRole==='admin') && (
-              <Link href="/compare" className="topnav-tab">
-                <span aria-hidden="true">📈</span>Analytics
-              </Link>
-            )}
-            {(userRole==='pro_user'||userRole==='admin') && (
-              <Link href="/alerts" className="topnav-tab">
-                <span aria-hidden="true">🔔</span>Alerts
-              </Link>
-            )}
-            {hasResort && (
-              <Link href="/resort/dashboard" className="topnav-tab">
-                <span aria-hidden="true">🎿</span>Resort
-              </Link>
-            )}
-            {userRole==='admin' && (
-              <Link href="/admin" className="topnav-tab">
-                <span aria-hidden="true">⚙️</span>Admin
-              </Link>
-            )}
-          </nav>
+        {/* ── SIDEBAR ── */}
+        <aside className="sidebar">
+          <div className="sb-section-lbl">Saved Resorts</div>
+          {favorites.length === 0 && (
+            <div style={{padding:'20px 14px',fontSize:12,color:'var(--text-3)',textAlign:'center',lineHeight:1.6}}>
+              No favorites yet.<br/>
+              <Link href="/mountains" style={{color:'var(--blue)',fontWeight:600}}>Browse mountains</Link>
+            </div>
+          )}
+          {favorites.map(fav => {
+            const s = fav.score ?? 0;
+            const isAct = selectedFav?.id === fav.id;
+            return (
+              <div key={fav.id} className={`sb-resort${isAct?' act':''}`} onClick={() => setSelectedFav(fav)}>
+                <div className="sb-resort-icon">
+                  <img src={getMtnImg(fav.mountain)} alt={fav.mountain.name}/>
+                </div>
+                <span className="sb-resort-name">{fav.mountain.name}</span>
+                {s > 0 && <span className="sb-resort-score" style={{color:getScoreColor(s)}}>{s}</span>}
+              </div>
+            );
+          })}
+        </aside>
 
-          <div className="topnav-right">
-            <Link href="/account/profile" className="topnav-avatar" aria-label="Account settings"
-              style={{textDecoration:'none',overflow:'hidden'}}>
-              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : (userName ? userName[0].toUpperCase() : '👤')}
-            </Link>
-            <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
-          </div>
-        </header>
+        {/* ── MAIN ── */}
+        <div className="main">
 
-        <div className="app-body">
+          {/* Map + right panel row */}
+          <div style={{flex:1,display:'flex',overflow:'hidden'}}>
 
-          {/* ── SIDEBAR ── */}
-          <aside className="sidebar" aria-label="Sidebar navigation">
+            {/* Map */}
+            <div className="map-wrap">
+              <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
+                onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
 
-            {favorites.length > 0 && (
-              <>
-                <div className="sidebar-label">Saved Resorts</div>
-                {favorites.map(f=>(
-                  <div key={f.id}
-                    className={`sidebar-resort-item${activeFav?.id===f.id?' active':''}`}
-                    onClick={()=>setSelectedFav(f)}
-                    role="button" tabIndex={0}
-                    aria-label={`View ${f.mountain.name}`}
-                    aria-pressed={activeFav?.id===f.id}
-                    onKeyDown={e=>e.key==='Enter'&&setSelectedFav(f)}>
-                    <img src={getMountainImage(f.mountain)} alt="" aria-hidden="true"
-                      className="sidebar-resort-thumb"
-                      onError={e=>{(e.target as HTMLImageElement).src=FALLBACK_IMG}} />
-                    <span className="sidebar-resort-name">{f.mountain.name}</span>
-                    {f.score!=null && <span className="sidebar-resort-score">{f.score}</span>}
-                  </div>
+              {/* Map mode toolbar */}
+              <div className="map-toolbar">
+                {(['trail','satellite','hybrid'] as const).map(m => (
+                  <button key={m} className={`map-mode-btn${mapMode===m?' act':''}`} onClick={() => setMapMode(m)}>
+                    {m === 'trail' ? '🗺 Trail Map' : m === 'satellite' ? '🛰️ Satellite' : '🌐 Hybrid'}
+                  </button>
                 ))}
-              </>
-            )}
-          </aside>
+              </div>
 
-          {/* ── MAIN ── */}
-          <main className="main-content" id="main-content">
-            <div className="main-inner">
+              {/* Difficulty filter */}
+              {allDiffs.length > 0 && (
+                <div className="diff-toolbar">
+                  <span style={{fontSize:11,fontWeight:700,color:'rgba(255,255,255,0.7)',background:'rgba(0,0,0,0.4)',padding:'5px 10px',borderRadius:8,backdropFilter:'blur(8px)'}}>Difficulty:</span>
+                  {allDiffs.map(d => (
+                    <button key={d} className={`diff-btn${diffFilter.includes(d)?' act':''}`}
+                      onClick={() => setDiffFilter(p => p.includes(d) ? p.filter(x=>x!==d) : [...p,d])}>
+                      <span style={{color:DIFF_COLOR[d]}}>{DIFF_ICON[d]}</span>
+                      {d.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {loading ? (
-                <div aria-label="Loading" aria-busy="true">
-                  <div className="skeleton" style={{height:190,marginBottom:14}} />
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 268px',gap:14}}>
-                    <div className="skeleton" style={{height:220}} />
-                    <div className="skeleton" style={{height:220}} />
+              {/* Map placeholder text */}
+              {!activeFav && (
+                <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(0,0,0,0.4)'}}>
+                  <div style={{textAlign:'center',color:'#fff'}}>
+                    <div style={{fontSize:48,marginBottom:8}}>⛷️</div>
+                    <div style={{fontSize:16,fontWeight:700}}>Save a resort to get started</div>
+                    <Link href="/mountains" style={{color:'#60a5fa',fontSize:13,marginTop:8,display:'block'}}>Browse mountains →</Link>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {userRole==='user' && (
-                    <div className="upgrade-banner" role="complementary">
-                      <div>
-                        <div className="upgrade-title">📊 Upgrade to Pro</div>
-                        <div className="upgrade-sub">Unlock Compare, Alerts, and personalized scoring weights.</div>
+              )}
+
+              {/* Mapbox attribution */}
+              <div style={{position:'absolute',bottom:8,right:8,fontSize:10,color:'rgba(255,255,255,0.5)',background:'rgba(0,0,0,0.3)',padding:'3px 7px',borderRadius:4,backdropFilter:'blur(4px)'}}>
+                © Mapbox © OpenStreetMap
+              </div>
+            </div>
+
+            {/* ── RIGHT PANEL ── */}
+            <div className="rpanel">
+
+              {/* Resort name */}
+              <div className="rpanel-section" style={{padding:'14px 14px 12px'}}>
+                <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:2}}>{activeFav?.mountain.name ?? '—'} Resort</div>
+                <div style={{fontSize:11,color:'var(--text-3)'}}>{activeFav?.mountain.state ?? ''}</div>
+              </div>
+
+              {/* Weather */}
+              <div className="rpanel-section">
+                <div className="rpanel-hdr">🌡️ Conditions</div>
+                <div className="weather-grid">
+                  {(['Summit','Mid','Base']).map((z,i) => (
+                    <div key={z} className="weather-zone">
+                      <div className="wz-label">{i===0?'🏔':i===1?'⛷':'🏠'} {z}</div>
+                      <div className="wz-temp">
+                        {i===0 ? (scoreData?.tempF?.toFixed(0) ?? '--') : '--'}
+                        <span className="wz-unit">°F</span>
                       </div>
-                      <Link href="/account" className="upgrade-btn">Upgrade Now</Link>
+                      <div className="wz-wind">{i===0 ? (scoreData?.windMph ? `${scoreData.windMph.toFixed(0)} mph` : '--') : '--'}</div>
                     </div>
-                  )}
+                  ))}
+                </div>
+              </div>
 
-                  {favorites.length === 0 ? (
-                    <div className="empty-state">
-                      <div className="empty-icon" aria-hidden="true">⭐</div>
-                      <div className="empty-title">No favorites yet</div>
-                      <div className="empty-sub">Add mountains to track your powder windows.</div>
-                      <Link href="/mountains" className="empty-btn">Browse Mountains</Link>
+              {/* Lift Status */}
+              <div className="rpanel-section">
+                <div className="rpanel-hdr">
+                  🚡 Lift Status
+                  {lifts.length > 0 && <span style={{fontSize:11,color:'var(--text-3)',fontWeight:400}}>{openLifts}/{lifts.length} open</span>}
+                </div>
+                {scoreLoading && <div style={{padding:'12px 14px',fontSize:12,color:'var(--text-3)'}}>Loading…</div>}
+                {!scoreLoading && lifts.length === 0 && <div style={{padding:'12px 14px',fontSize:12,color:'var(--text-3)'}}>No lift data available</div>}
+                {lifts.slice(0,6).map(l => (
+                  <div key={l.id} className="lift-row">
+                    <div className="lift-dot" style={{background:LIFT_COLOR[l.status]||'#6b849a'}}/>
+                    <span className="lift-name">{l.liftName}</span>
+                    {l.waitMinutes != null && l.status==='open' && <span className="lift-wait">{l.waitMinutes}m</span>}
+                    <span className="lift-status" style={{color:LIFT_COLOR[l.status]||'#6b849a'}}>{LIFT_LABEL[l.status]||l.status}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Trail Status */}
+              <div className="rpanel-section">
+                <div className="rpanel-hdr">
+                  ⛷️ Trail Status
+                  {trails.length > 0 && <span style={{fontSize:11,color:'var(--text-3)',fontWeight:400}}>{openTrails}/{trails.length} open</span>}
+                </div>
+                {[
+                  {label:'Open',    color:'#22c55e', count: trails.filter(t=>t.status==='open').length},
+                  {label:'Groomed', color:'#14b8a6', count: groomedCount},
+                  {label:'Closed',  color:'#ef4444', count: trails.filter(t=>t.status==='closed').length},
+                ].map(r => (
+                  <div key={r.label} className="trail-summary-row">
+                    <div className="ts-label"><div className="ts-dot" style={{background:r.color}}/>{r.label}</div>
+                    <div className="ts-val">{r.count} <span className="ts-check">✓</span></div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Powder Score */}
+              <div className="rpanel-section score-section">
+                <div style={{fontSize:12,fontWeight:700,color:'var(--text-2)',marginBottom:4}}>Powder Score</div>
+                {scoreLoading
+                  ? <div style={{width:130,height:130,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',fontSize:12}}>Loading…</div>
+                  : <ScoreRing score={score}/>
+                }
+                <div className="score-cond">{scoreData?.conditionDesc ?? '—'}</div>
+                {scoreData && (
+                  <div className="score-snow">
+                    {[
+                      {val:`${scoreData.snowfall24hIn?.toFixed(1) ?? '0'}"`, lbl:'24h Snow'},
+                      {val:`${scoreData.snowDepthIn?.toFixed(0) ?? '—'}"`, lbl:'Base Depth'},
+                    ].map(s => (
+                      <div key={s.lbl} className="score-snow-item">
+                        <div className="score-snow-val">{s.val}</div>
+                        <div className="score-snow-lbl">{s.lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* PowderIQ logo footer */}
+              <div className="logo-footer">
+                <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
+                <span className="logo-footer-brand">PowderIQ</span>
+              </div>
+
+            </div>
+          </div>
+
+          {/* ── BOTTOM STRIP ── */}
+          <div className="bottom-strip">
+
+            {/* Forecast strip */}
+            {forecast.length > 0 && (
+              <div className="forecast-strip">
+                {forecast.map(f => (
+                  <div key={f.date} className="fc-day">
+                    <div className="fc-label">{f.dayLabel}</div>
+                    <div className={`fc-snow${f.snowIn===0?' zero':''}`}>{f.snowIn > 0 ? `${f.snowIn.toFixed(1)}"` : '—'}</div>
+                    <div className="fc-temp">{f.tempHighF?.toFixed(0) ?? '--'}° / {f.tempLowF?.toFixed(0) ?? '--'}°</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Trails & Lifts table */}
+            <div className="bs-header">
+              <span className="bs-title">Trails &amp; Lifts</span>
+              <button className={`bs-tab${activePanel==='lifts'?' act':''}`} onClick={()=>setActivePanel('lifts')}>
+                {lifts.length > 0 ? `Lifts (${lifts.length})` : 'Lifts'}
+              </button>
+              <button className={`bs-tab${activePanel==='trails'?' act':''}`} onClick={()=>setActivePanel('trails')}>
+                {trails.length > 0 ? `Trails (${trails.length})` : 'Trails'}
+              </button>
+              <div className="bs-sort">⇅ Sort</div>
+            </div>
+            <div className="bs-grid">
+              {activePanel === 'lifts' && (
+                lifts.length === 0
+                  ? <div style={{padding:'24px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>No lift data — save a resort with a PowderIQ account to see live status</div>
+                  : lifts.map(l => (
+                    <div key={l.id} className="bs-row">
+                      <div className="bs-diff" style={{background:`${LIFT_COLOR[l.status] || '#6b849a'}22`}}>
+                        <span style={{color:LIFT_COLOR[l.status]||'#6b849a',fontSize:9}}>🚡</span>
+                      </div>
+                      <span className="bs-name">{l.liftName}</span>
+                      <span className={`bs-badge ${l.status==='open'?'open':l.status==='on_hold'?'hold':'closed'}`}>
+                        {LIFT_LABEL[l.status]||l.status}
+                      </span>
+                      <div className="bs-check" style={{background:l.status==='open'?'#f0fdf4':'var(--bg)',color:'#22c55e'}}>
+                        {l.status==='open'?'✓':''}
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      {/* HERO */}
-                      <div className="hero-card">
-                        <img src={heroImg} alt={activeFav?.mountain.name ?? ''} className="hero-img"
-                          onError={e=>{(e.target as HTMLImageElement).src=FALLBACK_IMG}} />
-                        <div className="hero-overlay" aria-hidden="true" />
-                        <div className="hero-label">
-                          <div className="hero-resort-name">{activeFav?.mountain.name} Resort</div>
-                          <div className="hero-state">{activeFav?.mountain.state}</div>
-                        </div>
-                        {updatedTime && (
-                          <div className="hero-updated">✓ Updated {updatedTime}</div>
-                        )}
+                  ))
+              )}
+              {activePanel === 'trails' && (
+                filteredTrails.length === 0
+                  ? <div style={{padding:'24px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>No trail data available</div>
+                  : filteredTrails.map(t => (
+                    <div key={t.id} className="bs-row">
+                      <div className="bs-diff" style={{background:`${DIFF_COLOR[t.difficulty]||'#6b849a'}22`}}>
+                        <span style={{color:DIFF_COLOR[t.difficulty]||'#6b849a',fontSize:9}}>{DIFF_ICON[t.difficulty]||'●'}</span>
                       </div>
-
-                      <div className={`content-grid${scoreLoading?' data-loading':''}`}>
-
-                        {/* LEFT */}
-                        <div style={{display:'flex',flexDirection:'column',gap:14}}>
-
-                          {/* SCORE + METRICS */}
-                          <div className="card" aria-label={`${activeFav?.mountain.name} conditions`}>
-                            <div className="card-title">
-                              <span aria-hidden="true">🏔️</span>
-                              Current Conditions — {activeFav?.mountain.name}
-                            </div>
-                            <div style={{display:'flex',alignItems:'flex-start',gap:20}}>
-                              <div>
-                                <div className="score-big" style={{color:scoreColor}}>{score}</div>
-                                <div className="score-label-text" style={{color:scoreColor}}>{scoreLabel}</div>
-                                <div className="score-sub">Powder Score</div>
-                              </div>
-                              {scoreData?.conditionDesc && (
-                                <div style={{padding:'8px 12px',background:'var(--bg)',borderRadius:10,border:'1px solid var(--border)',fontSize:13,color:'var(--text-2)',fontWeight:500,marginTop:4,maxWidth:200,lineHeight:1.5}}>
-                                  {scoreData.conditionDesc}
-                                </div>
-                              )}
-                            </div>
-                            <div className="metrics-row">
-                              {[
-                                {val: scoreData?.snowfall24hIn!=null ? `${fmt(scoreData.snowfall24hIn,1)}"` : '—', key:'New Snow 24h'},
-                                {val: scoreData?.windMph!=null       ? `${fmt(scoreData.windMph)} mph`      : '—', key:'Wind Speed'},
-                                {val: scoreData?.tempF!=null         ? `${fmt(scoreData.tempF)}°F`          : '—', key:'Temperature'},
-                                {val: scoreData?.snowDepthIn!=null   ? `${fmt(scoreData.snowDepthIn)}"`     : '—', key:'Base Depth'},
-                              ].map(m=>(
-                                <div key={m.key} className="metric-box">
-                                  {scoreLoading
-                                    ? <div className={`skeleton metric-loading`} />
-                                    : <div className="metric-val">{m.val}</div>
-                                  }
-                                  <div className="metric-key">{m.key}</div>
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* SNOW HISTORY + FORECAST */}
-                            <div style={{marginTop:14,paddingTop:14,borderTop:'1px solid var(--border)'}}>
-                              <div style={{fontSize:11,fontWeight:700,color:'var(--text-3)',letterSpacing:'.06em',textTransform:'uppercase',marginBottom:10}}>
-                                ❄️ Snowfall History &amp; Forecast
-                              </div>
-                              {scoreLoading ? (
-                                <div className="skeleton" style={{height:56,borderRadius:10}} />
-                              ) : (
-                                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
-                                  {[
-                                    {
-                                      val: scoreData?.snowfall24hIn != null ? `${fmt(scoreData.snowfall24hIn,1)}"` : '—',
-                                      label: 'Last 24h',
-                                      sub: 'actual',
-                                      color: (scoreData?.snowfall24hIn ?? 0) > 3 ? '#1d6ef5' : 'var(--text)',
-                                      bg: (scoreData?.snowfall24hIn ?? 0) > 3 ? 'var(--blue-light)' : 'var(--bg)',
-                                      border: (scoreData?.snowfall24hIn ?? 0) > 3 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
-                                    },
-                                    {
-                                      val: scoreData?.snowfall48hIn != null ? `${fmt(scoreData.snowfall48hIn,1)}"` : '—',
-                                      label: 'Last 48h',
-                                      sub: 'actual',
-                                      color: (scoreData?.snowfall48hIn ?? 0) > 6 ? '#1d6ef5' : 'var(--text)',
-                                      bg: (scoreData?.snowfall48hIn ?? 0) > 6 ? 'var(--blue-light)' : 'var(--bg)',
-                                      border: (scoreData?.snowfall48hIn ?? 0) > 6 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
-                                    },
-                                    {
-                                      val: scoreData?.snowfall72hIn != null ? `${fmt(scoreData.snowfall72hIn,1)}"` : '—',
-                                      label: 'Last 72h',
-                                      sub: 'actual',
-                                      color: (scoreData?.snowfall72hIn ?? 0) > 9 ? '#1d6ef5' : 'var(--text)',
-                                      bg: (scoreData?.snowfall72hIn ?? 0) > 9 ? 'var(--blue-light)' : 'var(--bg)',
-                                      border: (scoreData?.snowfall72hIn ?? 0) > 9 ? 'rgba(29,110,245,0.2)' : 'var(--border-2)',
-                                    },
-                                    {
-                                      val: scoreData?.forecastSnow24hIn != null ? `${fmt(scoreData.forecastSnow24hIn,1)}"` : '—',
-                                      label: 'Next 24h',
-                                      sub: 'forecast',
-                                      color: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? '#22c55e' : 'var(--text)',
-                                      bg: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? '#f0fdf4' : 'var(--bg)',
-                                      border: (scoreData?.forecastSnow24hIn ?? 0) > 2 ? 'rgba(34,197,94,0.2)' : 'var(--border-2)',
-                                    },
-                                  ].map(s => (
-                                    <div key={s.label} style={{
-                                      background:s.bg, border:`1px solid ${s.border}`,
-                                      borderRadius:10, padding:'10px 10px 8px', textAlign:'center',
-                                    }}>
-                                      <div style={{fontSize:20,fontWeight:900,color:s.color,lineHeight:1}}>{s.val}</div>
-                                      <div style={{fontSize:11,fontWeight:700,color:'var(--text-2)',marginTop:3}}>{s.label}</div>
-                                      <div style={{fontSize:10,color:'var(--text-3)',marginTop:1,fontStyle:'italic'}}>{s.sub}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* 6-DAY FORECAST STRIP */}
-                          <div className="card" aria-label="6-day snow forecast">
-                            <div className="card-title"><span aria-hidden="true">📅</span>6-Day Snow Forecast</div>
-                            {scoreLoading ? (
-                              <div className="skeleton" style={{height:90,borderRadius:10}} />
-                            ) : forecast.length > 0 ? (
-                              <div className="forecast-strip">
-                                {forecast.map((d,i)=>(
-                                  <div key={i} className="fc-day">
-                                    <div className="fc-day-name">{d.dayLabel}</div>
-                                    <div className="fc-icon" aria-hidden="true">{weatherIcon(d.conditionDesc, d.snowIn)}</div>
-                                    <div className="fc-snow-val">{fmt(d.snowIn,1)}<span className="fc-snow-unit">in</span></div>
-                                    {(d.tempHighF!=null||d.tempLowF!=null) && (
-                                      <div className="fc-temp">{d.tempHighF!=null?`${fmt(d.tempHighF)}°`:''}{d.tempLowF!=null?` / ${fmt(d.tempLowF)}°`:''}</div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div style={{color:'var(--text-3)',fontSize:13,padding:'12px 0',textAlign:'center'}}>
-                                Forecast data unavailable
-                              </div>
-                            )}
-                          </div>
-
-                          {/* SNOWFALL CHART */}
-                          <div className="card" aria-label="Forecast snowfall chart">
-                            <div className="card-title"><span aria-hidden="true">📊</span>Forecast Snowfall</div>
-                            {chartData.length > 0 ? (
-                              <div className="chart-wrap">
-                                <div className="chart-bars">
-                                  {chartData.map((d,i)=>(
-                                    <div key={i} className="chart-bar-col">
-                                      <div className="chart-bar"
-                                        style={{height:`${Math.max((d.val/chartMax)*100,4)}%`}}
-                                        title={`${d.label}: ${d.val}"`} />
-                                    </div>
-                                  ))}
-                                </div>
-                                <div style={{display:'flex',gap:4,marginTop:4}}>
-                                  {chartData.map((d,i)=>(
-                                    <div key={i} className="chart-bar-col">
-                                      <span className="chart-bar-lbl">{d.label}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="chart-empty">No forecast data</div>
-                            )}
-                          </div>
-
-                          {/* ALL FAVORITES */}
-                          <div>
-                            <div className="section-heading"><span aria-hidden="true">⭐</span>Your Saved Mountains</div>
-                            <div className="fav-grid" role="list">
-                              {favorites.map(f=>(
-                                <Link key={f.id} href={`/mountains/${f.mountain.id}`}
-                                  className="fav-card" role="listitem"
-                                  aria-label={`${f.mountain.name}, ${f.mountain.state}${f.score!=null?`, score ${f.score}`:''}`}>
-                                  <img
-                                    src={getMountainImage(f.mountain)}
-                                    alt={f.mountain.name}
-                                    className="fav-img"
-                                    loading="lazy"
-                                    onError={e=>{(e.target as HTMLImageElement).src=FALLBACK_IMG}}
-                                  />
-                                  <div className="fav-body">
-                                    <div>
-                                      <div className="fav-name">{f.mountain.name}</div>
-                                      <div className="fav-state">{f.mountain.state}</div>
-                                    </div>
-                                    {f.score!=null && <ScoreBadge score={f.score} />}
-                                  </div>
-                                </Link>
-                              ))}
-                            </div>
-                          </div>
-
-                        </div>
-
-                        {/* RIGHT SIDEBAR */}
-                        <div style={{display:'flex',flexDirection:'column',gap:14}}>
-
-                          {/* FORECAST LIST */}
-                          <div className="card" aria-label="Detailed forecast">
-                            <div className="card-title"><span aria-hidden="true">❄️</span>6-Day Snow Forecast</div>
-                            {scoreLoading ? (
-                              [...Array(5)].map((_,i)=>(
-                                <div key={i} className="skeleton" style={{height:36,marginBottom:6,borderRadius:8}} />
-                              ))
-                            ) : forecast.length > 0 ? (
-                              forecast.map((d,i)=>(
-                                <div key={i} className="fc-sidebar-row">
-                                  <span className="fc-sidebar-day">{d.dayLabel}</span>
-                                  <span className="fc-sidebar-icon" aria-hidden="true">{weatherIcon(d.conditionDesc,d.snowIn)}</span>
-                                  <span className="fc-sidebar-desc">{d.conditionDesc || (d.snowIn>0?'Snow likely':'Clear')}</span>
-                                  <span className="fc-sidebar-snow">{fmt(d.snowIn,0)}</span>
-                                  <span className="fc-sidebar-unit">in</span>
-                                </div>
-                              ))
-                            ) : (
-                              <div style={{color:'var(--text-3)',fontSize:12,padding:'8px 0',textAlign:'center'}}>No data</div>
-                            )}
-                          </div>
-
-                          {/* QUICK LINKS */}
-                          <div className="card">
-                            <div className="card-title"><span aria-hidden="true">🔗</span>Quick Links</div>
-                            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                              <Link href="/mountains" className="quick-link"><span>🏔️</span>Browse All Mountains</Link>
-                              {activeFav && (
-                                <Link href={`/mountains/${activeFav.mountain.id}`} className="quick-link"><span>📄</span>View {activeFav.mountain.name}</Link>
-                              )}
-                              {(userRole==='pro_user'||userRole==='admin') && <>
-                                <Link href="/compare" className="quick-link"><span>📊</span>Compare Resorts</Link>
-                                <Link href="/alerts"  className="quick-link"><span>🔔</span>Powder Alerts</Link>
-                              </>}
-                              {hasResort && (
-                                <Link href="/resort/dashboard" className="quick-link highlight"><span>🎿</span>Resort Dashboard</Link>
-                              )}
-                            </div>
-                          </div>
-
-                        </div>
+                      <span className="bs-name">{t.trailName}</span>
+                      <span className={`bs-badge ${t.status==='open'?'open':t.status==='groomed'?'groomed':t.status==='on_hold'?'hold':'closed'}`}>
+                        {t.status==='on_hold'?'Hold':t.status}
+                      </span>
+                      <div className="bs-check" style={{background:t.status==='open'||t.status==='groomed'?'#f0fdf4':'var(--bg)',color:'#22c55e'}}>
+                        {t.status==='open'||t.status==='groomed'?'✓':''}
                       </div>
-                    </>
-                  )}
-                </>
+                    </div>
+                  ))
               )}
             </div>
-          </main>
+          </div>
+
         </div>
       </div>
     </>
