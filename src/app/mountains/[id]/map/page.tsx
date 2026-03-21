@@ -51,17 +51,45 @@ export default function PublicTrailMapPage({ params: paramsPromise }: { params: 
         if (!mountain) throw new Error('Mountain not found');
         setResortName(mountain.name);
 
+        // Try to find a resort for this mountain — optional
+        let mapData = null;
         const resortRes = await fetch(`/api/resort?mountainId=${mountain.id}`);
-        if (!resortRes.ok) throw new Error('No resort for this mountain');
-        const resortJson = await resortRes.json();
-        const resort = Array.isArray(resortJson.data) ? resortJson.data[0] : resortJson.data;
-        if (!resort) throw new Error('No resort found');
+        if (resortRes.ok) {
+          const resortJson = await resortRes.json();
+          const resort = Array.isArray(resortJson.data) ? resortJson.data[0] : resortJson.data;
+          if (resort) {
+            const mapRes = await fetch(`/api/resort/${resort.id}/map`);
+            if (mapRes.ok) {
+              const mapJson = await mapRes.json();
+              mapData = mapJson.data;
+              if (mapJson.data?.resort?.name) setResortName(mapJson.data.resort.name);
+            }
+          }
+        }
 
-        const mapRes = await fetch(`/api/resort/${resort.id}/map`);
-        if (!mapRes.ok) throw new Error('Map data unavailable');
-        const mapJson = await mapRes.json();
-        setMapData(mapJson.data);
-        if (mapJson.data?.resort?.name) setResortName(mapJson.data.resort.name);
+        // If no resort map, build a minimal mapData from mountain directly
+        if (!mapData) {
+          mapData = {
+            resort: {
+              id: mountain.id,
+              name: mountain.name,
+              slug: mountain.slug,
+              baseElevFt: mountain.baseElevFt ?? 0,
+              midElevFt: mountain.midElevFt ?? 0,
+              summitElevFt: mountain.topElevFt ?? 0,
+              mountain: {
+                latitude: mountain.latitude,
+                longitude: mountain.longitude,
+              },
+            },
+            lifts: [],
+            trails: [],
+            weatherZones: [],
+            overlays: null,
+            map: null,
+          };
+        }
+        setMapData(mapData);
       } catch (e: any) {
         setError(e.message);
       } finally {
