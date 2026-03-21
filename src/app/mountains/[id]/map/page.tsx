@@ -45,7 +45,7 @@ export default function PublicTrailMapPage({ params: paramsPromise }: { params: 
     if (!slug) return;
     (async () => {
       try {
-        const mtnRes = await fetch(`/api/mountains?slug=${slug}`);
+        const mtnRes = await fetch(`/api/mountains?id=${slug}`);
         const mtnJson = await mtnRes.json();
         const mountain = mtnJson.data?.[0] ?? null;
         if (!mountain) throw new Error('Mountain not found');
