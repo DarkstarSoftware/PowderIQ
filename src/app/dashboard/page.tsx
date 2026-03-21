@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [lifts,        setLifts]        = useState<Lift[]>([]);
   const [trails,       setTrails]       = useState<Trail[]>([]);
   const [activePanel,  setActivePanel]  = useState<'lifts'|'trails'>('lifts');
+  const [weatherZones, setWeatherZones] = useState<Record<string,any>>({});
 
   // ── Auth + data load ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -139,7 +140,7 @@ export default function DashboardPage() {
   const loadDetail = useCallback(async (fav: FavoriteItem, tok: string) => {
     if (!fav || !tok) return;
     setScoreLoading(true);
-    setScoreData(null); setForecast([]); setLifts([]); setTrails([]);
+    setScoreData(null); setForecast([]); setLifts([]); setTrails([]); setWeatherZones({});
     try {
       const h = { Authorization: `Bearer ${tok}` };
       const [scoreRes, forecastRes] = await Promise.allSettled([
@@ -190,12 +191,18 @@ export default function DashboardPage() {
         const rj = await resortRes.json();
         const resort = Array.isArray(rj.data) ? rj.data[0] : rj.data;
         if (resort) {
-          const [lRes, tRes] = await Promise.allSettled([
-            fetch(`/api/resort/${resort.id}/lifts`,  { headers: h }),
-            fetch(`/api/resort/${resort.id}/trails`, { headers: h }),
+          const [lRes, tRes, wRes] = await Promise.allSettled([
+            fetch(`/api/resort/${resort.id}/lifts`,   { headers: h }),
+            fetch(`/api/resort/${resort.id}/trails`,  { headers: h }),
+            fetch(`/api/resort/${resort.id}/weather`, { headers: h }),
           ]);
           if (lRes.status === 'fulfilled' && lRes.value.ok) { const lj = await lRes.value.json(); setLifts(lj.data?.lifts ?? []); }
           if (tRes.status === 'fulfilled' && tRes.value.ok) { const tj = await tRes.value.json(); setTrails(tj.data?.trails ?? []); }
+          if (wRes.status === 'fulfilled' && wRes.value.ok) {
+            const wj = await wRes.value.json();
+            const zones = wj.data?.zones ?? {};
+            setWeatherZones(zones);
+          }
         }
       }
     } catch (e) { console.error(e); }
@@ -466,16 +473,23 @@ export default function DashboardPage() {
               <div className="rpanel-section">
                 <div className="rpanel-hdr">🌡️ Conditions</div>
                 <div className="weather-grid">
-                  {(['Summit','Mid','Base']).map((z,i) => (
-                    <div key={z} className="weather-zone">
-                      <div className="wz-label">{i===0?'🏔':i===1?'⛷':'🏠'} {z}</div>
-                      <div className="wz-temp">
-                        {i===0 ? (scoreData?.tempF?.toFixed(0) ?? '--') : '--'}
-                        <span className="wz-unit">°F</span>
+                  {([['summit','🏔','Summit'],['mid','⛷','Mid'],['base','🏠','Base']] as const).map(([key,icon,label]) => {
+                    const z = weatherZones[key];
+                    const temp = z?.tempF ?? (key==='summit' ? scoreData?.tempF : null);
+                    const wind = z?.windMph ?? (key==='summit' ? scoreData?.windMph : null);
+                    const snow = z?.snowfall24hIn;
+                    return (
+                      <div key={key} className="weather-zone">
+                        <div className="wz-label">{icon} {label}</div>
+                        <div className="wz-temp">
+                          {temp?.toFixed(0) ?? '--'}
+                          <span className="wz-unit">°F</span>
+                        </div>
+                        <div className="wz-wind">{wind ? `${wind.toFixed(0)} mph` : '--'}</div>
+                        {snow != null && snow > 0 && <div style={{fontSize:10,color:'#3b82f6',marginTop:2}}>{snow.toFixed(1)}" new</div>}
                       </div>
-                      <div className="wz-wind">{i===0 ? (scoreData?.windMph ? `${scoreData.windMph.toFixed(0)} mph` : '--') : '--'}</div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
