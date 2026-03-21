@@ -178,7 +178,7 @@ export default function PublicTrailMapPage({ params: paramsPromise }: { params: 
               </span>
             )}
             <Link href="/dashboard" className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors">
-              Sign In
+              Dashboard
             </Link>
           </div>
         </div>
