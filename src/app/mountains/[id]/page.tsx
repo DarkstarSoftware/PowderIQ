@@ -616,7 +616,7 @@ export default function MountainDetailPage() {
                     <span className="ql-arr">›</span>
                   </a>
                 )}
-                <Link href={`/mountains/${id}/trails`} className="ql-row">
+                <Link href={`/mountains/${id}/map`} className="ql-row">
                   <div className="ql-ico" style={{ background:'#dcfce7' }}>🗺️</div>
                   <span className="ql-txt">View Trail Map</span>
                   <span className="ql-arr">›</span>
