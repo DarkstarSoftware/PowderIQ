@@ -133,6 +133,7 @@ const SHARED_CSS = `
 
 export default function ForecastsPage() {
   const router = useRouter();
+  const [avatarUrl, setAvatarUrl] = useState('');
   const [token,     setToken]     = useState('');
   const [userName,  setUserName]  = useState('');
   const [userRole,  setUserRole]  = useState('user');
