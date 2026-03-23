@@ -1,69 +1,38 @@
 // src/services/scoreEngine.ts
-//
-// Powder score computation — weights and thresholds reflect real-world conditions.
-//
-// FIXES:
-//   - Thresholds are now region-aware via optional resortProfile.region
-//     Michigan/Midwest resorts max out at lower snowfall than Rockies/Sierras
-//   - Alert-aware: if a blizzard/storm warning is active, score is boosted
-//     for powder-seekers but flagged with a safety note
-//   - tempStability scorer now also penalizes freeze-thaw cycles
 
 import type { RiderProfile } from '@prisma/client';
-import type { WeatherAlert } from './elevationWeatherService';
 
 export interface SnowData {
-  snowfall24h: number;      // inches — past 24h actual
-  snowfall48h: number;      // inches — past 48h actual
-  snowfall72h: number;      // inches — past 72h actual
-  forecastSnow24h: number;  // inches — next 24h predicted
-  snowfall7d: number;       // inches — 7-day total
-  baseDepthIn: number;
-  windMph: number;
-  tempF: number;
-  tempMinF: number;
-  tempMaxF: number;
+  snowfall24h:  number; // inches in last 24h
+  snowfall7d:   number; // inches in last 7 days
+  baseDepthIn:  number; // current base depth inches
+  windMph:      number;
+  tempF:        number;
+  tempMinF:     number;
+  tempMaxF:     number;
+  // Season context
+  verticalFt?:  number; // resort vertical drop — used to calibrate thresholds
+  isOpenSeason?: boolean; // explicitly set if known
 }
 
 export interface ScoreBreakdown {
-  snowfall24h: number;
-  snowfall7d: number;
-  baseDepth: number;
-  wind: number;
+  snowfall24h:   number;
+  snowfall7d:    number;
+  baseDepth:     number;
+  wind:          number;
   tempStability: number;
-  crowd: number;
-  total: number;
+  crowd:         number;
+  seasonPenalty: number;
+  total:         number;
 }
-
-// Region affects what "great snow" means:
-//   midwest:  2" = good, 6" = exceptional
-//   rockies:  6" = good, 18" = exceptional
-//   sierras:  4" = good, 12" = exceptional
-//   northeast: 4" = good, 10" = exceptional
-export type SnowRegion = 'midwest' | 'rockies' | 'sierras' | 'northeast' | 'pacific_nw' | 'default';
-
-interface RegionThresholds {
-  snow24hPerfect: number;  // inches for 100 score
-  snow7dPerfect: number;
-  baseDepthPerfect: number;
-}
-
-const REGION_THRESHOLDS: Record<SnowRegion, RegionThresholds> = {
-  midwest:    { snow24hPerfect: 4,  snow7dPerfect: 12,  baseDepthPerfect: 30  },
-  northeast:  { snow24hPerfect: 6,  snow7dPerfect: 18,  baseDepthPerfect: 48  },
-  rockies:    { snow24hPerfect: 12, snow7dPerfect: 36,  baseDepthPerfect: 80  },
-  sierras:    { snow24hPerfect: 10, snow7dPerfect: 30,  baseDepthPerfect: 72  },
-  pacific_nw: { snow24hPerfect: 8,  snow7dPerfect: 24,  baseDepthPerfect: 60  },
-  default:    { snow24hPerfect: 6,  snow7dPerfect: 24,  baseDepthPerfect: 60  },
-};
 
 type Weights = Record<string, number>;
 
 const DEFAULT_WEIGHTS: Weights = {
   snowfall24h:   0.30,
   snowfall7d:    0.15,
-  baseDepth:     0.15,
-  wind:          0.20,
+  baseDepth:     0.20,
+  wind:          0.15,
   tempStability: 0.10,
   crowd:         0.10,
 };
@@ -91,21 +60,66 @@ function adjustWeights(profile: RiderProfile | null): Weights {
   return w;
 }
 
-// Individual scorers — region-aware thresholds
-function scoreSnowfall24h(inches: number, t: RegionThresholds) {
-  return Math.min(100, (inches / t.snow24hPerfect) * 100);
+// ── Season detection ──────────────────────────────────────────────────────────
+// Returns true if it's currently ski season for a given hemisphere/latitude.
+// Uses Northern Hemisphere ski season: Nov 15 – Apr 15.
+// Resorts at low elevation (< 2000ft vertical) tend to close earlier.
+export function isSkiSeason(now: Date = new Date(), verticalFt = 1000): boolean {
+  const month = now.getMonth(); // 0-indexed
+  const day   = now.getDate();
+
+  // Northern hemisphere ski season: Nov 15 – Apr 15
+  const afterNov15  = month === 10 && day >= 15 || month > 10;
+  const beforeApr15 = month === 3  && day <= 15 || month < 3;
+  const inSeason    = afterNov15 || beforeApr15;
+
+  if (!inSeason) return false;
+
+  // Small/low-vertical resorts (< 500ft like Pine Knob) close by late March
+  if (verticalFt < 500) {
+    const afterMar20 = month === 2 && day >= 20 || month > 2;
+    if (afterMar20) return false;
+  }
+  // Mid-sized resorts close by early April
+  if (verticalFt < 1500) {
+    const afterApr1 = month === 3 && day >= 1 || month > 3;
+    if (afterApr1) return false;
+  }
+
+  return true;
 }
-function scoreSnowfall7d(inches: number, t: RegionThresholds) {
-  return Math.min(100, (inches / t.snow7dPerfect) * 100);
+
+// ── Calibrated component scorers ─────────────────────────────────────────────
+// Thresholds scale with resort size (vertical drop).
+// A 6" storm at a 300ft resort is proportionally bigger than at a 3000ft resort.
+function getThresholds(verticalFt: number) {
+  // Scale based on vertical: small = 300ft, large = 3000ft
+  const scale = Math.min(1.0, Math.max(0.25, verticalFt / 3000));
+  return {
+    snow24hPerfect:  6  * scale,  // inches for perfect 24h score
+    snow7dPerfect:   24 * scale,  // inches for perfect 7d score
+    baseDepthFull:   60 * scale,  // inches for full base coverage
+  };
 }
-function scoreBaseDepth(inches: number, t: RegionThresholds) {
-  return Math.min(100, (inches / t.baseDepthPerfect) * 100);
+
+function scoreSnowfall24h(inches: number, verticalFt: number): number {
+  const { snow24hPerfect } = getThresholds(verticalFt);
+  return Math.min(100, (inches / snow24hPerfect) * 100);
+}
+
+function scoreSnowfall7d(inches: number, verticalFt: number): number {
+  const { snow7dPerfect } = getThresholds(verticalFt);
+  return Math.min(100, (inches / snow7dPerfect) * 100);
+}
+
+function scoreBaseDepth(inches: number, verticalFt: number): number {
+  const { baseDepthFull } = getThresholds(verticalFt);
+  if (inches < 6) return Math.max(0, inches * 5);  // < 6" is very bad for any resort
+  return Math.min(100, (inches / baseDepthFull) * 100);
 }
 
 function scoreTempStability(min: number, max: number): number {
   const spread = max - min;
-  // Freeze-thaw penalty: if min < 32 and max > 36, icy conditions likely
-  if (min < 32 && max > 36) return Math.max(0, 40 - spread * 2);
   if (spread <= 5)  return 100;
   if (spread >= 40) return 0;
   return 100 - (spread / 40) * 100;
@@ -121,55 +135,62 @@ function scoreCrowd(dayOfWeek: number): number {
   return dayOfWeek === 0 || dayOfWeek === 6 ? 30 : 80;
 }
 
-function tempBonus(tempF: number): number {
-  if (tempF >= 18 && tempF <= 30) return 10;  // ideal cold powder temp
-  if (tempF > 36)  return -15;                // slushy
-  if (tempF < 0)   return -15;                // dangerously cold
-  if (tempF < 10)  return -5;
+function scoreTempBonus(tempF: number): number {
+  if (tempF >= 20 && tempF <= 32) return 10;
+  if (tempF > 38) return -20;   // slushy/icy
+  if (tempF > 34) return -10;   // softening
+  if (tempF < 5)  return -10;   // dangerously cold
   return 0;
 }
 
-// Alert bonus: severe storm = powder hunters love it, but add safety flag
-function alertBonus(alerts: WeatherAlert[], profile: RiderProfile | null): number {
-  if (!alerts.length) return 0;
-  const severe = alerts.some(a => a.severity === 'Extreme' || a.severity === 'Severe');
-  const isBlizzard = alerts.some(a => a.event.toLowerCase().includes('blizzard'));
-  if (!severe && !isBlizzard) return 0;
-  // Powder seekers get a boost; beginners get a penalty
-  if (profile?.style === 'powder') return 5;
-  if (profile?.style === 'beginner' || profile?.skillLevel === 'beginner') return -10;
-  return 0; // neutral for other styles
-}
+// ── Main scoring function ─────────────────────────────────────────────────────
 
 export function computeScore(
   snow: SnowData,
-  profile: RiderProfile | null = null,
-  region: SnowRegion = 'default',
-  alerts: WeatherAlert[] = [],
+  profile: RiderProfile | null = null
 ): { score: number; breakdown: ScoreBreakdown; explanation: string } {
-  const w     = adjustWeights(profile);
-  const t     = REGION_THRESHOLDS[region] || REGION_THRESHOLDS.default;
-  const dow   = new Date().getDay();
+  const now       = new Date();
+  const vertical  = snow.verticalFt ?? 1500;
+  const dow       = now.getDay();
+  const w         = adjustWeights(profile);
 
-  const s24h  = scoreSnowfall24h(snow.snowfall24h, t);
-  const s7d   = scoreSnowfall7d(snow.snowfall7d, t);
-  const sBase = scoreBaseDepth(snow.baseDepthIn, t);
+  // ── Season check ──────────────────────────────────────────────────────────
+  // If explicitly told it's closed, or if we detect it's out of season, score = 0
+  const inSeason = snow.isOpenSeason !== undefined
+    ? snow.isOpenSeason
+    : isSkiSeason(now, vertical);
+
+  if (!inSeason) {
+    const breakdown: ScoreBreakdown = {
+      snowfall24h: 0, snowfall7d: 0, baseDepth: 0,
+      wind: 0, tempStability: 0, crowd: 0, seasonPenalty: -100, total: 0,
+    };
+    return {
+      score: 0,
+      breakdown,
+      explanation: 'This resort is currently closed for the season.',
+    };
+  }
+
+  // ── Component scores ──────────────────────────────────────────────────────
+  const s24h  = scoreSnowfall24h(snow.snowfall24h, vertical);
+  const s7d   = scoreSnowfall7d(snow.snowfall7d,   vertical);
+  const sBase = scoreBaseDepth(snow.baseDepthIn,   vertical);
   const sWind = scoreWind(snow.windMph);
   const sTemp = scoreTempStability(snow.tempMinF, snow.tempMaxF);
   const sCrd  = scoreCrowd(dow);
-  const tBon  = tempBonus(snow.tempF);
-  const aBon  = alertBonus(alerts, profile);
+  const tBonus = scoreTempBonus(snow.tempF);
 
   const weighted = Math.round(
-    s24h  * w.snowfall24h  +
-    s7d   * w.snowfall7d   +
-    sBase * w.baseDepth    +
-    sWind * w.wind         +
+    s24h  * w.snowfall24h +
+    s7d   * w.snowfall7d  +
+    sBase * w.baseDepth   +
+    sWind * w.wind        +
     sTemp * w.tempStability +
     sCrd  * w.crowd
   );
 
-  const total = Math.min(100, Math.max(0, weighted + tBon + aBon));
+  const total = Math.min(100, Math.max(0, weighted + tBonus));
 
   const breakdown: ScoreBreakdown = {
     snowfall24h:   Math.round(s24h),
@@ -178,69 +199,54 @@ export function computeScore(
     wind:          Math.round(sWind),
     tempStability: Math.round(sTemp),
     crowd:         Math.round(sCrd),
+    seasonPenalty: tBonus,
     total,
   };
 
-  return {
-    score: total,
-    breakdown,
-    explanation: generateExplanation(snow, total, region, alerts),
-  };
+  return { score: total, breakdown, explanation: generateExplanation(snow, total, vertical) };
 }
 
-function generateExplanation(
-  snow: SnowData,
-  total: number,
-  region: SnowRegion,
-  alerts: WeatherAlert[],
-): string {
+function generateExplanation(snow: SnowData, total: number, verticalFt: number): string {
   const parts: string[] = [];
 
-  // Alert first — most important
-  const blizzard = alerts.find(a =>
-    a.event.toLowerCase().includes('blizzard') || a.event.toLowerCase().includes('winter storm')
-  );
-  if (blizzard) {
-    parts.push(`⚠ ${blizzard.event} in effect. ${blizzard.headline.split('.')[0]}.`);
-  }
-
-  const t = REGION_THRESHOLDS[region] || REGION_THRESHOLDS.default;
-
-  if (snow.snowfall24h >= t.snow24hPerfect)
-    parts.push(`Outstanding fresh snowfall — ${snow.snowfall24h}" in the last 24 hours.`);
-  else if (snow.snowfall24h >= t.snow24hPerfect * 0.4)
-    parts.push(`Good recent snowfall of ${snow.snowfall24h}" in the past day.`);
+  if (snow.snowfall24h >= 4)
+    parts.push(`Great fresh snowfall — ${snow.snowfall24h}" in the last 24 hours.`);
+  else if (snow.snowfall24h >= 1)
+    parts.push(`Some fresh snow — ${snow.snowfall24h}" in the past day.`);
   else if (snow.snowfall24h > 0)
-    parts.push(`Light dusting of ${snow.snowfall24h}" in the past 24 hours.`);
+    parts.push(`Light dusting of ${snow.snowfall24h}" overnight.`);
   else
     parts.push('No new snowfall in the past 24 hours.');
 
-  if (snow.baseDepthIn >= t.baseDepthPerfect)
-    parts.push(`Deep base of ${snow.baseDepthIn}" ensures full coverage.`);
-  else if (snow.baseDepthIn >= t.baseDepthPerfect * 0.4)
-    parts.push(`Moderate base depth of ${snow.baseDepthIn}".`);
-  else
+  const depthLabel = verticalFt < 500 ? 30 : verticalFt < 1500 ? 48 : 60;
+  if (snow.baseDepthIn >= depthLabel)
+    parts.push(`Solid base of ${snow.baseDepthIn}".`);
+  else if (snow.baseDepthIn >= depthLabel * 0.5)
+    parts.push(`Base depth ${snow.baseDepthIn}" — adequate coverage.`);
+  else if (snow.baseDepthIn > 0)
     parts.push(`Thin base of ${snow.baseDepthIn}" — watch for rocks on lower runs.`);
+  else
+    parts.push('Base depth data unavailable.');
 
   if (snow.windMph <= 10)
-    parts.push('Calm winds — ideal conditions.');
+    parts.push('Calm winds.');
   else if (snow.windMph <= 25)
     parts.push(`Moderate winds at ${Math.round(snow.windMph)} mph.`);
   else
     parts.push(`High winds at ${Math.round(snow.windMph)} mph — upper lifts may be on hold.`);
 
-  if (snow.tempF > 36)
-    parts.push(`Warm temps at ${Math.round(snow.tempF)}°F — expect soft or slushy conditions.`);
+  if (snow.tempF > 38)
+    parts.push(`Warm at ${Math.round(snow.tempF)}°F — expect soft or slushy conditions.`);
+  else if (snow.tempF >= 20 && snow.tempF <= 32)
+    parts.push(`Ideal temperature at ${Math.round(snow.tempF)}°F.`);
   else if (snow.tempF < 10)
     parts.push(`Very cold at ${Math.round(snow.tempF)}°F — dress in layers.`);
-  else if (snow.tempF >= 18 && snow.tempF <= 30)
-    parts.push(`Ideal temperature at ${Math.round(snow.tempF)}°F.`);
 
   const prefix =
-    total >= 80 ? 'Outstanding conditions! ' :
-    total >= 65 ? 'Great day on the mountain. ' :
+    total >= 80 ? 'Outstanding powder day! ' :
+    total >= 65 ? 'Great conditions. ' :
     total >= 50 ? 'Decent conditions. ' :
-    total >= 35 ? 'Fair conditions with some caveats. ' :
+    total >= 35 ? 'Fair conditions. ' :
                   'Challenging conditions today. ';
 
   return prefix + parts.join(' ');
