@@ -33,18 +33,15 @@ export default function MountainsPage() {
   const [loading,    setLoading]    = useState(true);
   const [token,      setToken]      = useState('');
   const [userName,   setUserName]   = useState('');
-  const [avatarUrl,  setAvatarUrl]  = useState<string>('');
   const [userRole,   setUserRole]   = useState('user');
   const [hasResort,  setHasResort]  = useState(false);
   const [filter,     setFilter]     = useState<'all'|'favorites'>('all');
   const [toggling,   setToggling]   = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    const cached = localStorage.getItem('powderiq_avatar');
+    if (cached) setAvatarUrl(cached);
     (async () => {
-      // Show cached avatar instantly
-      const cachedAvatar = localStorage.getItem('powderiq_avatar');
-      if (cachedAvatar) setAvatarUrl(cachedAvatar);
-
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       const tok = data.session.access_token;
@@ -61,11 +58,7 @@ export default function MountainsPage() {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
-        setAvatarUrl(me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl || '');
-        // Also cache in localStorage for instant display
-        if (me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl) {
-          localStorage.setItem('powderiq_avatar', me?.data?.profile?.avatarUrl || me?.profile?.avatarUrl || '');
-        }
+        setAvatarUrl(me.data?.profile?.avatarUrl || '');
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -78,13 +71,6 @@ export default function MountainsPage() {
       }
       setLoading(false);
     })();
-    // Listen for avatar updates from profile page
-    function onAvatarChanged() {
-      const url = localStorage.getItem('powderiq_avatar') || '';
-      setAvatarUrl(url);
-    }
-    window.addEventListener('powderiq_avatar_changed', onAvatarChanged);
-    return () => window.removeEventListener('powderiq_avatar_changed', onAvatarChanged);
   }, [router]);
 
   async function toggleFavorite(mountainId: string) {
@@ -148,7 +134,7 @@ export default function MountainsPage() {
         .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
         .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
         .topnav-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--bg); border:1px solid var(--border-2); display:flex; align-items:center; justify-content:center; font-size:15px; text-decoration:none; }
-        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); cursor:pointer; transition:box-shadow .15s; } .topnav-avatar:hover { box-shadow:0 0 0 3px rgba(29,110,245,0.25); }
+        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); overflow:hidden; text-decoration:none; cursor:pointer; }
         .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; }
         .topnav-signout:hover { background:var(--bg); color:var(--text); }
         .page-body { background:var(--bg); min-height:calc(100vh - 60px); }
@@ -195,22 +181,20 @@ export default function MountainsPage() {
       <div style={{minHeight:'100vh',background:'var(--bg)'}}>
         <header className="topnav" role="banner">
           <div className="topnav-logo">
-            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:34,width:'auto'}} />
+            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:"32px",width:"auto"}}/>
             <span className="topnav-brand">PowderIQ</span>
           </div>
           <nav className="topnav-tabs" aria-label="Main navigation">
             <Link href="/dashboard" className="topnav-tab"><span>📊</span>Dashboard</Link>
             <Link href="/mountains" className="topnav-tab active" aria-current="page"><span>🏔️</span>Resorts</Link>
-            <Link href="/forecasts" className="topnav-tab"><span>📅</span>Forecasts</Link>
-            {(userRole==='pro_user'||userRole==='admin') && <Link href="/compare" className="topnav-tab"><span>📈</span>Analytics</Link>}
-            {(userRole==='pro_user'||userRole==='admin') && <Link href="/alerts" className="topnav-tab"><span>🔔</span>Alerts</Link>}
+            <Link href="/forecasts" className="topnav-tab"><span>🌨️</span>Forecasts</Link>
+            {hasResort && <Link href="/resort/dashboard" className="topnav-tab"><span>⛷️</span>Resort</Link>}
             {hasResort && <Link href="/resort/dashboard" className="topnav-tab"><span>🎿</span>Resort</Link>}
-            {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span>⚙️</span>Admin</Link>}
           </nav>
           <div className="topnav-right">
-            <Link href="/account/profile" className="topnav-avatar" style={{textDecoration:'none',overflow:'hidden'}} aria-label="Account settings">
-            {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}}/> : (userName ? userName[0].toUpperCase() : '👤')}
-          </Link>
+            <Link href="/account/profile" className="topnav-avatar" aria-label="Account">
+              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (userName ? userName[0].toUpperCase() : "👤")}
+            </Link>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>
