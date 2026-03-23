@@ -4,12 +4,15 @@ import type { RiderProfile } from '@prisma/client';
 
 export interface SnowData {
   snowfall24h:  number; // inches in last 24h
+  snowfall48h?: number; // inches in last 48h (optional)
+  snowfall72h?: number; // inches in last 72h (optional)
   snowfall7d:   number; // inches in last 7 days
   baseDepthIn:  number; // current base depth inches
   windMph:      number;
   tempF:        number;
   tempMinF:     number;
   tempMaxF:     number;
+  forecastSnow24h?: number; // optional forecast
   // Season context
   verticalFt?:  number; // resort vertical drop — used to calibrate thresholds
   isOpenSeason?: boolean; // explicitly set if known
