@@ -77,36 +77,127 @@ function ScoreRing({ score }: { score: number }) {
 // ── Liftie helpers ────────────────────────────────────────────────────────────
 
 const LIFTIE_SLUGS: Record<string, string> = {
-  'vail': 'vail', 'beaver creek': 'beavercreek', 'breckenridge': 'breck',
-  'keystone': 'keystone', 'arapahoe basin': 'abasin', 'copper mountain': 'copper',
-  'steamboat': 'steamboat', 'winter park': 'winterpark', 'park city': 'parkcity',
-  'deer valley': 'deervalley', 'alta': 'alta', 'snowbird': 'snowbird',
-  'jackson hole': 'jacksonhole', 'big sky': 'bigsky', 'mammoth mountain': 'mammoth',
-  'mammoth': 'mammoth', 'heavenly': 'heavenly', 'northstar': 'northstar',
-  'kirkwood': 'kirkwood', 'palisades tahoe': 'squaw', 'squaw valley': 'squaw',
-  'stowe': 'stowe', 'killington': 'killington', 'sugarbush': 'sugarbush',
-  'sunday river': 'sundayriver', 'sugarloaf': 'sugarloaf', 'whiteface': 'whiteface',
-  'okemo': 'okemo', 'mount snow': 'mountsnow', 'stratton': 'stratton',
-  'loon mountain': 'loon', 'cannon mountain': 'cannon', 'jay peak': 'jaypeak',
-  'mont tremblant': 'tremblant', 'sun valley': 'sunvalley', 'taos ski valley': 'taos',
-  'aspen mountain': 'aspen', 'snowmass': 'snowmass', 'buttermilk': 'buttermilk',
-  'crested butte': 'crestedbutte', 'telluride': 'telluride', 'loveland': 'loveland',
-  'crystal mountain': 'crystalmountain', 'mt. bachelor': 'mtbachelor',
-  'stevens pass': 'stevens', 'whistler blackcomb': 'whistler',
-  'pine knob': 'pineknob', 'boyne mountain': 'boynemountain',
-  'boyne highlands': 'boynehighlands', 'nubs nob': 'nubsnob',
-  'shanty creek': 'shantycreek', 'mount brighton': 'mountbrighton',
-  'snow snake': 'snowsnake', 'caberfae peaks': 'caberfae',
-  'whitecap mountain': 'whitecap', 'indianhead': 'indianhead',
+  // Colorado
+  'vail': 'vail', 'vail mountain': 'vail',
+  'beaver creek': 'beavercreek',
+  'breckenridge': 'breck',
+  'keystone': 'keystone',
+  'arapahoe basin': 'abasin',
+  'copper mountain': 'copper',
+  'steamboat': 'steamboat', 'steamboat springs': 'steamboat', 'steamboat ski resort': 'steamboat',
+  'winter park': 'winterpark', 'winter park resort': 'winterpark',
+  'loveland': 'loveland', 'loveland ski area': 'loveland',
+  'crested butte': 'crestedbutte', 'crested butte mountain resort': 'crestedbutte',
+  'telluride': 'telluride',
+  'aspen mountain': 'aspen',
+  'aspen highlands': 'highlands',
+  'snowmass': 'snowmass', 'aspen snowmass': 'snowmass',
+  'buttermilk': 'buttermilk',
+  'purgatory': 'purgatory', 'purgatory resort': 'purgatory',
+  'wolf creek': 'wolfcreek', 'wolf creek ski area': 'wolfcreek',
+  'monarch': 'monarch', 'monarch mountain': 'monarch',
+  'eldora': 'eldora', 'eldora mountain resort': 'eldora',
+  // Utah
+  'alta': 'alta',
+  'snowbird': 'snowbird',
+  'park city': 'parkcity', 'park city mountain': 'parkcity', 'park city mountain resort': 'parkcity',
+  'deer valley': 'deervalley', 'deer valley resort': 'deervalley',
+  'solitude': 'solitude', 'solitude mountain resort': 'solitude',
+  'brighton': 'brighton', 'brighton resort': 'brighton',
+  'sundance': 'sundance', 'sundance mountain resort': 'sundance',
+  // Wyoming
+  'jackson hole': 'jacksonhole', 'jackson hole mountain resort': 'jacksonhole',
+  'grand targhee': 'grandtarghee', 'grand targhee resort': 'grandtarghee',
+  // Montana
+  'big sky': 'bigsky', 'big sky resort': 'bigsky',
+  'moonlight basin': 'moonlightbasin',
+  'whitefish': 'whitefish', 'whitefish mountain resort': 'whitefish',
+  // California
+  'mammoth mountain': 'mammoth', 'mammoth': 'mammoth',
+  'heavenly': 'heavenly', 'heavenly mountain resort': 'heavenly',
+  'northstar': 'northstar', 'northstar california': 'northstar',
+  'kirkwood': 'kirkwood', 'kirkwood mountain resort': 'kirkwood',
+  'palisades tahoe': 'squaw', 'squaw valley': 'squaw',
+  'sugar bowl': 'sugarbowl', 'sugar bowl resort': 'sugarbowl',
+  'boreal': 'boreal', 'boreal mountain resort': 'boreal',
+  'sierra at tahoe': 'sierra', 'sierra-at-tahoe': 'sierra',
+  'mt. rose': 'mtrose', 'mount rose': 'mtrose',
+  // Oregon / Washington
+  'mt. bachelor': 'mtbachelor', 'mount bachelor': 'mtbachelor',
+  'mount hood meadows': 'meadows',
+  'timberline': 'timberline', 'timberline lodge': 'timberline',
+  'stevens pass': 'stevens',
+  'crystal mountain': 'crystalmountain',
+  'snoqualmie': 'snoqualmie', 'snoqualmie pass': 'snoqualmie',
+  'mission ridge': 'missionridge',
+  // Idaho
+  'sun valley': 'sunvalley', 'sun valley resort': 'sunvalley',
+  'bogus basin': 'bogusbasin',
+  'brundage': 'brundage', 'brundage mountain': 'brundage',
+  // New Mexico
+  'taos ski valley': 'taos', 'taos': 'taos',
+  'ski santa fe': 'santafe',
+  'ski apache': 'skiapache',
+  // Vermont
+  'stowe': 'stowe', 'stowe mountain resort': 'stowe',
+  'killington': 'killington', 'killington resort': 'killington',
+  'sugarbush': 'sugarbush', 'sugarbush resort': 'sugarbush',
+  'okemo': 'okemo', 'okemo mountain resort': 'okemo',
+  'mount snow': 'mountsnow',
+  'stratton': 'stratton', 'stratton mountain': 'stratton',
+  'mad river glen': 'madriverglen',
+  'jay peak': 'jaypeak', 'jay peak resort': 'jaypeak',
+  'magic mountain': 'magic',
+  // New Hampshire
+  'loon mountain': 'loon', 'loon mountain resort': 'loon',
+  'cannon mountain': 'cannon',
+  'waterville valley': 'waterville',
+  'bretton woods': 'brettonwoods',
+  'attitash': 'attitash',
+  // Maine
+  'sunday river': 'sundayriver', 'sunday river resort': 'sundayriver',
+  'sugarloaf': 'sugarloaf', 'sugarloaf mountain': 'sugarloaf',
+  // New York
+  'whiteface': 'whiteface', 'whiteface mountain': 'whiteface',
+  'hunter mountain': 'hunter',
+  'windham mountain': 'windham',
+  'gore mountain': 'gore',
+  'belleayre': 'belleayre',
+  // Michigan
+  'pine knob': 'pineknob',
+  'boyne mountain': 'boynemountain',
+  'boyne highlands': 'boynehighlands',
+  'nubs nob': 'nubsnob',
+  'shanty creek': 'shantycreek',
+  'mount brighton': 'mountbrighton',
+  'snow snake': 'snowsnake',
+  'caberfae peaks': 'caberfae',
+  'whitecap mountain': 'whitecap',
+  'indianhead': 'indianhead',
+  'crystal mountain': 'crystalmountainmi',
+  // Canada
+  'whistler blackcomb': 'whistler', 'whistler': 'whistler',
+  'mont tremblant': 'tremblant', 'mont-tremblant': 'tremblant',
+  'sun peaks': 'sunpeaks', 'sun peaks resort': 'sunpeaks',
+  'big white': 'bigwhite', 'big white ski resort': 'bigwhite',
+  'revelstoke': 'revelstoke', 'revelstoke mountain resort': 'revelstoke',
+  'fernie': 'fernie', 'fernie alpine resort': 'fernie',
+  'lake louise': 'lakelouise', 'ski lake louise': 'lakelouise',
+  'banff sunshine': 'sunshine', 'sunshine village': 'sunshine',
+  'kicking horse': 'kickinghorse',
+  'red mountain': 'redmountain', 'red mountain resort': 'redmountain',
 };
 
 function deriveLiftieSlug(name: string): string {
   const lower = name.toLowerCase().trim();
   if (LIFTIE_SLUGS[lower]) return LIFTIE_SLUGS[lower];
-  return lower
-    .replace(/\s*(ski resort|mountain resort|ski area|resort|ski|mtn\.?)\s*/gi, '')
+  // Strip common suffixes and try the lookup again
+  const stripped = lower
+    .replace(/\s*(ski resort|mountain resort|ski area|resort|mountain|ski|mtn\.?|springs|peak|peaks|valley|village)\s*/g, ' ')
     .replace(/[^a-z0-9]+/g, '')
     .trim();
+  if (LIFTIE_SLUGS[stripped]) return LIFTIE_SLUGS[stripped];
+  return stripped;
 }
 
 function inferLiftType(name: string): string {
