@@ -93,7 +93,10 @@ export default function DashboardPage() {
   const [diffFilter,   setDiffFilter]   = useState<string[]>([]);
   const [lifts,        setLifts]        = useState<Lift[]>([]);
   const [trails,       setTrails]       = useState<Trail[]>([]);
-  const [activePanel,  setActivePanel]  = useState<'lifts'|'trails'>('lifts');
+  const [activePanel,  setActivePanel]  = useState<'lifts'|'trails'>('trails');
+  const [sortBy,       setSortBy]       = useState<'name'|'difficulty'>('name');
+  const [sortDir,      setSortDir]      = useState<'asc'|'desc'>('asc');
+  const [sortOpen,     setSortOpen]     = useState(false);
   const [weatherZones, setWeatherZones] = useState<Record<string,any>>({});
 
   // ── Auth + data load ────────────────────────────────────────────────────────
@@ -225,6 +228,20 @@ export default function DashboardPage() {
   const heroImg     = activeFav ? getMtnImg(activeFav.mountain) : 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80';
   const allDiffs    = [...new Set(trails.map(t => t.difficulty))];
   const filteredTrails = diffFilter.length > 0 ? trails.filter(t => diffFilter.includes(t.difficulty)) : trails;
+
+  const DIFF_ORDER: Record<string,number> = { green:0, blue:1, black:2, double_black:3, terrain_park:4, backcountry:5 };
+
+  const sortedTrails = [...filteredTrails].sort((a, b) => {
+    let cmp = 0;
+    if (sortBy === 'name') cmp = a.trailName.localeCompare(b.trailName);
+    else cmp = (DIFF_ORDER[a.difficulty] ?? 9) - (DIFF_ORDER[b.difficulty] ?? 9);
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const sortedLifts = [...lifts].sort((a, b) => {
+    const cmp = a.liftName.localeCompare(b.liftName);
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
 
   if (loading) return (
     <>
@@ -362,9 +379,18 @@ export default function DashboardPage() {
         .tl-header { display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0; }
         .tl-title-icon { width:24px;height:24px;border-radius:6px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:13px; }
         .tl-title { font-size:14px;font-weight:700;color:var(--text); }
-        .tl-meta { display:flex;align-items:center;gap:6px;margin-left:4px; }
-        .tl-meta-icon { font-size:11px;color:var(--text-3); }
-        .tl-meta-lbl { font-size:12px;color:var(--text-3); }
+        .tl-tabs { display:flex;align-items:center;gap:4px;margin-left:8px; }
+        .tl-tab { padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-3);border:none;background:none;font-family:'Inter',sans-serif;transition:all .15s; }
+        .tl-tab.act { background:var(--blue-light);color:var(--blue); }
+        .tl-tab:hover:not(.act) { background:var(--bg); }
+        .sort-btn { display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-2);background:var(--white);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:'Inter',sans-serif;position:relative;transition:all .15s; }
+        .sort-btn:hover { background:var(--bg); }
+        .sort-dropdown { position:absolute;top:calc(100% + 4px);right:0;background:var(--white);border:1px solid var(--border-2);border-radius:10px;box-shadow:0 4px 16px rgba(15,40,80,0.12);z-index:100;min-width:180px;overflow:hidden; }
+        .sort-opt { display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;transition:background .12s; }
+        .sort-opt:hover { background:var(--bg); }
+        .sort-opt.act { color:var(--blue);font-weight:600;background:var(--blue-light); }
+        .sort-opt-check { margin-left:auto;font-size:11px;color:var(--blue); }
+        .sort-divider { height:1px;background:var(--border);margin:4px 0; }
         .tl-dots { margin-left:auto;display:flex;gap:3px; }
         .tl-dot { width:4px;height:4px;border-radius:50%;background:var(--text-3); }
         .tl-grid { display:grid;grid-template-columns:1fr 1fr;overflow-y:auto;flex:1; }
@@ -671,13 +697,37 @@ export default function DashboardPage() {
                 <div className="tl-header">
                   <div className="tl-title-icon">⊞</div>
                   <span className="tl-title">Trails &amp; Lifts</span>
-                  <div className="tl-meta">
-                    <span className="tl-meta-icon">⊡</span><span className="tl-meta-lbl">Bataigle</span>
-                    <span className="tl-meta-icon" style={{marginLeft:8}}>✏️</span><span className="tl-meta-lbl">Phn</span>
-                    <span className="tl-meta-icon" style={{marginLeft:8}}>⊟</span><span className="tl-meta-lbl">Sort</span>
+                  <div className="tl-tabs">
+                    <button className={`tl-tab${activePanel==='trails'?' act':''}`} onClick={()=>setActivePanel('trails')}>Trails</button>
+                    <button className={`tl-tab${activePanel==='lifts'?' act':''}`} onClick={()=>setActivePanel('lifts')}>Lifts</button>
                   </div>
-                  <div className="tl-dots" style={{marginLeft:'auto'}}>
-                    <div className="tl-dot"/><div className="tl-dot"/><div className="tl-dot"/>
+                  <div style={{marginLeft:'auto',position:'relative'}} onBlur={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget as Node)) setSortOpen(false); }} tabIndex={-1}>
+                    <button className="sort-btn" onClick={(e)=>{e.stopPropagation();setSortOpen(p=>!p);}}>
+                      ⇅ Sort
+                      {sortBy !== 'name' || sortDir !== 'asc'
+                        ? <span style={{width:6,height:6,background:'var(--blue)',borderRadius:'50%',flexShrink:0}}/>
+                        : null}
+                    </button>
+                    {sortOpen && (
+                      <div className="sort-dropdown">
+                        <div style={{padding:'8px 14px 4px',fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Sort by</div>
+                        {[
+                          {key:'name',      label:'Name (A–Z)',      dir:'asc'},
+                          {key:'name',      label:'Name (Z–A)',      dir:'desc'},
+                          {key:'difficulty',label:'Easiest first',   dir:'asc'},
+                          {key:'difficulty',label:'Hardest first',   dir:'desc'},
+                        ].map((opt,i) => {
+                          const isAct = sortBy === opt.key && sortDir === opt.dir;
+                          return (
+                            <div key={i} className={`sort-opt${isAct?' act':''}`}
+                              onClick={()=>{ setSortBy(opt.key as 'name'|'difficulty'); setSortDir(opt.dir as 'asc'|'desc'); setSortOpen(false); }}>
+                              {opt.label}
+                              {isAct && <span className="sort-opt-check">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -690,7 +740,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Trails */}
-                  {filteredTrails.map(t => {
+                  {sortedTrails.map(t => {
                     const diffClass = t.difficulty==='green'?'easy':t.difficulty==='blue'?'blue':t.difficulty==='black'?'black':t.difficulty==='double_black'?'dblack':t.difficulty==='terrain_park'?'park':'bc';
                     const diffIcon = t.difficulty==='green'?'■':t.difficulty==='blue'?'●':t.difficulty==='black'?'◆':t.difficulty==='double_black'?'◆◆':t.difficulty==='terrain_park'?'▲':'⬡';
                     const isOpen = t.status==='open'||t.status==='groomed';
@@ -715,7 +765,7 @@ export default function DashboardPage() {
                   })}
 
                   {/* Lifts (after trails) */}
-                  {lifts.map(l => {
+                  {sortedLifts.map(l => {
                     const isOpen = l.status==='open';
                     const badgeCls = l.status==='open'?'open':l.status==='on_hold'?'hold':l.status==='scheduled'?'sched':'closed';
                     const liftNum = isOpen ? 1 : 0;
