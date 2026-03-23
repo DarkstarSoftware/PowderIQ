@@ -31,6 +31,7 @@ export default function MountainsPage() {
   const [favorites,  setFavorites]  = useState<Set<string>>(new Set());
   const [search,     setSearch]     = useState('');
   const [loading,    setLoading]    = useState(true);
+  const [avatarUrl,  setAvatarUrl]  = useState('');
   const [token,      setToken]      = useState('');
   const [userName,   setUserName]   = useState('');
   const [userRole,   setUserRole]   = useState('user');
