@@ -141,9 +141,9 @@ export default function ForecastsPage() {
   const [pageLoad,  setPageLoad]  = useState(true);
 
   useEffect(() => {
-    const cached = localStorage.getItem('powderiq_avatar');
-    if (cached) setAvatarUrl(cached);
     (async () => {
+      const cached = localStorage.getItem('powderiq_avatar');
+      if (cached) setAvatarUrl(cached);
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
       const tok = data.session.access_token;
