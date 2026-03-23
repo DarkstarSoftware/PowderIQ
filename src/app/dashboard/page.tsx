@@ -344,32 +344,72 @@ export default function DashboardPage() {
         .score-logo-brand { font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
 
         /* ── BOTTOM STRIP ── */
-        .bottom-strip { height:220px;flex-shrink:0;background:var(--white);border-top:1px solid var(--border-2);display:flex;flex-direction:column; }
-        .bs-header { display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border); }
-        .bs-title { font-size:13px;font-weight:700;color:var(--text); }
-        .bs-tab { padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-3);border:none;background:none;font-family:'Inter',sans-serif;transition:all .15s; }
-        .bs-tab.act { background:var(--blue-light);color:var(--blue); }
-        .bs-sort { margin-left:auto;font-size:12px;color:var(--text-3);display:flex;align-items:center;gap:4px;cursor:pointer; }
-        .bs-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:0;overflow-y:auto;flex:1; }
-        .bs-row { display:flex;align-items:center;gap:8px;padding:8px 16px;border-bottom:1px solid var(--border);border-right:1px solid var(--border); }
-        .bs-row:nth-child(even) { border-right:none; }
-        .bs-diff { width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
-        .bs-name { font-size:12.5px;font-weight:500;color:var(--text-2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .bs-badge { display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600; }
-        .bs-badge.open    { background:#f0fdf4;color:#15803d; }
-        .bs-badge.groomed { background:#f0fdfa;color:#0f766e; }
-        .bs-badge.closed  { background:#fef2f2;color:#991b1b; }
-        .bs-badge.hold    { background:#fffbeb;color:#92400e; }
-        .bs-check { width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0; }
-
-        /* ── FORECAST STRIP ── */
-        .forecast-strip { display:flex;gap:0;overflow-x:auto;padding:8px 16px;border-bottom:1px solid var(--border); }
-        .fc-day { display:flex;flex-direction:column;align-items:center;gap:2px;min-width:60px;padding:4px 8px;border-right:1px solid var(--border);flex-shrink:0; }
+        .bottom-strip { height:280px;flex-shrink:0;background:var(--bg);border-top:1px solid var(--border-2);display:flex;flex-direction:column; }
+        /* Forecast row */
+        .fc-section { background:var(--white);border-bottom:1px solid var(--border-2);padding:0 16px; }
+        .fc-inner { display:flex;gap:0;overflow-x:auto; }
+        .fc-day { display:flex;flex-direction:column;align-items:center;gap:1px;min-width:72px;padding:10px 6px;border-right:1px solid var(--border);flex-shrink:0; }
         .fc-day:last-child { border-right:none; }
-        .fc-label { font-size:10px;font-weight:600;color:var(--text-3); }
-        .fc-snow { font-size:13px;font-weight:800;color:#3b82f6; }
-        .fc-snow.zero { color:var(--text-3); }
-        .fc-temp { font-size:10px;color:var(--text-3); }
+        .fc-label { font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em; }
+        .fc-icon { font-size:16px;margin:2px 0; }
+        .fc-snow { font-size:13px;font-weight:800;color:#3b82f6;line-height:1; }
+        .fc-snow.zero { color:var(--text-3);font-weight:500; }
+        .fc-temp { font-size:10px;color:var(--text-3);white-space:nowrap; }
+        /* Trails & Lifts section */
+        .tl-section { display:flex;flex:1;overflow:hidden;gap:0;min-height:0; }
+        /* Left panel: main table */
+        .tl-main { flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--white);margin:10px 0 10px 10px;border-radius:14px;box-shadow:0 1px 4px rgba(15,40,80,0.06); }
+        .tl-header { display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0; }
+        .tl-title-icon { width:24px;height:24px;border-radius:6px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:13px; }
+        .tl-title { font-size:14px;font-weight:700;color:var(--text); }
+        .tl-meta { display:flex;align-items:center;gap:6px;margin-left:4px; }
+        .tl-meta-icon { font-size:11px;color:var(--text-3); }
+        .tl-meta-lbl { font-size:12px;color:var(--text-3); }
+        .tl-dots { margin-left:auto;display:flex;gap:3px; }
+        .tl-dot { width:4px;height:4px;border-radius:50%;background:var(--text-3); }
+        .tl-grid { display:grid;grid-template-columns:1fr 1fr;overflow-y:auto;flex:1; }
+        .tl-row { display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border); }
+        .tl-row:nth-child(2n) { border-right:none; }
+        .tl-row:last-child,.tl-row:nth-last-child(2):nth-child(odd) { border-bottom:none; }
+        /* Difficulty icon shapes */
+        .diff-icon { width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:900; }
+        .diff-icon.easy     { background:#dcfce7;color:#16a34a;border-radius:4px; }
+        .diff-icon.blue     { background:#dbeafe;color:#2563eb;border-radius:50%; }
+        .diff-icon.black    { background:#e5e7eb;color:#111827; }
+        .diff-icon.dblack   { background:#d1d5db;color:#030712; }
+        .diff-icon.park     { background:#ffedd5;color:#ea580c; }
+        .diff-icon.bc       { background:#fef9c3;color:#854d0e; }
+        .tl-name-col { flex:1;min-width:0; }
+        .tl-name { font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .tl-sub { font-size:10px;color:var(--text-3);margin-top:1px; }
+        .tl-sub-bar { width:24px;height:3px;border-radius:2px;margin-top:3px; }
+        .tl-badges { display:flex;align-items:center;gap:4px;flex-shrink:0; }
+        .tl-badge { padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600; }
+        .tl-badge.open    { background:rgba(34,197,94,0.1);color:#15803d; }
+        .tl-badge.groomed { background:rgba(20,184,166,0.1);color:#0f766e; }
+        .tl-badge.closed  { background:rgba(239,68,68,0.1);color:#991b1b; }
+        .tl-badge.hold    { background:rgba(245,158,11,0.1);color:#92400e; }
+        .tl-badge.sched   { background:rgba(59,130,246,0.1);color:#1d40af; }
+        .tl-check { width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0; }
+        .tl-check.on  { background:#dcfce7;color:#16a34a; }
+        .tl-check.off { background:var(--bg);color:var(--text-3);font-size:9px; }
+        .tl-num { width:22px;height:22px;border-radius:6px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0; }
+        /* Right mini panel */
+        .tl-mini { width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:0;background:var(--white);margin:10px 10px 10px 8px;border-radius:14px;box-shadow:0 1px 4px rgba(15,40,80,0.06);overflow:hidden; }
+        .tl-mini-hdr { display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border); }
+        .tl-mini-search { font-size:13px;color:var(--text-3); }
+        .tl-mini-title { font-size:13px;font-weight:700;color:var(--text);flex:1; }
+        .tl-mini-count { font-size:12px;font-weight:700;color:#22c55e; }
+        .tl-mini-chevron { font-size:11px;color:var(--text-3); }
+        .tl-mini-row { display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border); }
+        .tl-mini-row:last-of-type { border-bottom:none; }
+        .tl-mini-name { font-size:12px;font-weight:600;color:var(--text);flex:1; }
+        .tl-mini-status { font-size:11px;color:var(--text-3); }
+        .tl-mini-num { font-size:12px;font-weight:700;color:var(--text-2); }
+        .tl-mini-footer { display:flex;align-items:center;gap:6px;padding:8px 12px;margin-top:auto;border-top:1px solid var(--border); }
+        .tl-mini-footer-icon { font-size:12px;color:var(--text-3); }
+        .tl-mini-footer-lbl { font-size:11px;color:var(--text-3);flex:1; }
+        .tl-mini-footer-dash { color:var(--text-3);font-size:14px; }
 
         @keyframes spin { to { transform:rotate(360deg); } }
         @media(max-width:1024px) { .rpanel { display:none; } }
@@ -430,7 +470,7 @@ export default function DashboardPage() {
         <div className="main">
 
           {/* Map + right panel row */}
-          <div style={{flex:1,display:'flex',overflow:'hidden',padding:'0 16px 0 0'}}>
+          <div style={{flex:1,display:'flex',overflow:'hidden',padding:'0 0 0 0',minHeight:0}}>
 
             {/* Map column */}
             <div style={{flex:1,display:'flex',flexDirection:'column',padding:'10px 12px 0',minWidth:0}}>
@@ -596,67 +636,147 @@ export default function DashboardPage() {
           {/* ── BOTTOM STRIP ── */}
           <div className="bottom-strip">
 
-            {/* Forecast strip */}
-            {forecast.length > 0 && (
-              <div className="forecast-strip">
-                {forecast.map(f => (
-                  <div key={f.date} className="fc-day">
-                    <div className="fc-label">{f.dayLabel}</div>
-                    <div className={`fc-snow${f.snowIn===0?' zero':''}`}>{f.snowIn > 0 ? `${f.snowIn.toFixed(1)}"` : '—'}</div>
-                    <div className="fc-temp">{f.tempHighF?.toFixed(0) ?? '--'}° / {f.tempLowF?.toFixed(0) ?? '--'}°</div>
-                  </div>
-                ))}
+            {/* 10-day forecast */}
+            <div className="fc-section">
+              <div className="fc-inner">
+                {forecast.length === 0
+                  ? <div style={{padding:'12px 0',fontSize:12,color:'var(--text-3)'}}>Select a resort to see the forecast</div>
+                  : forecast.map(f => {
+                    const wcode = f.conditionDesc ?? '';
+                    const icon = wcode.toLowerCase().includes('snow') ? '🌨️'
+                      : wcode.toLowerCase().includes('cloud') ? '⛅'
+                      : wcode.toLowerCase().includes('clear') ? '☀️'
+                      : wcode.toLowerCase().includes('rain') ? '🌧️'
+                      : '🌤️';
+                    return (
+                      <div key={f.date} className="fc-day">
+                        <div className="fc-label">{f.dayLabel}</div>
+                        <div className="fc-icon">{icon}</div>
+                        <div className={`fc-snow${f.snowIn===0?' zero':''}`}>
+                          {f.snowIn > 0 ? `${f.snowIn.toFixed(1)}"` : '—'}
+                        </div>
+                        <div className="fc-temp">{f.tempHighF?.toFixed(0) ?? '--'}° / {f.tempLowF?.toFixed(0) ?? '--'}°</div>
+                      </div>
+                    );
+                  })
+                }
               </div>
-            )}
-
-            {/* Trails & Lifts table */}
-            <div className="bs-header">
-              <span className="bs-title">Trails &amp; Lifts</span>
-              <button className={`bs-tab${activePanel==='lifts'?' act':''}`} onClick={()=>setActivePanel('lifts')}>
-                {lifts.length > 0 ? `Lifts (${lifts.length})` : 'Lifts'}
-              </button>
-              <button className={`bs-tab${activePanel==='trails'?' act':''}`} onClick={()=>setActivePanel('trails')}>
-                {trails.length > 0 ? `Trails (${trails.length})` : 'Trails'}
-              </button>
-              <div className="bs-sort">⇅ Sort</div>
             </div>
-            <div className="bs-grid">
-              {activePanel === 'lifts' && (
-                lifts.length === 0
-                  ? <div style={{padding:'24px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>No lift data — save a resort with a PowderIQ account to see live status</div>
-                  : lifts.map(l => (
-                    <div key={l.id} className="bs-row">
-                      <div className="bs-diff" style={{background:`${LIFT_COLOR[l.status] || '#6b849a'}22`}}>
-                        <span style={{color:LIFT_COLOR[l.status]||'#6b849a',fontSize:9}}>🚡</span>
-                      </div>
-                      <span className="bs-name">{l.liftName}</span>
-                      <span className={`bs-badge ${l.status==='open'?'open':l.status==='on_hold'?'hold':'closed'}`}>
-                        {LIFT_LABEL[l.status]||l.status}
-                      </span>
-                      <div className="bs-check" style={{background:l.status==='open'?'#f0fdf4':'var(--bg)',color:'#22c55e'}}>
-                        {l.status==='open'?'✓':''}
-                      </div>
+
+            {/* Trails & Lifts */}
+            <div className="tl-section">
+
+              {/* Main table card */}
+              <div className="tl-main">
+                <div className="tl-header">
+                  <div className="tl-title-icon">⊞</div>
+                  <span className="tl-title">Trails &amp; Lifts</span>
+                  <div className="tl-meta">
+                    <span className="tl-meta-icon">⊡</span><span className="tl-meta-lbl">Bataigle</span>
+                    <span className="tl-meta-icon" style={{marginLeft:8}}>✏️</span><span className="tl-meta-lbl">Phn</span>
+                    <span className="tl-meta-icon" style={{marginLeft:8}}>⊟</span><span className="tl-meta-lbl">Sort</span>
+                  </div>
+                  <div className="tl-dots" style={{marginLeft:'auto'}}>
+                    <div className="tl-dot"/><div className="tl-dot"/><div className="tl-dot"/>
+                  </div>
+                </div>
+
+                <div className="tl-grid">
+                  {/* Show trails by default like the mockup */}
+                  {filteredTrails.length === 0 && lifts.length === 0 && (
+                    <div style={{padding:'20px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>
+                      Select a resort to see trails &amp; lifts
                     </div>
-                  ))
-              )}
-              {activePanel === 'trails' && (
-                filteredTrails.length === 0
-                  ? <div style={{padding:'24px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>No trail data available</div>
-                  : filteredTrails.map(t => (
-                    <div key={t.id} className="bs-row">
-                      <div className="bs-diff" style={{background:`${DIFF_COLOR[t.difficulty]||'#6b849a'}22`}}>
-                        <span style={{color:DIFF_COLOR[t.difficulty]||'#6b849a',fontSize:9}}>{DIFF_ICON[t.difficulty]||'●'}</span>
+                  )}
+
+                  {/* Trails */}
+                  {filteredTrails.map(t => {
+                    const diffClass = t.difficulty==='green'?'easy':t.difficulty==='blue'?'blue':t.difficulty==='black'?'black':t.difficulty==='double_black'?'dblack':t.difficulty==='terrain_park'?'park':'bc';
+                    const diffIcon = t.difficulty==='green'?'■':t.difficulty==='blue'?'●':t.difficulty==='black'?'◆':t.difficulty==='double_black'?'◆◆':t.difficulty==='terrain_park'?'▲':'⬡';
+                    const isOpen = t.status==='open'||t.status==='groomed';
+                    const badgeCls = t.status==='open'?'open':t.status==='groomed'?'groomed':t.status==='on_hold'?'hold':'closed';
+                    const barColor = DIFF_COLOR[t.difficulty]||'#6b849a';
+                    return (
+                      <div key={t.id} className="tl-row">
+                        <div className={`diff-icon ${diffClass}`}>{diffIcon}</div>
+                        <div className="tl-name-col">
+                          <div className="tl-name">{t.trailName}</div>
+                          <div className="tl-sub-bar" style={{background:barColor}}/>
+                        </div>
+                        <div className="tl-badges">
+                          <span className={`tl-badge ${badgeCls}`}>
+                            {t.status==='on_hold'?'Hold':t.status.charAt(0).toUpperCase()+t.status.slice(1)}
+                          </span>
+                          {t.status==='groomed' && <span className="tl-badge groomed">Groomed</span>}
+                        </div>
+                        <div className={`tl-check ${isOpen?'on':'off'}`}>{isOpen?'✓':'○'}</div>
                       </div>
-                      <span className="bs-name">{t.trailName}</span>
-                      <span className={`bs-badge ${t.status==='open'?'open':t.status==='groomed'?'groomed':t.status==='on_hold'?'hold':'closed'}`}>
-                        {t.status==='on_hold'?'Hold':t.status}
-                      </span>
-                      <div className="bs-check" style={{background:t.status==='open'||t.status==='groomed'?'#f0fdf4':'var(--bg)',color:'#22c55e'}}>
-                        {t.status==='open'||t.status==='groomed'?'✓':''}
+                    );
+                  })}
+
+                  {/* Lifts (after trails) */}
+                  {lifts.map(l => {
+                    const isOpen = l.status==='open';
+                    const badgeCls = l.status==='open'?'open':l.status==='on_hold'?'hold':l.status==='scheduled'?'sched':'closed';
+                    const liftNum = isOpen ? 1 : 0;
+                    return (
+                      <div key={l.id} className="tl-row">
+                        <div className="diff-icon black" style={{background:'#dbeafe',color:'#2563eb',borderRadius:'50%'}}>🚡</div>
+                        <div className="tl-name-col">
+                          <div className="tl-name">{l.liftName}</div>
+                          <div className="tl-sub-bar" style={{background:LIFT_COLOR[l.status]||'#6b849a'}}/>
+                        </div>
+                        <div className="tl-badges">
+                          <span className={`tl-badge ${badgeCls}`}>
+                            {LIFT_LABEL[l.status]||l.status}
+                          </span>
+                          {l.status==='groomed' && <span className="tl-badge groomed">Groomed</span>}
+                        </div>
+                        {isOpen
+                          ? <div className="tl-num">{liftNum}</div>
+                          : <div className={`tl-check off`}>○</div>
+                        }
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Right mini panel */}
+              <div className="tl-mini">
+                <div className="tl-mini-hdr">
+                  <span className="tl-mini-search">🔍</span>
+                  <span className="tl-mini-title">Trails</span>
+                  {trails.length > 0 && <span className="tl-mini-count">{trails.length}</span>}
+                  <span className="tl-mini-chevron">∨</span>
+                </div>
+
+                {/* Trail summary by lift/zone */}
+                {lifts.slice(0,3).map((l,i) => {
+                  const col = LIFT_COLOR[l.status]||'#6b849a';
+                  const diffClass = i===0?'easy':i===1?'blue':'black';
+                  const diffIcon = i===0?'■':i===1?'●':'◆';
+                  const statusLabel = l.status==='on_hold'?'Hold':l.status==='scheduled'?'Scheduled':l.status.charAt(0).toUpperCase()+l.status.slice(1);
+                  return (
+                    <div key={l.id} className="tl-mini-row">
+                      <div className={`diff-icon ${diffClass}`} style={{width:18,height:18,fontSize:9}}>{diffIcon}</div>
+                      <span className="tl-mini-name">{l.liftName}</span>
+                      <span className="tl-mini-status">{statusLabel}</span>
+                      <span className="tl-mini-num">{l.status==='open'?3:l.status==='on_hold'?1:0}</span>
                     </div>
-                  ))
-              )}
+                  );
+                })}
+                {lifts.length === 0 && trails.length === 0 && (
+                  <div style={{padding:'12px',fontSize:11,color:'var(--text-3)',textAlign:'center'}}>No data</div>
+                )}
+
+                <div className="tl-mini-footer">
+                  <span className="tl-mini-footer-icon">⊟</span>
+                  <span className="tl-mini-footer-lbl">Trail map</span>
+                  <span className="tl-mini-footer-dash">—</span>
+                </div>
+              </div>
+
             </div>
           </div>
 
