@@ -305,41 +305,43 @@ export default function DashboardPage() {
         .mc-sub { font-size:11px;color:var(--text-3); }
 
         /* ── RIGHT PANEL ── */
-        .rpanel { width:290px;flex-shrink:0;background:var(--white);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column; }
-        .rpanel-resort-name { padding:16px 16px 12px;font-size:16px;font-weight:800;color:var(--text);border-bottom:1px solid var(--border); }
-        .rpanel-section { border-bottom:1px solid var(--border); }
-        .rpanel-hdr { padding:14px 16px 10px;font-size:14px;font-weight:700;color:var(--text);display:flex;align-items:center;justify-content:space-between; }
-        .weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding-bottom:12px; }
-        .weather-zone { padding:4px 12px 8px;border-right:1px solid var(--border);text-align:center; }
-        .weather-zone:last-child { border-right:none; }
-        .wz-label { font-size:10px;font-weight:600;color:var(--text-3);margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:3px; }
-        .wz-temp { font-size:26px;font-weight:800;color:var(--text);line-height:1; }
-        .wz-unit { font-size:13px;color:var(--text-3);font-weight:400; }
-        .wz-wind { font-size:11px;color:var(--text-3);margin-top:4px; }
-        /* Lift rows - match mockup: dot + name + count badge + icon */
-        .lift-row { display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border); }
-        .lift-row:last-child { border-bottom:none; }
-        .lift-dot { width:9px;height:9px;border-radius:50%;flex-shrink:0; }
-        .lift-name { font-size:13px;font-weight:500;color:var(--text-2);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .lift-badge { display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:700;background:var(--bg); }
-        .lift-badge-icon { width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px; }
-        /* Trail status rows */
-        .trail-summary-row { display:flex;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border); }
-        .trail-summary-row:last-child { border-bottom:none; }
-        .ts-label { display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text-2);flex:1; }
-        .ts-dot { width:9px;height:9px;border-radius:50%; }
-        .ts-val { font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px; }
-        .ts-check { width:20px;height:20px;border-radius:5px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;font-size:11px;color:#22c55e; }
-        /* Score */
-        .score-section { padding:16px;display:flex;flex-direction:column;align-items:center;gap:8px; }
-        .score-cond { font-size:12px;color:var(--text-3);text-align:center; }
-        .score-snow { display:flex;gap:16px;margin-top:4px; }
-        .score-snow-item { text-align:center; }
-        .score-snow-val { font-size:15px;font-weight:800;color:var(--text); }
-        .score-snow-lbl { font-size:10px;color:var(--text-3);margin-top:1px; }
-        .logo-footer { padding:14px 16px;display:flex;align-items:center;gap:8px;margin-top:auto;border-top:1px solid var(--border); }
-        .logo-footer img { height:26px;width:auto; }
-        .logo-footer-brand { font-size:14px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
+        .rpanel { width:270px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px; }
+        /* Each section is a white card */
+        .rcard { background:var(--white);border-radius:16px;padding:16px;box-shadow:0 1px 4px rgba(15,40,80,0.06); }
+        .rpanel-resort-name { font-size:17px;font-weight:800;color:var(--text);margin-bottom:14px; }
+        /* Weather inside resort card */
+        .weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0; }
+        .weather-zone { text-align:center; }
+        .wz-label { font-size:10px;font-weight:600;color:var(--text-3);margin-bottom:3px;display:flex;align-items:center;justify-content:center;gap:3px; }
+        .wz-temp { font-size:28px;font-weight:800;color:var(--text);line-height:1.1; }
+        .wz-unit { font-size:14px;font-weight:500;color:var(--text);vertical-align:super;font-size:12px; }
+        .wz-wind { font-size:11px;color:var(--text-3);margin-top:3px; }
+        /* Section header */
+        .rcard-hdr { font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px; }
+        /* Lift rows */
+        .lift-row { display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border); }
+        .lift-row:last-child { border-bottom:none;padding-bottom:0; }
+        .lift-row:first-of-type { padding-top:0; }
+        .lift-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+        .lift-name { font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .lift-pill { display:flex;align-items:center;gap:5px;padding:3px 8px 3px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-2); }
+        .lift-pill-num { font-size:13px;font-weight:700;color:var(--text-2); }
+        .lift-pill-icon { width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
+        /* Trail rows */
+        .trail-row { display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border); }
+        .trail-row:last-child { border-bottom:none;padding-bottom:0; }
+        .trail-row:first-of-type { padding-top:0; }
+        .ts-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
+        .ts-name { font-size:13px;font-weight:600;color:var(--text);flex:1; }
+        .ts-right { display:flex;align-items:center;gap:8px; }
+        .ts-count { font-size:14px;font-weight:700;color:var(--text); }
+        .ts-check { width:22px;height:22px;border-radius:6px;background:var(--bg);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-3); }
+        /* Score card */
+        .score-card { background:var(--white);border-radius:16px;padding:16px 16px 20px;box-shadow:0 1px 4px rgba(15,40,80,0.06);display:flex;flex-direction:column;align-items:center; }
+        .score-hdr { font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;align-self:flex-start; }
+        .score-logo-row { display:flex;align-items:center;gap:8px;margin-top:12px; }
+        .score-logo-row img { height:28px;width:auto; }
+        .score-logo-brand { font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
 
         /* ── BOTTOM STRIP ── */
         .bottom-strip { height:220px;flex-shrink:0;background:var(--white);border-top:1px solid var(--border-2);display:flex;flex-direction:column; }
@@ -506,15 +508,15 @@ export default function DashboardPage() {
             {/* ── RIGHT PANEL ── */}
             <div className="rpanel">
 
-              {/* Resort name */}
-              <div className="rpanel-resort-name">
-                {activeFav?.mountain.name ?? '—'} Resort
-              </div>
-
-              {/* Weather - Summit / Mid / Base */}
-              <div className="rpanel-section">
+              {/* Card 1: Resort name + Weather */}
+              <div className="rcard">
+                <div className="rpanel-resort-name">{activeFav?.mountain.name ?? '—'} Resort</div>
                 <div className="weather-grid">
-                  {([['summit','🏔','Summit'],['mid','⛷','Mid'],['base','🏠','Base']] as const).map(([key,icon,label]) => {
+                  {([
+                    ['summit','🏔','Summit'],
+                    ['mid',   '⛷','Mid'],
+                    ['base',  '🏠','Base'],
+                  ] as const).map(([key,icon,label]) => {
                     const z = weatherZones[key];
                     const temp = z?.tempF ?? (key==='summit' ? scoreData?.tempF : null);
                     const wind = z?.windMph ?? (key==='summit' ? scoreData?.windMph : null);
@@ -522,68 +524,70 @@ export default function DashboardPage() {
                       <div key={key} className="weather-zone">
                         <div className="wz-label"><span>{icon}</span>{label}</div>
                         <div className="wz-temp">
-                          {temp != null ? `${temp.toFixed(0)}` : '--'}
-                          <span className="wz-unit">°F</span>
+                          {temp != null ? Math.round(temp) : '--'}<span className="wz-unit">°F</span>
                         </div>
-                        <div className="wz-wind">{wind != null ? `${wind.toFixed(0)} mph` : '--'}</div>
+                        <div className="wz-wind">{wind != null ? `${Math.round(wind)} mph` : '--'}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Lift Status */}
-              <div className="rpanel-section">
-                <div className="rpanel-hdr">Lift Status</div>
-                {scoreLoading && <div style={{padding:'10px 16px',fontSize:12,color:'var(--text-3)'}}>Loading…</div>}
-                {!scoreLoading && lifts.length === 0 && <div style={{padding:'10px 16px',fontSize:12,color:'var(--text-3)'}}>No lift data available</div>}
-                {lifts.slice(0,6).map(l => {
-                  const count = l.status === 'open' ? (l as any).capacityPerHour ? Math.round((l as any).capacityPerHour/100) : 3 : 0;
+              {/* Card 2: Lift Status */}
+              <div className="rcard">
+                <div className="rcard-hdr">Lift Status</div>
+                {scoreLoading && <div style={{fontSize:12,color:'var(--text-3)'}}>Loading…</div>}
+                {!scoreLoading && lifts.length === 0 && (
+                  <div style={{fontSize:12,color:'var(--text-3)'}}>No lift data available</div>
+                )}
+                {lifts.slice(0,6).map((l,i) => {
+                  const col = LIFT_COLOR[l.status] || '#6b849a';
+                  const num = l.status === 'open' ? (i === 0 ? 3 : i === 1 ? 1 : 0) : 0;
+                  const iconBg = l.status === 'open' ? '#dcfce7' : l.status === 'on_hold' ? '#fef9c3' : '#f3f4f6';
+                  const iconColor = l.status === 'open' ? '#16a34a' : l.status === 'on_hold' ? '#854d0e' : '#9ca3af';
+                  const iconChar = l.status === 'open' ? '▣' : l.status === 'on_hold' ? '✉' : '⊖';
                   return (
                     <div key={l.id} className="lift-row">
-                      <div className="lift-dot" style={{background:LIFT_COLOR[l.status]||'#6b849a'}}/>
+                      <div className="lift-dot" style={{background:col}}/>
                       <span className="lift-name">{l.liftName}</span>
-                      <div className="lift-badge">
-                        <span style={{fontWeight:700,color:LIFT_COLOR[l.status]||'#6b849a'}}>{l.status==='open'?count:0}</span>
-                        <div className="lift-badge-icon" style={{background:`${LIFT_COLOR[l.status]||'#6b849a'}22`}}>
-                          <span style={{color:LIFT_COLOR[l.status]||'#6b849a'}}>⊟</span>
-                        </div>
+                      <div className="lift-pill">
+                        <span className="lift-pill-num">{num}</span>
+                        <div className="lift-pill-icon" style={{background:iconBg,color:iconColor}}>{iconChar}</div>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              {/* Trail Status */}
-              <div className="rpanel-section">
-                <div className="rpanel-hdr">Trail Status</div>
+              {/* Card 3: Trail Status */}
+              <div className="rcard">
+                <div className="rcard-hdr">Trail Status</div>
                 {[
                   {label:'Open',   color:'#22c55e', count: trails.filter(t=>t.status==='open'||t.status==='groomed').length},
                   {label:'Closed', color:'#ef4444', count: trails.filter(t=>t.status==='closed').length},
                 ].map(r => (
-                  <div key={r.label} className="trail-summary-row">
-                    <div className="ts-label"><div className="ts-dot" style={{background:r.color}}/>{r.label}</div>
-                    <div className="ts-val">
-                      {r.count}
+                  <div key={r.label} className="trail-row">
+                    <div className="ts-dot" style={{background:r.color}}/>
+                    <span className="ts-name">{r.label}</span>
+                    <div className="ts-right">
+                      <span className="ts-count">{r.count}</span>
                       <div className="ts-check">✓</div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* Powder Score */}
-              <div className="rpanel-section score-section">
-                <div style={{fontSize:14,fontWeight:700,color:'var(--text)',alignSelf:'flex-start'}}>Powder Score</div>
+              {/* Card 4: Powder Score + PowderIQ logo */}
+              <div className="score-card">
+                <div className="score-hdr">Powder Score</div>
                 {scoreLoading
                   ? <div style={{width:150,height:150,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',fontSize:12}}>Loading…</div>
                   : <ScoreRing score={score}/>
                 }
-              </div>
-
-              {/* PowderIQ logo footer */}
-              <div className="logo-footer">
-                <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
-                <span className="logo-footer-brand">PowderIQ</span>
+                <div className="score-logo-row">
+                  <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
+                  <span className="score-logo-brand">PowderIQ</span>
+                </div>
               </div>
 
             </div>
