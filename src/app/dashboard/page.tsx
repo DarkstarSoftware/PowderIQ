@@ -275,19 +275,11 @@ export default function DashboardPage() {
       if (!hasResortData) {
         try {
           const slug = deriveLiftieSlug(fav.mountain.name);
-          const liftieRes = await fetch(`https://liftie.info/api/resort/${slug}`);
+          const liftieRes = await fetch(`/api/lifts/${slug}`);
           if (liftieRes.ok) {
             const liftieData = await liftieRes.json();
-            const lifts = liftieData.lifts ?? liftieData;
-            if (Array.isArray(lifts) && lifts.length > 0) {
-              setLifts(lifts.map((l: any, i: number) => ({
-                id: `liftie-${i}`,
-                liftName: l.name ?? l.title ?? `Lift ${i+1}`,
-                liftType: inferLiftType(l.name ?? ''),
-                status: mapLiftieStatus(l.status ?? l.state ?? ''),
-                waitMinutes: l.wait ?? undefined,
-              })));
-            }
+            const liftList = liftieData.lifts ?? [];
+            if (liftList.length > 0) setLifts(liftList);
           }
         } catch (e) {
           console.warn('[Liftie] fetch failed:', e);
