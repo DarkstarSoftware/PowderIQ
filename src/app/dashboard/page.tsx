@@ -302,17 +302,28 @@ export default function DashboardPage() {
         .main { flex:1;overflow:hidden;display:flex;flex-direction:column; }
 
         /* ── MAP AREA ── */
-        .map-controls { padding:10px 0 8px;display:flex;flex-direction:column;gap:8px;flex-shrink:0; }
-        .map-mode-row { display:flex;gap:4px; }
-        .map-mode-btn { display:flex;align-items:center;gap:5px;padding:7px 14px;border-radius:20px;border:1px solid var(--border-2);background:var(--white);font-size:13px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;box-shadow:0 1px 3px rgba(15,40,80,0.06); }
-        .map-mode-btn.act { background:var(--blue-light);color:var(--blue);border-color:rgba(29,110,245,0.3); }
-        .map-mode-btn:hover:not(.act) { background:var(--bg); }
-        .diff-row { display:flex;align-items:center;gap:8px; }
-        .diff-label { font-size:12px;font-weight:600;color:var(--text-3); }
-        .diff-btn { display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:6px;border:1px solid var(--border-2);background:var(--white);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif; }
-        .diff-btn.act { background:var(--blue-light);border-color:rgba(29,110,245,0.3);color:var(--blue); }
+        .map-controls { padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;flex-shrink:0; }
+        /* Row 1: Trail Map / Satellite / Hybrid pill group */
+        .map-mode-row { display:flex;gap:0;background:var(--white);border:1px solid var(--border-2);border-radius:22px;padding:3px;width:fit-content;box-shadow:0 1px 3px rgba(15,40,80,0.06); }
+        .map-mode-btn { display:flex;align-items:center;gap:6px;padding:6px 16px;border-radius:18px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap; }
+        .map-mode-btn.act { background:var(--white);color:var(--text);box-shadow:0 1px 4px rgba(15,40,80,0.12);border:1px solid var(--border-2); }
+        .map-mode-btn:hover:not(.act) { color:var(--text-2); }
+        .map-mode-icon { width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
+        .map-mode-icon.trail { background:#e8f1fe;color:#1d6ef5; }
+        .map-mode-icon.sat   { background:#dbeafe;color:#2563eb; }
+        .map-mode-icon.hyb   { background:#f3f4f6;color:#6b7280; }
+        /* Row 2: Difficulty filter */
+        .diff-row { display:flex;align-items:center;gap:6px;background:var(--white);border:1px solid var(--border-2);border-radius:22px;padding:5px 14px;width:fit-content;box-shadow:0 1px 3px rgba(15,40,80,0.06); }
+        .diff-label { font-size:12px;font-weight:600;color:var(--text-3);margin-right:2px; }
+        .diff-sep { width:1px;height:14px;background:var(--border-2); }
+        .diff-btn { display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:14px;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif; }
+        .diff-btn.act { background:var(--blue-light);color:var(--blue); }
         .diff-btn:hover:not(.act) { background:var(--bg); }
-        .diff-more { padding:5px 8px;border-radius:6px;border:1px solid var(--border-2);background:var(--white);font-size:12px;color:var(--text-3);cursor:pointer;font-family:'Inter',sans-serif; }
+        .diff-icon-easy   { width:13px;height:13px;border-radius:2px;background:#16a34a;flex-shrink:0; }
+        .diff-icon-inter  { width:13px;height:13px;border-radius:50%;background:#2563eb;flex-shrink:0; }
+        .diff-icon-adv    { width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #111827;flex-shrink:0; }
+        .diff-icon-expert { position:relative;width:13px;height:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+        .diff-more { padding:3px 8px;border:none;background:transparent;font-size:12px;color:var(--text-3);cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:2px; }
         .map-wrap { flex:1;position:relative;overflow:hidden;border-radius:16px;box-shadow:0 2px 12px rgba(15,40,80,0.1); }
         .map-img { width:100%;height:100%;object-fit:cover;display:block;border-radius:16px; }
         .map-attrib { position:absolute;bottom:10px;left:12px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);backdrop-filter:blur(6px);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text-3);font-weight:500; }
@@ -503,29 +514,76 @@ export default function DashboardPage() {
 
               {/* Map controls - ABOVE the map like mockup */}
               <div className="map-controls">
+
+                {/* Row 1: Trail Map / Satellite / Hybrid */}
                 <div className="map-mode-row">
-                  {(['trail','satellite','hybrid'] as const).map(m => (
-                    <button key={m} className={`map-mode-btn${mapMode===m?' act':''}`} onClick={() => setMapMode(m)}>
-                      {m === 'trail' ? '🗺 Trail Map' : m === 'satellite' ? '🛰 Satellite' : '🌐 Hybrid'}
-                    </button>
-                  ))}
+                  <button className={`map-mode-btn${mapMode==='trail'?' act':''}`} onClick={() => setMapMode('trail')}>
+                    <div className="map-mode-icon trail">🗺</div>
+                    Trail Map
+                  </button>
+                  <button className={`map-mode-btn${mapMode==='satellite'?' act':''}`} onClick={() => setMapMode('satellite')}>
+                    <div className="map-mode-icon sat" style={{background:'#dbeafe'}}>
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <circle cx="5" cy="5" r="4" stroke="#2563eb" strokeWidth="1.5"/>
+                        <circle cx="5" cy="5" r="1.5" fill="#2563eb"/>
+                      </svg>
+                    </div>
+                    Satellite
+                  </button>
+                  <button className={`map-mode-btn${mapMode==='hybrid'?' act':''}`} onClick={() => setMapMode('hybrid')}>
+                    <div className="map-mode-icon hyb">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <circle cx="5" cy="5" r="4" stroke="#6b7280" strokeWidth="1.5"/>
+                        <path d="M5 1v8M1 5h8" stroke="#6b7280" strokeWidth="1"/>
+                      </svg>
+                    </div>
+                    Hybrid
+                  </button>
                 </div>
+
+                {/* Row 2: Difficulty filter */}
                 <div className="diff-row">
                   <span className="diff-label">Difficulty:</span>
-                  {[
-                    {key:'green',       icon:'▣', label:'Easy'},
-                    {key:'blue',        icon:'◉', label:'Intermediate'},
-                    {key:'black',       icon:'✚', label:'Advanced'},
-                    {key:'double_black',icon:'◆', label:'Expert'},
-                  ].map(d => (
-                    <button key={d.key} className={`diff-btn${diffFilter.includes(d.key)?' act':''}`}
-                      onClick={() => setDiffFilter(p => p.includes(d.key) ? p.filter(x=>x!==d.key) : [...p,d.key])}>
-                      <span style={{color:DIFF_COLOR[d.key],fontSize:10}}>{d.icon}</span>
-                      {d.label}
-                    </button>
-                  ))}
-                  <button className="diff-more">∨</button>
+                  <div className="diff-sep"/>
+
+                  {/* Easy - green square */}
+                  <button className={`diff-btn${diffFilter.includes('green')?' act':''}`}
+                    onClick={() => setDiffFilter(p => p.includes('green') ? p.filter(x=>x!=='green') : [...p,'green'])}>
+                    <div className="diff-icon-easy"/>
+                    Easy
+                  </button>
+
+                  {/* Intermediate - blue circle */}
+                  <button className={`diff-btn${diffFilter.includes('blue')?' act':''}`}
+                    onClick={() => setDiffFilter(p => p.includes('blue') ? p.filter(x=>x!=='blue') : [...p,'blue'])}>
+                    <div className="diff-icon-inter"/>
+                    Intermediate
+                  </button>
+
+                  {/* Advanced - black diamond */}
+                  <button className={`diff-btn${diffFilter.includes('black')?' act':''}`}
+                    onClick={() => setDiffFilter(p => p.includes('black') ? p.filter(x=>x!=='black') : [...p,'black'])}>
+                    <svg width="13" height="13" viewBox="0 0 13 13" style={{flexShrink:0}}>
+                      <rect x="6.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 6.5 0.5)" fill="#111827"/>
+                    </svg>
+                    Advanced
+                  </button>
+
+                  {/* Expert - double black diamond */}
+                  <button className={`diff-btn${diffFilter.includes('double_black')?' act':''}`}
+                    onClick={() => setDiffFilter(p => p.includes('double_black') ? p.filter(x=>x!=='double_black') : [...p,'double_black'])}>
+                    <svg width="20" height="13" viewBox="0 0 20 13" style={{flexShrink:0}}>
+                      <rect x="6.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 6.5 0.5)" fill="#111827"/>
+                      <rect x="13.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 13.5 0.5)" fill="#111827"/>
+                    </svg>
+                    Expert
+                  </button>
+
+                  <button className="diff-more">
+                    ∨
+                  </button>
                 </div>
+
               </div>
 
               {/* Map image */}
