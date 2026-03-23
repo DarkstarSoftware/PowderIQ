@@ -463,7 +463,6 @@ export default function DashboardPage() {
           <Link href="/dashboard" className="tnav-tab act">📊 Dashboard</Link>
           <Link href="/mountains" className="tnav-tab">🏔️ Resorts</Link>
           <Link href="/forecasts" className="tnav-tab">🌨️ Forecasts</Link>
-          <Link href="/account/profile" className="tnav-tab">👤 Account</Link>
           {hasResort && <Link href="/resort/dashboard" className="tnav-tab">⛷️ Resort</Link>}
         </div>
         <div className="tnav-right">
