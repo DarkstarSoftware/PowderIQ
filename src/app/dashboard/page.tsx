@@ -73,6 +73,60 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
+
+// ── Liftie helpers ────────────────────────────────────────────────────────────
+
+const LIFTIE_SLUGS: Record<string, string> = {
+  'vail': 'vail', 'beaver creek': 'beavercreek', 'breckenridge': 'breck',
+  'keystone': 'keystone', 'arapahoe basin': 'abasin', 'copper mountain': 'copper',
+  'steamboat': 'steamboat', 'winter park': 'winterpark', 'park city': 'parkcity',
+  'deer valley': 'deervalley', 'alta': 'alta', 'snowbird': 'snowbird',
+  'jackson hole': 'jacksonhole', 'big sky': 'bigsky', 'mammoth mountain': 'mammoth',
+  'mammoth': 'mammoth', 'heavenly': 'heavenly', 'northstar': 'northstar',
+  'kirkwood': 'kirkwood', 'palisades tahoe': 'squaw', 'squaw valley': 'squaw',
+  'stowe': 'stowe', 'killington': 'killington', 'sugarbush': 'sugarbush',
+  'sunday river': 'sundayriver', 'sugarloaf': 'sugarloaf', 'whiteface': 'whiteface',
+  'okemo': 'okemo', 'mount snow': 'mountsnow', 'stratton': 'stratton',
+  'loon mountain': 'loon', 'cannon mountain': 'cannon', 'jay peak': 'jaypeak',
+  'mont tremblant': 'tremblant', 'sun valley': 'sunvalley', 'taos ski valley': 'taos',
+  'aspen mountain': 'aspen', 'snowmass': 'snowmass', 'buttermilk': 'buttermilk',
+  'crested butte': 'crestedbutte', 'telluride': 'telluride', 'loveland': 'loveland',
+  'crystal mountain': 'crystalmountain', 'mt. bachelor': 'mtbachelor',
+  'stevens pass': 'stevens', 'whistler blackcomb': 'whistler',
+  'pine knob': 'pineknob', 'boyne mountain': 'boynemountain',
+  'boyne highlands': 'boynehighlands', 'nubs nob': 'nubsnob',
+  'shanty creek': 'shantycreek', 'mount brighton': 'mountbrighton',
+  'snow snake': 'snowsnake', 'caberfae peaks': 'caberfae',
+  'whitecap mountain': 'whitecap', 'indianhead': 'indianhead',
+};
+
+function deriveLiftieSlug(name: string): string {
+  const lower = name.toLowerCase().trim();
+  if (LIFTIE_SLUGS[lower]) return LIFTIE_SLUGS[lower];
+  return lower
+    .replace(/\s*(ski resort|mountain resort|ski area|resort|ski|mtn\.?)\s*/gi, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
+function inferLiftType(name: string): string {
+  const n = name.toLowerCase();
+  if (n.includes('gondola') || n.includes('cable car')) return 'gondola';
+  if (n.includes('tram') || n.includes('aerial')) return 'tram';
+  if (n.includes('carpet') || n.includes('conveyor') || n.includes('t-bar')) return 'surface';
+  return 'chairlift';
+}
+
+function mapLiftieStatus(s: string): 'open' | 'on_hold' | 'closed' | 'scheduled' {
+  switch (s?.toLowerCase()) {
+    case 'open':      return 'open';
+    case 'hold':
+    case 'on_hold':   return 'on_hold';
+    case 'scheduled': return 'scheduled';
+    default:          return 'closed';
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -188,8 +242,9 @@ export default function DashboardPage() {
         }
       }
 
-      // Try to load lifts/trails from resort API
+      // Try resort API first (resorts with PowderIQ accounts have full data)
       const resortRes = await fetch(`/api/resort?mountainId=${fav.mountain.id}`, { headers: h });
+      let hasResortData = false;
       if (resortRes.ok) {
         const rj = await resortRes.json();
         const resort = Array.isArray(rj.data) ? rj.data[0] : rj.data;
@@ -199,13 +254,43 @@ export default function DashboardPage() {
             fetch(`/api/resort/${resort.id}/trails`,  { headers: h }),
             fetch(`/api/resort/${resort.id}/weather`, { headers: h }),
           ]);
-          if (lRes.status === 'fulfilled' && lRes.value.ok) { const lj = await lRes.value.json(); setLifts(lj.data?.lifts ?? []); }
-          if (tRes.status === 'fulfilled' && tRes.value.ok) { const tj = await tRes.value.json(); setTrails(tj.data?.trails ?? []); }
+          if (lRes.status === 'fulfilled' && lRes.value.ok) {
+            const lj = await lRes.value.json();
+            const liftList = lj.data?.lifts ?? [];
+            if (liftList.length > 0) { setLifts(liftList); hasResortData = true; }
+          }
+          if (tRes.status === 'fulfilled' && tRes.value.ok) {
+            const tj = await tRes.value.json();
+            const trailList = tj.data?.trails ?? [];
+            if (trailList.length > 0) setTrails(trailList);
+          }
           if (wRes.status === 'fulfilled' && wRes.value.ok) {
             const wj = await wRes.value.json();
-            const zones = wj.data?.zones ?? {};
-            setWeatherZones(zones);
+            setWeatherZones(wj.data?.zones ?? {});
           }
+        }
+      }
+
+      // Fallback: fetch live lift status from Liftie.info (covers ~400 resorts, no auth needed)
+      if (!hasResortData) {
+        try {
+          const slug = deriveLiftieSlug(fav.mountain.name);
+          const liftieRes = await fetch(`https://liftie.info/api/resort/${slug}`);
+          if (liftieRes.ok) {
+            const liftieData = await liftieRes.json();
+            const lifts = liftieData.lifts ?? liftieData;
+            if (Array.isArray(lifts) && lifts.length > 0) {
+              setLifts(lifts.map((l: any, i: number) => ({
+                id: `liftie-${i}`,
+                liftName: l.name ?? l.title ?? `Lift ${i+1}`,
+                liftType: inferLiftType(l.name ?? ''),
+                status: mapLiftieStatus(l.status ?? l.state ?? ''),
+                waitMinutes: l.wait ?? undefined,
+              })));
+            }
+          }
+        } catch (e) {
+          console.warn('[Liftie] fetch failed:', e);
         }
       }
     } catch (e) { console.error(e); }
