@@ -174,7 +174,7 @@ const LIFTIE_SLUGS: Record<string, string> = {
   'caberfae peaks': 'caberfae',
   'whitecap mountain': 'whitecap',
   'indianhead': 'indianhead',
-  'crystal mountain mi': 'crystalmountainmi',
+  'crystal mountain': 'crystalmountainmi',
   // Canada
   'whistler blackcomb': 'whistler', 'whistler': 'whistler',
   'mont tremblant': 'tremblant', 'mont-tremblant': 'tremblant',
@@ -237,6 +237,7 @@ export default function DashboardPage() {
   const [mapMode,      setMapMode]      = useState<'trail'|'satellite'|'hybrid'>('satellite');
   const [diffFilter,   setDiffFilter]   = useState<string[]>([]);
   const [lifts,        setLifts]        = useState<Lift[]>([]);
+  const [liftieStats,  setLiftieStats]  = useState<{open:number;hold:number;scheduled:number;closed:number}|null>(null);
   const [trails,       setTrails]       = useState<Trail[]>([]);
   const [activePanel,  setActivePanel]  = useState<'lifts'|'trails'>('trails');
   const [sortBy,       setSortBy]       = useState<'name'|'difficulty'>('name');
@@ -288,7 +289,7 @@ export default function DashboardPage() {
   const loadDetail = useCallback(async (fav: FavoriteItem, tok: string) => {
     if (!fav || !tok) return;
     setScoreLoading(true);
-    setScoreData(null); setForecast([]); setLifts([]); setTrails([]); setWeatherZones({});
+    setScoreData(null); setForecast([]); setLifts([]); setTrails([]); setWeatherZones({}); setLiftieStats(null);
     try {
       const h = { Authorization: `Bearer ${tok}` };
       const [scoreRes, forecastRes] = await Promise.allSettled([
@@ -371,6 +372,7 @@ export default function DashboardPage() {
             const liftieData = await liftieRes.json();
             const liftList = liftieData.lifts ?? [];
             if (liftList.length > 0) setLifts(liftList);
+            if (liftieData.stats) setLiftieStats(liftieData.stats);
           }
         } catch (e) {
           console.warn('[Liftie] fetch failed:', e);
@@ -826,7 +828,17 @@ export default function DashboardPage() {
 
               {/* Card 2: Lift Status */}
               <div className="rcard">
-                <div className="rcard-hdr">Lift Status</div>
+                <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14}}>
+                  <span className="rcard-hdr" style={{margin:0}}>Lift Status</span>
+                  {liftieStats && (
+                    <div style={{display:'flex',gap:8,fontSize:11,fontWeight:600}}>
+                      <span style={{color:'#22c55e'}}>{liftieStats.open} open</span>
+                      {liftieStats.hold > 0 && <span style={{color:'#f59e0b'}}>{liftieStats.hold} hold</span>}
+                      {liftieStats.scheduled > 0 && <span style={{color:'#3b82f6'}}>{liftieStats.scheduled} sched</span>}
+                      <span style={{color:'#ef4444'}}>{liftieStats.closed} closed</span>
+                    </div>
+                  )}
+                </div>
                 {scoreLoading && <div style={{fontSize:12,color:'var(--text-3)'}}>Loading…</div>}
                 {!scoreLoading && lifts.length === 0 && (
                   <div style={{fontSize:12,color:'var(--text-3)'}}>No lift data available</div>
@@ -1021,8 +1033,8 @@ export default function DashboardPage() {
               <div className="tl-mini">
                 <div className="tl-mini-hdr">
                   <span className="tl-mini-search">🔍</span>
-                  <span className="tl-mini-title">Trails</span>
-                  {trails.length > 0 && <span className="tl-mini-count">{trails.length}</span>}
+                  <span className="tl-mini-title">Lifts</span>
+                  {liftieStats ? <span className="tl-mini-count">{liftieStats.open}/{lifts.length}</span> : lifts.length > 0 ? <span className="tl-mini-count">{lifts.filter(l=>l.status==='open').length}/{lifts.length}</span> : null}
                   <span className="tl-mini-chevron">∨</span>
                 </div>
 
