@@ -72,86 +72,50 @@ function parseOverpass(data: any): { runs: any; lifts: any } {
   };
 }
 
-// ── Mountain extents from OSM piste + lift data ──────────────────────────────
-// Uses bounding box of ALL ski features to find summit and base reliably.
-// Does NOT rely on lift encoding direction (which is inconsistent in OSM).
-//
-// Summit = coordinate cluster in the top 10% of the bbox (highest elevation area)
-// Base   = coordinate cluster in the bottom 20% of the bbox (base village area)
-// Bearing is computed so camera faces FROM base TOWARD summit.
-//
-// Special case: for resorts where summit is to the south (rare), this still
-// works because we use actual coordinate spread, not assumed north=up.
-
-interface MountainExtents {
-  summit:    [number, number];
-  base:      [number, number];
-  center:    [number, number];
-  spanKm:    number;
-  bearing:   number;
-  autoZoom:  number;
-  camCenter: [number, number];
-}
-
-function extractMountainExtents(geo: { runs: any; lifts: any }): MountainExtents | null {
-  // Collect every coordinate from pistes AND lifts
+// ── Find summit: coordinate farthest from resort center ─────────────────────
+// This works regardless of OSM encoding direction.
+// The resort center (lat/lon from DB) is the map center.
+// The summit is the ski feature coordinate most distant from that center.
+function findSummitCoord(
+  geo: { runs: any; lifts: any },
+  centerLat: number,
+  centerLon: number
+): [number, number] | null {
   const all: [number, number][] = [];
   for (const f of [...(geo.runs?.features ?? []), ...(geo.lifts?.features ?? [])]) {
     for (const c of f.geometry?.coordinates ?? []) all.push(c as [number, number]);
   }
-  if (all.length < 6) return null;
+  if (all.length === 0) return null;
 
-  // Bounding box
+  // Weight by distance from center — summit is farthest point
+  let best = all[0];
+  let bestDist = 0;
+  for (const c of all) {
+    const d = Math.hypot(
+      (c[0] - centerLon) * Math.cos(centerLat * Math.PI / 180),
+      c[1] - centerLat
+    );
+    if (d > bestDist) { bestDist = d; best = c; }
+  }
+  return best;
+}
+
+// ── Compute zoom from geographic span of ski features ────────────────────────
+function computeAutoZoom(geo: { runs: any; lifts: any }): number {
+  const all: [number, number][] = [];
+  for (const f of [...(geo.runs?.features ?? []), ...(geo.lifts?.features ?? [])]) {
+    for (const c of f.geometry?.coordinates ?? []) all.push(c as [number, number]);
+  }
+  if (all.length < 2) return 13;
   const lats = all.map(c => c[1]);
   const lons = all.map(c => c[0]);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-  const cLat = (minLat + maxLat) / 2;
-  const cLon = (minLon + maxLon) / 2;
-
-  // Summit = centroid of coords in top 15% of lat range
-  // (works regardless of which direction OSM encoded the lifts)
-  const latRange = maxLat - minLat;
-  const topThresh = maxLat - latRange * 0.15;
-  const botThresh = minLat + latRange * 0.20;
-
-  const topCoords = all.filter(c => c[1] >= topThresh);
-  const botCoords = all.filter(c => c[1] <= botThresh);
-
-  const summit: [number, number] = topCoords.length > 0
-    ? [topCoords.reduce((s, c) => s + c[0], 0) / topCoords.length,
-       topCoords.reduce((s, c) => s + c[1], 0) / topCoords.length]
-    : [cLon, maxLat];
-
-  const base: [number, number] = botCoords.length > 0
-    ? [botCoords.reduce((s, c) => s + c[0], 0) / botCoords.length,
-       botCoords.reduce((s, c) => s + c[1], 0) / botCoords.length]
-    : [cLon, minLat];
-
-  // Span = diagonal of bounding box in km
-  const dLatKm = latRange * 111;
-  const dLonKm = (maxLon - minLon) * 111 * Math.cos(cLat * Math.PI / 180);
-  const spanKm = Math.max(Math.hypot(dLatKm, dLonKm), 0.3);
-
-  // Bearing: camera looks FROM base TOWARD summit
-  const dLon = summit[0] - base[0];
-  const dLat = summit[1] - base[1];
-  const bearing = ((Math.atan2(dLon, dLat) * 180) / Math.PI + 360) % 360;
-
-  // Auto zoom: scale with span + compensate for high pitch foreshortening
-  // 0.5km span → zoom 14.5, 2km → 13, 5km → 12, 15km → 11
-  const baseZoom = Math.max(10.5, Math.min(15, 14 - Math.log2(Math.max(spanKm, 0.5))));
-  const pitchComp = 1 - (75 - 45) / 200; // slight zoom-out for 75° pitch
-  const autoZoom = Math.round(baseZoom * pitchComp * 10) / 10;
-
-  // Camera center: shift 30% toward base so summit appears in upper screen
-  const camCenter: [number, number] = [
-    cLon + (base[0] - cLon) * 0.30,
-    cLat + (base[1] - cLat) * 0.30,
-  ];
-
-  return { summit, base, center: [cLon, cLat], spanKm, bearing, autoZoom, camCenter };
+  const spanLat = (Math.max(...lats) - Math.min(...lats)) * 111;
+  const spanLon = (Math.max(...lons) - Math.min(...lons)) * 111 * Math.cos((lats[0] ?? 45) * Math.PI / 180);
+  const spanKm  = Math.max(Math.hypot(spanLat, spanLon), 0.3);
+  // ~0.3km = zoom 14.5 (Pine Knob), ~5km = zoom 12.5 (Steamboat), ~15km = zoom 11
+  return Math.max(10.5, Math.min(14.5, 14.5 - Math.log2(spanKm / 0.3)));
 }
+
 
 // ── 3D terrain + sky + fog + piste/lift layers ───────────────────────────────
 function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: MapMode) {
@@ -443,30 +407,29 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
       try {
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
 
-        // Compute extents from lift endpoints (most accurate)
-        const extents = extractMountainExtents(geo);
+        // Auto-zoom based on actual ski area footprint
+        const autoZoom = computeAutoZoom(geo);
 
-        if (extents) {
-          // All camera values pre-computed in extents
-          map.easeTo({
-            center:   extents.camCenter,
-            zoom:     extents.autoZoom,
-            bearing:  extents.bearing,
-            pitch:    75,
-            duration: 1400,
-          });
+        // Camera: north-up (bearing=0), pitched 60° for 3D feel
+        // Center on the resort's actual coordinates — no offset tricks
+        map.easeTo({
+          center:   [_lon, _lat],
+          zoom:     autoZoom,
+          bearing:  0,
+          pitch:    60,
+          duration: 1200,
+        });
 
-          // Summit marker at highest coordinate cluster
+        // Summit pin: farthest ski feature from resort center
+        const summitCoord = findSummitCoord(geo, _lat, _lon);
+        if (summitCoord) {
           const mglMod = (await import('mapbox-gl')).default;
           markerRef.current?.remove();
           const label = (_name ?? resortName ?? 'Summit').replace(/ (Resort|Mountain|Ski Area)$/i, '');
           const el = createPinEl(label);
           markerRef.current = new mglMod.Marker({ element: el, anchor: 'bottom' })
-            .setLngLat(extents.summit)
+            .setLngLat(summitCoord)
             .addTo(map);
-        } else {
-          // No OSM data yet — just fix pitch
-          map.easeTo({ pitch: 75, duration: 800 });
         }
       } catch (e) {
         console.warn('[MapboxMap] setup3D:', e);
@@ -498,8 +461,8 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              75,
-          bearing:            160,
+          pitch:              60,
+          bearing:            0,
           attributionControl: false,
           logoPosition:       'bottom-left',
           antialias:          true,
@@ -533,8 +496,8 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
     if (key === prevKey.current) return;
     prevKey.current = key;
 
-    // Initial fly to resort center — OSM load will refine position
-    map.flyTo({ center:[lon,lat], zoom, pitch:75, bearing:160, speed:1.4, curve:1.2 });
+    // Fly to resort center — OSM load will refine zoom via easeTo
+    map.flyTo({ center:[lon,lat], zoom, pitch:60, bearing:0, speed:1.4, curve:1.2 });
     map.once('moveend', () => {
       if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode, resortName);
     });
