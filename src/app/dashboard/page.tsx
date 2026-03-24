@@ -174,7 +174,6 @@ const LIFTIE_SLUGS: Record<string, string> = {
   'caberfae peaks': 'caberfae',
   'whitecap mountain': 'whitecap',
   'indianhead': 'indianhead',
-  'crystal mountain': 'crystalmountainmi',
   // Canada
   'whistler blackcomb': 'whistler', 'whistler': 'whistler',
   'mont tremblant': 'tremblant', 'mont-tremblant': 'tremblant',
