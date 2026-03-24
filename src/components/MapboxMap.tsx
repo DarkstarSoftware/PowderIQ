@@ -59,8 +59,13 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
 
     (async () => {
       try {
-        // Import Mapbox CSS dynamically — safe in client-only context
-        await import('mapbox-gl/dist/mapbox-gl.css');
+        if (!document.getElementById('mapbox-css')) {
+          const link = document.createElement('link');
+          link.id = 'mapbox-css';
+          link.rel = 'stylesheet';
+          link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css';
+          document.head.appendChild(link);
+        }
         const mapboxgl = (await import('mapbox-gl')).default;
         // @ts-ignore — mapbox-gl typings quirk
         mapboxgl.accessToken = TOKEN;
