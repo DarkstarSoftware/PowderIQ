@@ -142,6 +142,24 @@ function ScoreRing({ score }: { score: number }) {
 }
 
 
+// ── Pro gate wrapper ─────────────────────────────────────────────────────────
+function ProGate({ isPro, title, desc, children }: {
+  isPro: boolean; title: string; desc: string; children: React.ReactNode;
+}) {
+  if (isPro) return <>{children}</>;
+  return (
+    <div className="pro-gate" style={{position:'relative'}}>
+      <div className="pro-gate-blur">{children}</div>
+      <div className="pro-gate-overlay">
+        <div className="pro-badge">⭐ Pro Feature</div>
+        <div className="pro-gate-title">{title}</div>
+        <div className="pro-gate-sub">{desc}</div>
+        <a href="/account/billing" className="pro-gate-btn">Upgrade to Pro</a>
+      </div>
+    </div>
+  );
+}
+
 // ── Liftie helpers ────────────────────────────────────────────────────────────
 
 const LIFTIE_SLUGS: Record<string, string> = {
@@ -294,6 +312,7 @@ export default function DashboardPage() {
   const [favorites,    setFavorites]    = useState<FavoriteItem[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [userRole,     setUserRole]     = useState('user');
+  const [isPro,        setIsPro]        = useState(false); // active sub or pro_user/admin role
   const [userName,     setUserName]     = useState('');
   const [avatarUrl,    setAvatarUrl]    = useState('');
   const [riderStyle,   setRiderStyle]   = useState('all_mountain'); // powder|all_mountain|freestyle|beginner
@@ -334,8 +353,14 @@ export default function DashboardPage() {
 
       if (meRes.ok) {
         const me = await meRes.json();
-        setUserRole(me.data?.role || 'user');
+        const role = me.data?.role || 'user';
+        setUserRole(role);
         setUserName(me.data?.profile?.displayName || '');
+        // isPro = active subscription OR pro_user/admin role
+        const subStatus = me.data?.subscription?.status;
+        const isProRole = role === 'pro_user' || role === 'admin';
+        const isActiveSub = subStatus === 'active' || subStatus === 'trialing';
+        setIsPro(isProRole || isActiveSub);
         const url = me.data?.profile?.avatarUrl || '';
         if (url) { setAvatarUrl(url); localStorage.setItem('powderiq_avatar', url); }
         if (me.data?.profile?.style)      setRiderStyle(me.data.profile.style);
@@ -832,6 +857,26 @@ export default function DashboardPage() {
         @keyframes spin { to { transform:rotate(360deg); } }
         @media(max-width:1200px) { .rpanel { display:none; } }
         @media(max-width:900px) { .sidebar { display:none; } }
+
+        /* ── Pro gate overlay ── */
+        .pro-gate { position:relative;overflow:hidden;border-radius:inherit; }
+        .pro-gate-blur { filter:blur(3px);pointer-events:none;user-select:none;opacity:0.5; }
+        .pro-gate-overlay {
+          position:absolute;inset:0;display:flex;flex-direction:column;
+          align-items:center;justify-content:center;gap:8px;
+          background:rgba(240,245,251,0.85);backdrop-filter:blur(2px);
+          border-radius:inherit;z-index:10;padding:16px;text-align:center;
+        }
+        .pro-badge { display:flex;align-items:center;gap:5px;padding:4px 10px;
+          background:linear-gradient(135deg,#1d6ef5,#0d9488);
+          color:#fff;border-radius:20px;font-size:10px;font-weight:700;
+          letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px; }
+        .pro-gate-title { font-size:13px;font-weight:700;color:var(--text); }
+        .pro-gate-sub { font-size:11px;color:var(--text-3);line-height:1.5;max-width:180px; }
+        .pro-gate-btn { padding:7px 16px;background:var(--blue);color:#fff;
+          border:none;border-radius:8px;font-size:12px;font-weight:700;
+          cursor:pointer;font-family:Inter,sans-serif;margin-top:4px;
+          text-decoration:none;display:inline-block; }
       `}</style>
 
       {/* ── TOPNAV ── */}
@@ -910,7 +955,7 @@ export default function DashboardPage() {
 
           {/* Map */}
           <div className="map-area">
-            {activeFav?.mountain.latitude && TOKEN_OK ? (
+            {activeFav?.mountain.latitude && TOKEN_OK && isPro ? (
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
@@ -928,12 +973,30 @@ export default function DashboardPage() {
                 onLoad={() => setMapLoaded(true)}
               />
             ) : (
-              <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
-                onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
+              <div style={{position:'relative',width:'100%',height:'100%'}}>
+                <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
+                  onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
+                {activeFav && !isPro && (
+                  <div style={{position:'absolute',bottom:16,left:16,background:'rgba(13,27,46,0.88)',
+                    backdropFilter:'blur(10px)',borderRadius:12,padding:'10px 14px',
+                    display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}
+                    onClick={() => window.location.href='/account/billing'}>
+                    <span style={{fontSize:16}}>🗺️</span>
+                    <div>
+                      <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>Unlock 3D Trail Map</div>
+                      <div style={{fontSize:10,color:'rgba(255,255,255,0.6)'}}>Interactive 3D terrain with live trail overlays</div>
+                    </div>
+                    <div style={{background:'var(--blue)',color:'#fff',borderRadius:6,
+                      padding:'4px 10px',fontSize:10,fontWeight:700,whiteSpace:'nowrap',marginLeft:4}}>
+                      Pro →
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Best Area insight card — personalized */}
-            {activeFav && (() => {
+            {/* Best Area insight card — Pro only */}
+            {activeFav && isPro && (() => {
               const snow24  = scoreData?.snowfall24hIn ?? 0;
               const wind    = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
               const temp    = scoreData?.tempF ?? 28;
@@ -1071,6 +1134,7 @@ export default function DashboardPage() {
                       <span className="runs-hdr-badge">{trails.filter(t=>t.status==='open'||t.status==='groomed').length} open</span>
                   }
                 </div>
+                <ProGate isPro={isPro} title="Top Runs Personalization" desc="Smart trail ranking based on your skill level, riding style, and live conditions.">
                 <div className="runs-grid">
                   {(() => {
                     const DCLS: Record<string,{bg:string,col:string,icon:string}> = {
@@ -1182,6 +1246,7 @@ export default function DashboardPage() {
                   })()}
                 </div>
               </div>
+                </ProGate>
 
               {/* Smart Lift Access */}
               <div className="lifts-card">
@@ -1401,8 +1466,8 @@ export default function DashboardPage() {
             })()}
           </div>
 
-          {/* ── 3. Next 6 Hours ── */}
-          {forecast.length > 0 && (() => {
+          {/* ── 3. Next 6 Hours — Pro only ── */}
+          {forecast.length > 0 && isPro && (() => {
             const f = forecast[0];
             const f1 = forecast[1];
             // Build 4 time slots from today's data
@@ -1435,8 +1500,8 @@ export default function DashboardPage() {
             );
           })()}
 
-          {/* ── 4. Crowd Insights ── */}
-          {(trails.length > 0 || lifts.length > 0) && (() => {
+          {/* ── 4. Crowd Insights — Pro only ── */}
+          {isPro && (trails.length > 0 || lifts.length > 0) && (() => {
             const wind = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
             // Curated insight rows — max 3, each tells a story
             const rows: {icon:string; name:string; desc:string; pill:string; cls:'green'|'yellow'|'red'}[] = [];
@@ -1503,8 +1568,8 @@ export default function DashboardPage() {
             );
           })()}
 
-          {/* ── 5. Smart Alerts ── */}
-          {activeFav && (() => {
+          {/* ── 5. Smart Alerts — Pro only ── */}
+          {isPro && activeFav && (() => {
             const wind      = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
             const snow24h   = scoreData?.snowfall24hIn ?? 0;
             const snow48h   = scoreData?.snowfall48hIn ?? 0;
@@ -1571,6 +1636,22 @@ export default function DashboardPage() {
               </div>
             );
           })()}
+
+          {/* Upgrade nudge for free users */}
+          {!isPro && (
+            <div style={{background:'linear-gradient(135deg,#1d6ef5,#0d9488)',borderRadius:14,
+              padding:'16px',display:'flex',flexDirection:'column',gap:8}}>
+              <div style={{fontSize:12,fontWeight:800,color:'#fff'}}>⭐ Upgrade to PowderIQ Pro</div>
+              <div style={{fontSize:11,color:'rgba(255,255,255,0.8)',lineHeight:1.5}}>
+                Unlock 3D trail maps, personalized run recommendations, crowd insights, smart alerts, and more.
+              </div>
+              <a href="/account/billing" style={{padding:'8px 0',background:'rgba(255,255,255,0.2)',
+                color:'#fff',borderRadius:8,fontSize:12,fontWeight:700,
+                textAlign:'center',textDecoration:'none',border:'1px solid rgba(255,255,255,0.3)'}}>
+                See Pro Plans →
+              </a>
+            </div>
+          )}
 
           {/* PowderIQ footer */}
           <div className="rp-footer">
