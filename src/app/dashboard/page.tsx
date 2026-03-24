@@ -58,18 +58,72 @@ const LIFT_LABEL: Record<string,string> = { open:'Open', on_hold:'Hold', closed:
 
 // Powder score ring SVG
 function ScoreRing({ score }: { score: number }) {
-  const r = 60, circ = 2 * Math.PI * r;
-  const pct = score / 100;
-  const color = getScoreColor(score);
+  const size = 160;
+  const cx = size / 2, cy = size / 2;
+  const r = 62;
+  const strokeW = 13;
+  const circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, score / 100));
+  const filled = circ * pct;
+  const gap = circ - filled;
+
+  // Day quality label + colors
+  const quality =
+    score >= 80 ? { label:'Outstanding', color:'#16a34a' } :
+    score >= 65 ? { label:'Great Day',   color:'#0d9488' } :
+    score >= 50 ? { label:'Good Day',    color:'#2563eb' } :
+    score >= 35 ? { label:'Fair Day',    color:'#d97706' } :
+                  { label:'Challenging', color:'#dc2626' };
+
+  const gradId = `sg-${score}`;
+
   return (
-    <svg width={150} height={150} viewBox="0 0 150 150">
-      <circle cx={75} cy={75} r={r} fill="none" stroke="rgba(100,150,200,0.1)" strokeWidth={12}/>
-      <circle cx={75} cy={75} r={r} fill="none" stroke={color} strokeWidth={12}
-        strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)}
-        strokeLinecap="round" transform="rotate(-90 75 75)" style={{transition:'stroke-dashoffset .6s ease'}}/>
-      <text x={75} y={70} textAnchor="middle" fill={color} fontSize={34} fontWeight={800} fontFamily="Inter,sans-serif">{score}</text>
-      <text x={75} y={90} textAnchor="middle" fill="rgba(100,150,200,0.6)" fontSize={13} fontFamily="Inter,sans-serif">{score > 0 ? score : 0}</text>
-    </svg>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:0,width:'100%'}}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{overflow:'visible'}}>
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#1e3a8a"/>
+            <stop offset="30%"  stopColor="#1d6ef5"/>
+            <stop offset="60%"  stopColor="#38bdf8"/>
+            <stop offset="85%"  stopColor="#34d399"/>
+            <stop offset="100%" stopColor="#22c55e"/>
+          </linearGradient>
+          {/* Soft drop shadow filter */}
+          <filter id="ring-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#1d6ef5" floodOpacity="0.18"/>
+          </filter>
+        </defs>
+
+        {/* Track ring */}
+        <circle cx={cx} cy={cy} r={r} fill="none"
+          stroke="#e8f1fe" strokeWidth={strokeW}/>
+
+        {/* Filled gradient arc */}
+        {score > 0 && (
+          <circle cx={cx} cy={cy} r={r} fill="none"
+            stroke={`url(#${gradId})`} strokeWidth={strokeW}
+            strokeDasharray={`${filled} ${gap}`}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{transition:'stroke-dasharray .7s cubic-bezier(.4,0,.2,1)'}}
+            filter="url(#ring-shadow)"/>
+        )}
+
+        {/* Score number */}
+        <text x={cx} y={cy - 8} textAnchor="middle"
+          fill="#0d1b2e" fontSize={42} fontWeight={800}
+          fontFamily="Inter,sans-serif" letterSpacing="-2">
+          {score > 0 ? score : '—'}
+        </text>
+
+        {/* /100 */}
+        <text x={cx} y={cy + 14} textAnchor="middle"
+          fill="#94a3b8" fontSize={12} fontWeight={500}
+          fontFamily="Inter,sans-serif">
+          out of 100
+        </text>
+      </svg>
+    </div>
   );
 }
 
@@ -609,15 +663,37 @@ export default function DashboardPage() {
         .rs-snow-lbl { font-size:11px;color:#3b82f6;font-weight:500; }
 
         /* 2. Score card */
-        .sc-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center; }
-        .sc-ring-wrap { position:relative;margin:4px 0 6px; }
-        .sc-day-label { font-size:13px;font-weight:800;letter-spacing:-.01em; }
-        .sc-explanation { font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;margin-top:4px;max-width:210px; }
-        .sc-drivers { display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;justify-content:center; }
-        .sc-driver { display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid transparent; }
-        .sc-driver.pos { background:#f0fdf4;color:#15803d;border-color:rgba(34,197,94,0.2); }
-        .sc-driver.neg { background:#fef2f2;color:#991b1b;border-color:rgba(239,68,68,0.2); }
+        .sc-card {
+          background:var(--white);border-radius:18px;
+          border:1px solid rgba(100,150,200,0.18);
+          padding:20px 16px 16px;
+          box-shadow:0 2px 12px rgba(15,40,80,0.07);
+          display:flex;flex-direction:column;align-items:center;gap:0;
+        }
+        .sc-hdr { font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.09em;margin-bottom:4px;align-self:flex-start; }
+        .sc-day-label {
+          font-size:15px;font-weight:800;letter-spacing:-.02em;
+          margin-top:2px;margin-bottom:6px;
+        }
+        .sc-explanation {
+          font-size:11px;color:var(--text-3);text-align:center;
+          line-height:1.6;margin-bottom:10px;
+          max-width:215px;padding:0 4px;
+        }
+        .sc-divider { width:100%;height:1px;background:var(--border);margin:4px 0 10px; }
+        .sc-drivers { display:flex;flex-wrap:wrap;gap:5px;justify-content:center;width:100%; }
+        .sc-driver {
+          display:flex;align-items:center;gap:4px;
+          padding:4px 9px;border-radius:20px;
+          font-size:10px;font-weight:600;border:1px solid transparent;
+          white-space:nowrap;
+        }
+        .sc-driver.pos { background:#f0fdf4;color:#15803d;border-color:rgba(34,197,94,0.25); }
+        .sc-driver.neg { background:#fef2f2;color:#991b1b;border-color:rgba(239,68,68,0.25); }
         .sc-driver.neu { background:var(--bg);color:var(--text-3);border-color:var(--border); }
+        .sc-logo-row { display:flex;align-items:center;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border);align-self:stretch;justify-content:center; }
+        .sc-logo-row img { height:20px;width:auto; }
+        .sc-logo-brand { font-size:12px;font-weight:800;color:var(--text);letter-spacing:-.03em; }
 
         /* 3. Next 6 hours */
         .h6-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px 14px;box-shadow:var(--shadow); }
@@ -1116,33 +1192,97 @@ export default function DashboardPage() {
 
           {/* ── 2. PowderIQ Score ── */}
           <div className="sc-card">
-            <div className="rp-card-hdr" style={{margin:0,marginBottom:8}}>PowderIQ Score</div>
+            <div className="sc-hdr">PowderIQ Score</div>
+
             {scoreLoading ? (
-              <div style={{height:130,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <div style={{width:28,height:28,border:'3px solid #dbeafe',borderTopColor:'var(--blue)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+              <div style={{height:160,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:32,height:32,border:'3px solid #dbeafe',borderTopColor:'var(--blue)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
               </div>
-            ) : (
-              <>
-                <ScoreRing score={score}/>
-                <div className="sc-day-label" style={{color:getScoreColor(score)}}>
-                  {score>=80?'Outstanding Day 🔥':score>=65?'Great Day ✓':score>=50?'Good Day':score>=35?'Fair Day':'Challenging Day'}
-                </div>
-                <div className="sc-explanation">
-                  {scoreData?.conditionDesc ?? (activeFav ? 'Computing conditions…' : 'Select a resort to see score')}
-                </div>
-                {scoreData && (
-                  <div className="sc-drivers">
-                    {(scoreData.snowfall24hIn ?? 0) > 2 && <span className="sc-driver pos">❄ Fresh snow</span>}
-                    {(scoreData.snowfall24hIn ?? 0) === 0 && groomedCount > 0 && <span className="sc-driver pos">🎿 Groomed</span>}
-                    {(scoreData.windMph ?? 0) <= 10 && <span className="sc-driver pos">💨 Calm winds</span>}
-                    {(scoreData.windMph ?? 0) > 25 && <span className="sc-driver neg">⚠ High wind</span>}
-                    {(scoreData.tempF ?? 28) >= 20 && (scoreData.tempF ?? 28) <= 32 && <span className="sc-driver pos">🌡 Ideal temp</span>}
-                    {(scoreData.tempF ?? 28) > 36 && <span className="sc-driver neg">🌡 Warm/slushy</span>}
-                    {openLifts > 0 && <span className="sc-driver neu">🚡 {openLifts} lifts open</span>}
+            ) : (() => {
+              // Day quality config
+              const quality = score>=80
+                ? { label:'Outstanding Day', emoji:'🔥', color:'#16a34a', bg:'#f0fdf4', border:'rgba(34,197,94,0.2)' }
+                : score>=65
+                ? { label:'Great Day',       emoji:'✓',  color:'#0d9488', bg:'#f0fdfa', border:'rgba(13,148,136,0.2)' }
+                : score>=50
+                ? { label:'Good Day',        emoji:'',   color:'#2563eb', bg:'#eff6ff', border:'rgba(37,99,235,0.2)' }
+                : score>=35
+                ? { label:'Fair Day',        emoji:'',   color:'#d97706', bg:'#fffbeb', border:'rgba(217,119,6,0.2)' }
+                : { label:'Challenging',     emoji:'',   color:'#dc2626', bg:'#fef2f2', border:'rgba(220,38,38,0.2)' };
+
+              // Smart explanation from real data
+              const snow24 = scoreData?.snowfall24hIn ?? 0;
+              const wind   = scoreData?.windMph ?? 0;
+              const temp   = scoreData?.tempF ?? 28;
+              const depth  = scoreData?.snowDepthIn ?? 0;
+
+              let explanation = '';
+              if (!activeFav) {
+                explanation = 'Select a resort to see your personalized powder score.';
+              } else if (score === 0) {
+                explanation = 'This resort appears to be closed for the season.';
+              } else if (snow24 > 5 && wind <= 15) {
+                explanation = `${snow24.toFixed(1)}" of fresh snow overnight with calm winds — prime conditions across the mountain.`;
+              } else if (snow24 > 2 && wind <= 20) {
+                explanation = `Fresh snow and light winds are boosting conditions. Great time to find untracked terrain.`;
+              } else if (snow24 > 0 && wind > 25) {
+                explanation = `New snow is offset by strong winds at ${Math.round(wind)} mph. Watch for wind holds on upper lifts.`;
+              } else if (snow24 === 0 && groomedCount > 0 && wind <= 15) {
+                explanation = `No new snow, but groomed runs and calm winds make for solid all-mountain conditions.`;
+              } else if (temp > 36) {
+                explanation = `Warm temps at ${Math.round(temp)}°F will soften snow by midday. Ski early for the best conditions.`;
+              } else if (wind > 30) {
+                explanation = `High winds at ${Math.round(wind)} mph are the main challenge today. Stick to sheltered lower terrain.`;
+              } else if (depth > 40) {
+                explanation = `Strong base of ${Math.round(depth)}" with solid coverage. A reliable day on the mountain.`;
+              } else {
+                explanation = scoreData?.conditionDesc ?? 'Computing current conditions for this resort.';
+              }
+
+              return (
+                <>
+                  <ScoreRing score={score}/>
+
+                  {/* Day quality label pill */}
+                  <div style={{
+                    display:'flex',alignItems:'center',gap:5,
+                    padding:'5px 14px',borderRadius:20,marginBottom:8,marginTop:2,
+                    background:quality.bg,border:`1px solid ${quality.border}`,
+                  }}>
+                    <span style={{fontSize:13,fontWeight:800,color:quality.color,letterSpacing:'-.01em'}}>
+                      {quality.label}{quality.emoji ? ` ${quality.emoji}` : ''}
+                    </span>
                   </div>
-                )}
-              </>
-            )}
+
+                  {/* Explanation */}
+                  <p className="sc-explanation">{explanation}</p>
+
+                  {/* Driver chips */}
+                  {scoreData && (
+                    <>
+                      <div className="sc-divider"/>
+                      <div className="sc-drivers">
+                        {snow24 > 2    && <span className="sc-driver pos">❄ {snow24.toFixed(1)}" snow</span>}
+                        {snow24 === 0 && groomedCount > 0 && <span className="sc-driver pos">🎿 Groomed</span>}
+                        {wind <= 10   && <span className="sc-driver pos">💨 Calm winds</span>}
+                        {wind > 10 && wind <= 20 && <span className="sc-driver neu">💨 {Math.round(wind)} mph</span>}
+                        {wind > 25    && <span className="sc-driver neg">⚠ {Math.round(wind)} mph wind</span>}
+                        {temp >= 20 && temp <= 32 && <span className="sc-driver pos">🌡 {Math.round(temp)}°F</span>}
+                        {temp > 36    && <span className="sc-driver neg">🌡 {Math.round(temp)}°F warm</span>}
+                        {depth > 0    && <span className="sc-driver neu">📏 {Math.round(depth)}" base</span>}
+                        {openLifts > 0 && <span className="sc-driver neu">🚡 {openLifts} open</span>}
+                      </div>
+                    </>
+                  )}
+
+                  {/* PowderIQ branding */}
+                  <div className="sc-logo-row">
+                    <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
+                    <span className="sc-logo-brand">PowderIQ</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* ── 3. Next 6 Hours ── */}
