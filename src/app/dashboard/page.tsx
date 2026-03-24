@@ -394,6 +394,7 @@ export default function DashboardPage() {
       // Try resort API first (resorts with PowderIQ accounts have full data)
       const resortRes = await fetch(`/api/resort?mountainId=${fav.mountain.id}`, { headers: h });
       let hasResortData = false;
+      let hasResortTrails = false;
       if (resortRes.ok) {
         const rj = await resortRes.json();
         const resort = Array.isArray(rj.data) ? rj.data[0] : rj.data;
@@ -411,7 +412,7 @@ export default function DashboardPage() {
           if (tRes.status === 'fulfilled' && tRes.value.ok) {
             const tj = await tRes.value.json();
             const trailList = tj.data?.trails ?? [];
-            if (trailList.length > 0) setTrails(trailList);
+            if (trailList.length > 0) { setTrails(trailList); hasResortTrails = true; }
           }
           if (wRes.status === 'fulfilled' && wRes.value.ok) {
             const wj = await wRes.value.json();
@@ -420,7 +421,7 @@ export default function DashboardPage() {
         }
       }
 
-      // Fallback: fetch live lift status from Liftie.info (covers ~400 resorts, no auth needed)
+      // Fallback: live lift status from Liftie.info
       if (!hasResortData) {
         try {
           const slug = deriveLiftieSlug(fav.mountain.name);
@@ -433,6 +434,31 @@ export default function DashboardPage() {
           }
         } catch (e) {
           console.warn('[Liftie] fetch failed:', e);
+        }
+      }
+
+      // Fallback: OSM trail data for any mountain (consumer users without resort account)
+      // This gives us real trail names + difficulty for Top Runs personalization
+      if (!hasResortTrails) {
+        try {
+          const trailRes = await fetch(`/api/mountains/${fav.mountain.id}/trails`, { headers: h });
+          if (trailRes.ok) {
+            const td = await trailRes.json();
+            const osmTrails = td.data?.trails ?? [];
+            if (osmTrails.length > 0) {
+              // Blend with Liftie lift data to infer which trails are "open"
+              // If we have open lifts, mark trails as open; otherwise leave as OSM default
+              const openLiftCount = lifts.filter(l => l.status === 'open').length;
+              const enriched = osmTrails.map((t: any) => ({
+                ...t,
+                // If lifts are open, OSM trails are likely open too
+                status: openLiftCount > 0 ? (t.status === 'groomed' ? 'groomed' : 'open') : t.status,
+              }));
+              setTrails(enriched);
+            }
+          }
+        } catch (e) {
+          console.warn('[OSM trails] fetch failed:', e);
         }
       }
     } catch (e) { console.error(e); }
