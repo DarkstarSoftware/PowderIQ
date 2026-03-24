@@ -913,7 +913,7 @@ export default function DashboardPage() {
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
-                zoom={12}
+                zoom={13}
                 mode={mapMode}
                 trails={trails}
                 diffFilter={diffFilter}

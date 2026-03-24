@@ -146,28 +146,63 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
     }, 'waterway-label'); // insert below labels
   }
 
-  // ── Snow white fill over terrain ─────────────────────────────────────────
-  // On satellite mode skip (real imagery already shows snow)
-  // On outdoors/trail mode: add a semi-transparent white layer above terrain
-  // to give the traditional "white mountain with shadows" trail-map look
-  if (!map.getLayer('piq-snow-fill')) {
-    if (!map.getSource('piq-snow-src')) {
-      map.addSource('piq-snow-src', {
-        type: 'raster-dem',
-        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        tileSize: 512,
-      });
-    }
-    // Use fill-extrusion trick: flat terrain colored white with hillshade
-    // Actually we layer a light snow-colored raster tint using a background layer
-    if (!map.getLayer('piq-snow-tint')) {
+  // ── Snow + tree layer using Mapbox terrain-rgb elevation data ───────────
+  // On satellite: real imagery already shows snow, just add hillshade depth
+  // On trail/hybrid: add snow-white fill using the terrain vector source
+  // that ships with Mapbox outdoors — it has 'landcover' with 'snow' class
+  if (mode !== 'satellite') {
+
+    // Snow white layer — targets high-elevation terrain using landcover
+    if (!map.getLayer('piq-snow-white')) {
       map.addLayer({
-        id: 'piq-snow-tint', type: 'background',
+        id:     'piq-snow-white',
+        type:   'fill',
+        source: 'composite',
+        'source-layer': 'landcover',
+        filter: ['==', ['get', 'class'], 'snow'],
         paint: {
-          'background-color': '#ddeeff',   // cool snow-blue tint
-          'background-opacity': mode === 'satellite' ? 0 : 0.22, // skip on satellite
+          'fill-color':   '#f0f6ff',
+          'fill-opacity': 0.9,
         },
       }, 'piq-hillshade');
+    }
+
+    // Tree/forest layer — dark green so it contrasts against white snow
+    if (!map.getLayer('piq-trees')) {
+      map.addLayer({
+        id:     'piq-trees',
+        type:   'fill',
+        source: 'composite',
+        'source-layer': 'landcover',
+        filter: ['in', ['get', 'class'], ['literal', ['wood', 'scrub', 'grass']]],
+        paint: {
+          'fill-color': [
+            'interpolate', ['linear'], ['zoom'],
+            10, '#2d5a1b',
+            14, '#3a7023',
+          ],
+          'fill-opacity': [
+            'interpolate', ['linear'], ['zoom'],
+            10, 0.55,
+            14, 0.45,
+          ],
+        },
+      }, 'piq-hillshade');
+    }
+
+    // Rock/bare terrain above treeline — gray-white
+    if (!map.getLayer('piq-rock')) {
+      map.addLayer({
+        id:     'piq-rock',
+        type:   'fill',
+        source: 'composite',
+        'source-layer': 'landcover',
+        filter: ['==', ['get', 'class'], 'rock'],
+        paint: {
+          'fill-color':   '#c8d8e8',
+          'fill-opacity': 0.7,
+        },
+      }, 'piq-trees');
     }
   }
 
@@ -342,7 +377,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
         const bearing = computeBearing(geo.runs);
 
         // Adjust camera bearing without full flyTo (already at location)
-        map.easeTo({ bearing, pitch: 50, duration: 1200 });
+        map.easeTo({ bearing, pitch: 30, duration: 1200 });
 
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
       } catch (e) {
@@ -375,7 +410,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              50,
+          pitch:              30,
           bearing:            160,   // default SSE-facing; corrected after OSM load
           attributionControl: false,
           logoPosition:       'bottom-left',
@@ -410,7 +445,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
     if (key === prevKey.current) return;
     prevKey.current = key;
 
-    map.flyTo({ center:[lon,lat], zoom, pitch:50, bearing:160, speed:1.2, curve:1.4 });
+    map.flyTo({ center:[lon,lat], zoom, pitch:30, bearing:160, speed:1.2, curve:1.4 });
     map.once('moveend', () => {
       if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
     });
