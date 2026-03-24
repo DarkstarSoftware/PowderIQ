@@ -127,7 +127,7 @@ export async function GET(
       orderBy: { fetchedAt: 'desc' },
     });
     if (cached) {
-      const payload = cached.payload as { trails: TrailItem[] };
+      const payload = cached.payload as unknown as { trails: TrailItem[] };
       return NextResponse.json({
         data: { trails: payload.trails ?? [], source: 'cache' },
       }, { headers: { 'Cache-Control': 'public, max-age=3600' } });
