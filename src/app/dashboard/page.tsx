@@ -174,6 +174,7 @@ const LIFTIE_SLUGS: Record<string, string> = {
   'caberfae peaks': 'caberfae',
   'whitecap mountain': 'whitecap',
   'indianhead': 'indianhead',
+  'crystal mountain': 'crystalmountainmi',
   // Canada
   'whistler blackcomb': 'whistler', 'whistler': 'whistler',
   'mont tremblant': 'tremblant', 'mont-tremblant': 'tremblant',
@@ -422,204 +423,192 @@ export default function DashboardPage() {
     </>
   );
 
+
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
         :root {
-          --blue:#1d6ef5; --blue-light:#e8f1fe;
+          --blue:#1d6ef5; --blue-light:#e8f1fe; --blue-dark:#1558d6;
           --text:#0d1b2e; --text-2:#3d5166; --text-3:#6b849a;
           --border:rgba(100,150,200,0.15); --border-2:rgba(100,150,200,0.25);
           --bg:#f0f5fb; --white:#ffffff;
+          --green:#22c55e; --green-bg:#f0fdf4;
+          --amber:#f59e0b; --amber-bg:#fffbeb;
+          --red:#ef4444; --red-bg:#fef2f2;
           --shadow:0 1px 4px rgba(15,40,80,0.08);
+          --shadow-md:0 4px 16px rgba(15,40,80,0.10);
         }
-        html,body,#__next { height:100%; font-family:'Inter',sans-serif; background:var(--bg); }
+        html,body,#__next { height:100%; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
 
         /* ── TOPNAV ── */
-        .tnav { position:sticky;top:0;z-index:100;height:56px;background:var(--white);border-bottom:1px solid var(--border-2);display:flex;align-items:center;padding:0 20px;gap:16px;box-shadow:var(--shadow); }
+        .tnav { position:sticky;top:0;z-index:100;height:52px;background:var(--white);border-bottom:1px solid var(--border-2);display:flex;align-items:center;padding:0 20px;gap:16px;box-shadow:var(--shadow); }
         .tnav-logo { display:flex;align-items:center;gap:8px;flex-shrink:0; }
-        .tnav-logo img { height:32px;width:auto; }
-        .tnav-brand { font-size:17px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
+        .tnav-logo img { height:30px;width:auto; }
+        .tnav-brand { font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
         .tnav-tabs { display:flex;align-items:center;gap:2px;flex:1; }
-        .tnav-tab { display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-3);text-decoration:none;white-space:nowrap;transition:all .15s; }
+        .tnav-tab { display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-3);text-decoration:none;white-space:nowrap;transition:all .15s; }
         .tnav-tab:hover { background:var(--bg);color:var(--text); }
         .tnav-tab.act { background:var(--blue-light);color:var(--blue); }
-        .tnav-right { display:flex;align-items:center;gap:10px;margin-left:auto; }
-        .ar-badge { display:flex;align-items:center;gap:6px;padding:5px 12px;background:#f0fdf4;border:1px solid rgba(34,197,94,0.3);border-radius:20px;font-size:12px;font-weight:600;color:#15803d; }
-        .ar-dot { width:7px;height:7px;background:#22c55e;border-radius:50%; }
-        .tnav-av { width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#3b82f6);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;border:2px solid var(--border-2);overflow:hidden;text-decoration:none;flex-shrink:0; }
+        .tnav-right { display:flex;align-items:center;gap:8px;margin-left:auto; }
+        .api-badge { display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--green-bg);border:1px solid rgba(34,197,94,0.3);border-radius:20px;font-size:11px;font-weight:600;color:#15803d; }
+        .api-dot { width:6px;height:6px;background:var(--green);border-radius:50%; }
+        .tnav-av { width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#3b82f6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid var(--border-2);overflow:hidden;text-decoration:none;flex-shrink:0; }
         .tnav-av img { width:100%;height:100%;object-fit:cover; }
-        .score-badge { display:flex;align-items:center;gap:4px;padding:4px 10px;background:var(--blue-light);border-radius:20px;font-size:12px;font-weight:700;color:var(--blue); }
 
-        /* ── LAYOUT ── */
-        .shell { display:flex;height:calc(100vh - 56px);overflow:hidden; }
+        /* ── SHELL ── */
+        .shell { display:flex;height:calc(100vh - 52px);overflow:hidden; }
 
-        /* ── SIDEBAR ── */
-        .sidebar { width:200px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column; }
-        .sb-section-lbl { font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:.07em;text-transform:uppercase;padding:14px 14px 6px; }
-        .sb-resort { display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;transition:background .15s;margin:2px 6px; }
+        /* ── LEFT SIDEBAR ── */
+        .sidebar { width:190px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column; }
+        .sb-lbl { font-size:10px;font-weight:700;color:var(--text-3);letter-spacing:.08em;text-transform:uppercase;padding:14px 14px 6px; }
+        .sb-resort { display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:10px;cursor:pointer;transition:background .15s;margin:2px 5px; }
         .sb-resort:hover { background:var(--bg); }
         .sb-resort.act { background:var(--blue-light); }
-        .sb-resort-icon { width:28px;height:28px;border-radius:7px;overflow:hidden;flex-shrink:0; }
-        .sb-resort-icon img { width:100%;height:100%;object-fit:cover; }
-        .sb-resort-name { font-size:12.5px;font-weight:600;color:var(--text);line-height:1.2;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .sb-resort-score { font-size:11px;font-weight:700;flex-shrink:0; }
-        .sb-resort.act .sb-resort-name { color:var(--blue); }
+        .sb-thumb { width:26px;height:26px;border-radius:6px;overflow:hidden;flex-shrink:0;background:var(--bg); }
+        .sb-thumb img { width:100%;height:100%;object-fit:cover; }
+        .sb-name { font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .sb-resort.act .sb-name { color:var(--blue); }
+        .sb-score { font-size:11px;font-weight:700;flex-shrink:0; }
 
-        /* ── MAIN ── */
-        .main { flex:1;overflow:hidden;display:flex;flex-direction:column; }
+        /* ── MAIN CONTENT ── */
+        .main { flex:1;overflow:hidden;display:flex;flex-direction:column;min-width:0; }
+
+        /* ── MAP CONTROLS BAR ── */
+        .map-ctrl-bar { display:flex;align-items:center;gap:8px;padding:10px 14px 8px;flex-shrink:0; }
+        .mode-group { display:flex;background:var(--white);border:1px solid var(--border-2);border-radius:20px;padding:3px;gap:0;box-shadow:var(--shadow); }
+        .mode-btn { display:flex;align-items:center;gap:5px;padding:5px 13px;border-radius:16px;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--text-3);cursor:pointer;font-family:Inter,sans-serif;transition:all .15s;white-space:nowrap; }
+        .mode-btn.act { background:var(--white);color:var(--text);box-shadow:0 1px 4px rgba(15,40,80,0.1);border:1px solid var(--border-2); }
+        .diff-group { display:flex;align-items:center;gap:5px;background:var(--white);border:1px solid var(--border-2);border-radius:20px;padding:5px 12px;box-shadow:var(--shadow); }
+        .diff-sep { width:1px;height:12px;background:var(--border-2); }
+        .diff-lbl { font-size:11px;font-weight:600;color:var(--text-3); }
+        .diff-chip { display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;border:none;background:transparent;font-size:11px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:Inter,sans-serif;transition:all .15s; }
+        .diff-chip.act { background:var(--blue-light);color:var(--blue); }
+        .diff-chip:hover:not(.act) { background:var(--bg); }
 
         /* ── MAP AREA ── */
-        .map-controls { padding:10px 12px 8px;display:flex;flex-direction:column;gap:8px;flex-shrink:0; }
-        /* Row 1: Trail Map / Satellite / Hybrid pill group */
-        .map-mode-row { display:flex;gap:0;background:var(--white);border:1px solid var(--border-2);border-radius:22px;padding:3px;width:fit-content;box-shadow:0 1px 3px rgba(15,40,80,0.06); }
-        .map-mode-btn { display:flex;align-items:center;gap:6px;padding:6px 16px;border-radius:18px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif;white-space:nowrap; }
-        .map-mode-btn.act { background:var(--white);color:var(--text);box-shadow:0 1px 4px rgba(15,40,80,0.12);border:1px solid var(--border-2); }
-        .map-mode-btn:hover:not(.act) { color:var(--text-2); }
-        .map-mode-icon { width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
-        .map-mode-icon.trail { background:#e8f1fe;color:#1d6ef5; }
-        .map-mode-icon.sat   { background:#dbeafe;color:#2563eb; }
-        .map-mode-icon.hyb   { background:#f3f4f6;color:#6b7280; }
-        /* Row 2: Difficulty filter */
-        .diff-row { display:flex;align-items:center;gap:6px;background:var(--white);border:1px solid var(--border-2);border-radius:22px;padding:5px 14px;width:fit-content;box-shadow:0 1px 3px rgba(15,40,80,0.06); }
-        .diff-label { font-size:12px;font-weight:600;color:var(--text-3);margin-right:2px; }
-        .diff-sep { width:1px;height:14px;background:var(--border-2); }
-        .diff-btn { display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:14px;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif; }
-        .diff-btn.act { background:var(--blue-light);color:var(--blue); }
-        .diff-btn:hover:not(.act) { background:var(--bg); }
-        .diff-icon-easy   { width:13px;height:13px;border-radius:2px;background:#16a34a;flex-shrink:0; }
-        .diff-icon-inter  { width:13px;height:13px;border-radius:50%;background:#2563eb;flex-shrink:0; }
-        .diff-icon-adv    { width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:13px solid #111827;flex-shrink:0; }
-        .diff-icon-expert { position:relative;width:13px;height:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
-        .diff-more { padding:3px 8px;border:none;background:transparent;font-size:12px;color:var(--text-3);cursor:pointer;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:2px; }
-        .map-wrap { flex:1;position:relative;overflow:hidden;border-radius:16px;box-shadow:0 2px 12px rgba(15,40,80,0.1); }
+        .map-area { flex:1;position:relative;overflow:hidden;margin:0 14px 0;border-radius:16px;box-shadow:var(--shadow-md);min-height:0; }
         .map-img { width:100%;height:100%;object-fit:cover;display:block;border-radius:16px; }
-        .map-attrib { position:absolute;bottom:10px;left:12px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.85);backdrop-filter:blur(6px);border-radius:6px;padding:4px 8px;font-size:11px;color:var(--text-3);font-weight:500; }
-        /* Callout cards on map */
-        .map-callout { position:absolute;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border-radius:10px;padding:10px 14px;box-shadow:0 4px 16px rgba(15,40,80,0.15);min-width:180px;pointer-events:none; }
-        .mc-title { font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px;margin-bottom:3px; }
-        .mc-sub { font-size:11px;color:var(--text-3); }
+
+        /* "Best Area" insight card on the map */
+        .best-area-card {
+          position:absolute;top:16px;left:16px;z-index:10;
+          background:rgba(13,27,46,0.88);backdrop-filter:blur(12px);
+          border:1px solid rgba(255,255,255,0.12);border-radius:14px;
+          padding:14px 16px;min-width:220px;max-width:280px;
+          box-shadow:0 8px 32px rgba(0,0,0,0.3);
+        }
+        .bac-label { font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px; }
+        .bac-title { font-size:18px;font-weight:800;color:#fff;margin-bottom:8px; }
+        .bac-row { display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px; }
+        .bac-row:last-of-type { margin-bottom:10px; }
+        .bac-icon { width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
+        .bac-btns { display:flex;gap:7px;margin-top:2px; }
+        .bac-btn-primary { flex:1;padding:7px 0;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;text-align:center; }
+        .bac-btn-secondary { flex:1;padding:7px 0;background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;text-align:center; }
+
+        /* zone label pins on map */
+        .map-pin { position:absolute;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);border-radius:8px;padding:4px 9px;font-size:11px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(15,40,80,0.15);pointer-events:none;border:1px solid var(--border-2); }
+
+        /* Mapbox attribution */
+        .map-attrib { position:absolute;bottom:10px;left:14px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.8);backdrop-filter:blur(6px);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--text-3); }
+
+        /* ── BOTTOM SECTION ── */
+        .bottom { height:210px;flex-shrink:0;background:var(--bg);display:flex;gap:10px;padding:10px 14px;overflow:hidden; }
+
+        /* Top Runs card */
+        .top-runs-card { flex:1;background:var(--white);border-radius:14px;border:1px solid var(--border-2);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow); }
+        .trc-hdr { display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0; }
+        .trc-title { font-size:13px;font-weight:700;color:var(--text);flex:1; }
+        .trc-tabs { display:flex;gap:3px; }
+        .trc-tab { padding:3px 9px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:none;background:none;font-family:Inter,sans-serif;color:var(--text-3);transition:all .15s; }
+        .trc-tab.act { background:var(--blue-light);color:var(--blue); }
+        .trc-dots { color:var(--text-3);font-size:16px;letter-spacing:2px;cursor:pointer; }
+        .trc-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0;flex:1;overflow:hidden; }
+        .trc-col { padding:10px 12px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:6px; }
+        .trc-col:last-child { border-right:none; }
+        .trc-run { display:flex;flex-direction:column;gap:2px; }
+        .trc-run-hdr { display:flex;align-items:center;gap:6px; }
+        .trc-diff { width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;flex-shrink:0; }
+        .trc-run-name { font-size:12px;font-weight:700;color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .trc-zone-badge { font-size:10px;font-weight:600;color:var(--text-3);background:var(--bg);padding:1px 6px;border-radius:4px;white-space:nowrap; }
+        .trc-run-sub { font-size:11px;color:var(--text-3);padding-left:24px; }
+        .trc-lift { display:flex;align-items:center;gap:5px;margin-top:4px;padding:4px 8px;background:var(--bg);border-radius:7px; }
+        .trc-lift-dot { width:7px;height:7px;border-radius:50%;flex-shrink:0; }
+        .trc-lift-name { font-size:11px;font-weight:500;color:var(--text-2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .trc-lift-wait { font-size:10px;color:var(--text-3);white-space:nowrap; }
+        .trc-lift-eye { font-size:11px;color:var(--text-3); }
+
+        /* Forecast mini card */
+        .fc-card { width:220px;flex-shrink:0;background:var(--white);border-radius:14px;border:1px solid var(--border-2);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow); }
+        .fc-hdr { display:flex;align-items:center;gap:6px;padding:10px 12px 6px;border-bottom:1px solid var(--border);flex-shrink:0; }
+        .fc-hdr-title { font-size:12px;font-weight:700;color:var(--text); }
+        .fc-scroll { flex:1;overflow-y:auto;padding:4px 0; }
+        .fc-row { display:flex;align-items:center;gap:8px;padding:5px 12px; }
+        .fc-day { font-size:11px;font-weight:600;color:var(--text-3);width:28px;flex-shrink:0; }
+        .fc-icon { font-size:14px;flex-shrink:0; }
+        .fc-bar-wrap { flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden; }
+        .fc-bar { height:100%;background:#93c5fd;border-radius:3px;transition:width .4s ease; }
+        .fc-snow-val { font-size:11px;font-weight:700;color:var(--blue);width:28px;text-align:right;flex-shrink:0; }
+        .fc-temp { font-size:10px;color:var(--text-3);width:44px;text-align:right;flex-shrink:0;white-space:nowrap; }
 
         /* ── RIGHT PANEL ── */
-        .rpanel { width:270px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px; }
-        /* Each section is a white card */
-        .rcard { background:var(--white);border-radius:16px;padding:16px;box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .rpanel-resort-name { font-size:17px;font-weight:800;color:var(--text);margin-bottom:14px; }
-        /* Weather inside resort card */
-        .weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0; }
-        .weather-zone { text-align:center; }
-        .wz-label { font-size:10px;font-weight:600;color:var(--text-3);margin-bottom:3px;display:flex;align-items:center;justify-content:center;gap:3px; }
-        .wz-temp { font-size:28px;font-weight:800;color:var(--text);line-height:1.1; }
-        .wz-unit { font-size:14px;font-weight:500;color:var(--text);vertical-align:super;font-size:12px; }
-        .wz-wind { font-size:11px;color:var(--text-3);margin-top:3px; }
-        /* Section header */
-        .rcard-hdr { font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px; }
-        /* Lift rows */
-        .lift-row { display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border); }
-        .lift-row:last-child { border-bottom:none;padding-bottom:0; }
-        .lift-row:first-of-type { padding-top:0; }
-        .lift-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
-        .lift-name { font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .lift-pill { display:flex;align-items:center;gap:5px;padding:3px 8px 3px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--border-2); }
-        .lift-pill-num { font-size:13px;font-weight:700;color:var(--text-2); }
-        .lift-pill-icon { width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
-        /* Trail rows */
-        .trail-row { display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border); }
-        .trail-row:last-child { border-bottom:none;padding-bottom:0; }
-        .trail-row:first-of-type { padding-top:0; }
-        .ts-dot { width:10px;height:10px;border-radius:50%;flex-shrink:0; }
-        .ts-name { font-size:13px;font-weight:600;color:var(--text);flex:1; }
-        .ts-right { display:flex;align-items:center;gap:8px; }
-        .ts-count { font-size:14px;font-weight:700;color:var(--text); }
-        .ts-check { width:22px;height:22px;border-radius:6px;background:var(--bg);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-3); }
-        /* Score card */
-        .score-card { background:var(--white);border-radius:16px;padding:16px 16px 20px;box-shadow:0 1px 4px rgba(15,40,80,0.06);display:flex;flex-direction:column;align-items:center; }
-        .score-hdr { font-size:15px;font-weight:700;color:var(--text);margin-bottom:12px;align-self:flex-start; }
-        .score-logo-row { display:flex;align-items:center;gap:8px;margin-top:12px; }
-        .score-logo-row img { height:28px;width:auto; }
-        .score-logo-brand { font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
+        .rpanel { width:255px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px; }
 
-        /* ── BOTTOM STRIP ── */
-        .bottom-strip { height:280px;flex-shrink:0;background:var(--bg);border-top:1px solid var(--border-2);display:flex;flex-direction:column; }
-        /* Forecast row */
-        .fc-section { background:var(--white);border-bottom:1px solid var(--border-2);padding:0 16px; }
-        .fc-inner { display:flex;gap:0;overflow-x:auto; }
-        .fc-day { display:flex;flex-direction:column;align-items:center;gap:1px;min-width:72px;padding:10px 6px;border-right:1px solid var(--border);flex-shrink:0; }
-        .fc-day:last-child { border-right:none; }
-        .fc-label { font-size:10px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em; }
-        .fc-icon { font-size:16px;margin:2px 0; }
-        .fc-snow { font-size:13px;font-weight:800;color:#3b82f6;line-height:1; }
-        .fc-snow.zero { color:var(--text-3);font-weight:500; }
-        .fc-temp { font-size:10px;color:var(--text-3);white-space:nowrap; }
-        /* Trails & Lifts section */
-        .tl-section { display:flex;flex:1;overflow:hidden;gap:0;min-height:0; }
-        /* Left panel: main table */
-        .tl-main { flex:1;display:flex;flex-direction:column;overflow:hidden;background:var(--white);margin:10px 0 10px 10px;border-radius:14px;box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .tl-header { display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-shrink:0; }
-        .tl-title-icon { width:24px;height:24px;border-radius:6px;background:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:13px; }
-        .tl-title { font-size:14px;font-weight:700;color:var(--text); }
-        .tl-tabs { display:flex;align-items:center;gap:4px;margin-left:8px; }
-        .tl-tab { padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;color:var(--text-3);border:none;background:none;font-family:'Inter',sans-serif;transition:all .15s; }
-        .tl-tab.act { background:var(--blue-light);color:var(--blue); }
-        .tl-tab:hover:not(.act) { background:var(--bg); }
-        .sort-btn { display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;border:1px solid var(--border-2);background:var(--white);font-size:12px;font-weight:600;color:var(--text-2);cursor:pointer;font-family:'Inter',sans-serif;position:relative;transition:all .15s; }
-        .sort-btn:hover { background:var(--bg); }
-        .sort-dropdown { position:absolute;top:calc(100% + 4px);right:0;background:var(--white);border:1px solid var(--border-2);border-radius:10px;box-shadow:0 4px 16px rgba(15,40,80,0.12);z-index:100;min-width:180px;overflow:hidden; }
-        .sort-opt { display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:13px;font-weight:500;color:var(--text-2);cursor:pointer;transition:background .12s; }
-        .sort-opt:hover { background:var(--bg); }
-        .sort-opt.act { color:var(--blue);font-weight:600;background:var(--blue-light); }
-        .sort-opt-check { margin-left:auto;font-size:11px;color:var(--blue); }
-        .sort-divider { height:1px;background:var(--border);margin:4px 0; }
-        .tl-dots { margin-left:auto;display:flex;gap:3px; }
-        .tl-dot { width:4px;height:4px;border-radius:50%;background:var(--text-3); }
-        .tl-grid { display:grid;grid-template-columns:1fr 1fr;overflow-y:auto;flex:1; }
-        .tl-row { display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);border-right:1px solid var(--border); }
-        .tl-row:nth-child(2n) { border-right:none; }
-        .tl-row:last-child,.tl-row:nth-last-child(2):nth-child(odd) { border-bottom:none; }
-        /* Difficulty icon shapes */
-        .diff-icon { width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:900; }
-        .diff-icon.easy     { background:#dcfce7;color:#16a34a;border-radius:4px; }
-        .diff-icon.blue     { background:#dbeafe;color:#2563eb;border-radius:50%; }
-        .diff-icon.black    { background:#e5e7eb;color:#111827; }
-        .diff-icon.dblack   { background:#d1d5db;color:#030712; }
-        .diff-icon.park     { background:#ffedd5;color:#ea580c; }
-        .diff-icon.bc       { background:#fef9c3;color:#854d0e; }
-        .tl-name-col { flex:1;min-width:0; }
-        .tl-name { font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .tl-sub { font-size:10px;color:var(--text-3);margin-top:1px; }
-        .tl-sub-bar { width:24px;height:3px;border-radius:2px;margin-top:3px; }
-        .tl-badges { display:flex;align-items:center;gap:4px;flex-shrink:0; }
-        .tl-badge { padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600; }
-        .tl-badge.open    { background:rgba(34,197,94,0.1);color:#15803d; }
-        .tl-badge.groomed { background:rgba(20,184,166,0.1);color:#0f766e; }
-        .tl-badge.closed  { background:rgba(239,68,68,0.1);color:#991b1b; }
-        .tl-badge.hold    { background:rgba(245,158,11,0.1);color:#92400e; }
-        .tl-badge.sched   { background:rgba(59,130,246,0.1);color:#1d40af; }
-        .tl-check { width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0; }
-        .tl-check.on  { background:#dcfce7;color:#16a34a; }
-        .tl-check.off { background:var(--bg);color:var(--text-3);font-size:9px; }
-        .tl-num { width:22px;height:22px;border-radius:6px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0; }
-        /* Right mini panel */
-        .tl-mini { width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:0;background:var(--white);margin:10px 10px 10px 8px;border-radius:14px;box-shadow:0 1px 4px rgba(15,40,80,0.06);overflow:hidden; }
-        .tl-mini-hdr { display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border); }
-        .tl-mini-search { font-size:13px;color:var(--text-3); }
-        .tl-mini-title { font-size:13px;font-weight:700;color:var(--text);flex:1; }
-        .tl-mini-count { font-size:12px;font-weight:700;color:#22c55e; }
-        .tl-mini-chevron { font-size:11px;color:var(--text-3); }
-        .tl-mini-row { display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border); }
-        .tl-mini-row:last-of-type { border-bottom:none; }
-        .tl-mini-name { font-size:12px;font-weight:600;color:var(--text);flex:1; }
-        .tl-mini-status { font-size:11px;color:var(--text-3); }
-        .tl-mini-num { font-size:12px;font-weight:700;color:var(--text-2); }
-        .tl-mini-footer { display:flex;align-items:center;gap:6px;padding:8px 12px;margin-top:auto;border-top:1px solid var(--border); }
-        .tl-mini-footer-icon { font-size:12px;color:var(--text-3); }
-        .tl-mini-footer-lbl { font-size:11px;color:var(--text-3);flex:1; }
-        .tl-mini-footer-dash { color:var(--text-3);font-size:14px; }
+        /* Resort header card */
+        .rcard { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow); }
+        .rc-resort-name { font-size:15px;font-weight:800;color:var(--text);line-height:1.2; }
+        .rc-resort-sub { font-size:11px;color:var(--text-3);margin-top:2px;margin-bottom:12px; }
+        .rc-weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0; }
+        .rc-zone { text-align:center; }
+        .rc-zone-lbl { font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:2px; }
+        .rc-zone-temp { font-size:22px;font-weight:800;color:var(--text);line-height:1; }
+        .rc-zone-unit { font-size:11px;color:var(--text-3);font-weight:400; }
+        .rc-zone-wind { font-size:10px;color:var(--text-3);margin-top:2px; }
+
+        /* Score card */
+        .score-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center; }
+        .score-hdr { font-size:13px;font-weight:700;color:var(--text);align-self:flex-start;margin-bottom:10px; }
+        .score-label { font-size:12px;font-weight:600;margin-top:4px; }
+        .score-sub { font-size:11px;color:var(--text-3);margin-top:2px;text-align:center; }
+        .score-meta { display:flex;gap:10px;margin-top:8px;width:100%; }
+        .score-meta-item { flex:1;text-align:center;background:var(--bg);border-radius:8px;padding:5px; }
+        .score-meta-val { font-size:13px;font-weight:800;color:var(--text); }
+        .score-meta-lbl { font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em; }
+
+        /* Next hours card */
+        .hours-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px;box-shadow:var(--shadow); }
+        .hours-hdr { font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px; }
+        .hours-row { display:grid;grid-template-columns:repeat(4,1fr);gap:4px; }
+        .hour-col { display:flex;flex-direction:column;align-items:center;gap:2px; }
+        .hour-time { font-size:9px;font-weight:600;color:var(--text-3); }
+        .hour-icon { font-size:16px; }
+        .hour-temp { font-size:11px;font-weight:700;color:var(--text); }
+        .hour-snow { font-size:9px;color:#3b82f6;font-weight:600; }
+
+        /* Crowd insights card */
+        .crowd-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px;box-shadow:var(--shadow); }
+        .crowd-hdr { font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px; }
+        .crowd-row { display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border); }
+        .crowd-row:last-child { border-bottom:none;padding-bottom:0; }
+        .crowd-diff { width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;flex-shrink:0;margin-top:1px; }
+        .crowd-name { font-size:11px;font-weight:600;color:var(--text);flex:1; }
+        .crowd-badge { font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap; }
+        .crowd-badge.low    { background:#f0fdf4;color:#16a34a; }
+        .crowd-badge.mod    { background:#fffbeb;color:#92400e; }
+        .crowd-badge.high   { background:#fef2f2;color:#991b1b; }
+        .crowd-badge.avoid  { background:#fef2f2;color:#991b1b;border:1px solid rgba(239,68,68,0.3); }
+        .crowd-sub { font-size:10px;color:var(--text-3);margin-top:1px; }
+
+        /* PowderIQ logo footer */
+        .rcard-footer { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:10px 14px;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px; }
+        .rcard-footer img { height:22px;width:auto; }
+        .rcard-footer-brand { font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
 
         @keyframes spin { to { transform:rotate(360deg); } }
-        @media(max-width:1024px) { .rpanel { display:none; } }
-        @media(max-width:768px) { .sidebar { display:none; } .diff-toolbar { display:none; } }
+        @media(max-width:1200px) { .rpanel { display:none; } }
+        @media(max-width:900px) { .sidebar { display:none; } }
       `}</style>
 
       {/* ── TOPNAV ── */}
@@ -635,25 +624,23 @@ export default function DashboardPage() {
           {hasResort && <Link href="/resort/dashboard" className="tnav-tab">⛷️ Resort</Link>}
         </div>
         <div className="tnav-right">
-          <div className="ar-badge"><div className="ar-dot"/>AR Connected</div>
-          <Link href="/mountains" className="tnav-tab" style={{fontSize:18,padding:'4px 8px'}}>🏔️</Link>
+          <div className="api-badge"><div className="api-dot"/>API Connected</div>
           <Link href="/account/profile" className="tnav-av" aria-label="Account">
             {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : (userName ? userName[0].toUpperCase() : '👤')}
           </Link>
-          {score > 0 && <div className="score-badge">{score}</div>}
         </div>
       </nav>
 
       {/* ── SHELL ── */}
       <div className="shell">
 
-        {/* ── SIDEBAR ── */}
+        {/* ── LEFT SIDEBAR ── */}
         <aside className="sidebar">
-          <div className="sb-section-lbl">Saved Resorts</div>
+          <div className="sb-lbl">Saved Resorts</div>
           {favorites.length === 0 && (
-            <div style={{padding:'20px 14px',fontSize:12,color:'var(--text-3)',textAlign:'center',lineHeight:1.6}}>
+            <div style={{padding:'16px 14px',fontSize:12,color:'var(--text-3)',lineHeight:1.6}}>
               No favorites yet.<br/>
-              <Link href="/mountains" style={{color:'var(--blue)',fontWeight:600}}>Browse mountains</Link>
+              <Link href="/mountains" style={{color:'var(--blue)',fontWeight:600}}>Browse resorts →</Link>
             </div>
           )}
           {favorites.map(fav => {
@@ -661,11 +648,9 @@ export default function DashboardPage() {
             const isAct = selectedFav?.id === fav.id;
             return (
               <div key={fav.id} className={`sb-resort${isAct?' act':''}`} onClick={() => setSelectedFav(fav)}>
-                <div className="sb-resort-icon">
-                  <img src={getMtnImg(fav.mountain)} alt={fav.mountain.name}/>
-                </div>
-                <span className="sb-resort-name">{fav.mountain.name}</span>
-                {s > 0 && <span className="sb-resort-score" style={{color:getScoreColor(s)}}>{s}</span>}
+                <div className="sb-thumb"><img src={getMtnImg(fav.mountain)} alt={fav.mountain.name}/></div>
+                <span className="sb-name">{fav.mountain.name}</span>
+                {s > 0 && <span className="sb-score" style={{color:getScoreColor(s)}}>{s}</span>}
               </div>
             );
           })}
@@ -674,396 +659,384 @@ export default function DashboardPage() {
         {/* ── MAIN ── */}
         <div className="main">
 
-          {/* Map + right panel row */}
-          <div style={{flex:1,display:'flex',overflow:'hidden',padding:'0 0 0 0',minHeight:0}}>
-
-            {/* Map column */}
-            <div style={{flex:1,display:'flex',flexDirection:'column',padding:'10px 12px 0',minWidth:0}}>
-
-              {/* Map controls - ABOVE the map like mockup */}
-              <div className="map-controls">
-
-                {/* Row 1: Trail Map / Satellite / Hybrid */}
-                <div className="map-mode-row">
-                  <button className={`map-mode-btn${mapMode==='trail'?' act':''}`} onClick={() => setMapMode('trail')}>
-                    <div className="map-mode-icon trail">🗺</div>
-                    Trail Map
-                  </button>
-                  <button className={`map-mode-btn${mapMode==='satellite'?' act':''}`} onClick={() => setMapMode('satellite')}>
-                    <div className="map-mode-icon sat" style={{background:'#dbeafe'}}>
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <circle cx="5" cy="5" r="4" stroke="#2563eb" strokeWidth="1.5"/>
-                        <circle cx="5" cy="5" r="1.5" fill="#2563eb"/>
-                      </svg>
-                    </div>
-                    Satellite
-                  </button>
-                  <button className={`map-mode-btn${mapMode==='hybrid'?' act':''}`} onClick={() => setMapMode('hybrid')}>
-                    <div className="map-mode-icon hyb">
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <circle cx="5" cy="5" r="4" stroke="#6b7280" strokeWidth="1.5"/>
-                        <path d="M5 1v8M1 5h8" stroke="#6b7280" strokeWidth="1"/>
-                      </svg>
-                    </div>
-                    Hybrid
-                  </button>
-                </div>
-
-                {/* Row 2: Difficulty filter */}
-                <div className="diff-row">
-                  <span className="diff-label">Difficulty:</span>
-                  <div className="diff-sep"/>
-
-                  {/* Easy - green square */}
-                  <button className={`diff-btn${diffFilter.includes('green')?' act':''}`}
-                    onClick={() => setDiffFilter(p => p.includes('green') ? p.filter(x=>x!=='green') : [...p,'green'])}>
-                    <div className="diff-icon-easy"/>
-                    Easy
-                  </button>
-
-                  {/* Intermediate - blue circle */}
-                  <button className={`diff-btn${diffFilter.includes('blue')?' act':''}`}
-                    onClick={() => setDiffFilter(p => p.includes('blue') ? p.filter(x=>x!=='blue') : [...p,'blue'])}>
-                    <div className="diff-icon-inter"/>
-                    Intermediate
-                  </button>
-
-                  {/* Advanced - black diamond */}
-                  <button className={`diff-btn${diffFilter.includes('black')?' act':''}`}
-                    onClick={() => setDiffFilter(p => p.includes('black') ? p.filter(x=>x!=='black') : [...p,'black'])}>
-                    <svg width="13" height="13" viewBox="0 0 13 13" style={{flexShrink:0}}>
-                      <rect x="6.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 6.5 0.5)" fill="#111827"/>
-                    </svg>
-                    Advanced
-                  </button>
-
-                  {/* Expert - double black diamond */}
-                  <button className={`diff-btn${diffFilter.includes('double_black')?' act':''}`}
-                    onClick={() => setDiffFilter(p => p.includes('double_black') ? p.filter(x=>x!=='double_black') : [...p,'double_black'])}>
-                    <svg width="20" height="13" viewBox="0 0 20 13" style={{flexShrink:0}}>
-                      <rect x="6.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 6.5 0.5)" fill="#111827"/>
-                      <rect x="13.5" y="0.5" width="8.5" height="8.5" rx="1" transform="rotate(45 13.5 0.5)" fill="#111827"/>
-                    </svg>
-                    Expert
-                  </button>
-
-                  <button className="diff-more">
-                    ∨
-                  </button>
-                </div>
-
-              </div>
-
-              {/* Map image */}
-              <div className="map-wrap">
-                <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
-                  onError={e => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
-
-                {/* Callout cards - only show when we have score data suggesting good conditions */}
-                {scoreData && (scoreData.snowfall24hIn ?? 0) > 3 && (
-                  <div className="map-callout" style={{top:'20%',left:'8%'}}>
-                    <div className="mc-title">🔥 Best Powder Zone</div>
-                    <div className="mc-sub">Deep powder · Advanced</div>
-                  </div>
-                )}
-                {lifts.some(l => l.status === 'on_hold') && (
-                  <div className="map-callout" style={{top:'42%',left:'30%'}}>
-                    <div className="mc-title">👑 Low Crowd Lift</div>
-                    <div className="mc-sub">Wind holds possible</div>
-                  </div>
-                )}
-                {(scoreData?.windMph ?? 0) > 25 && (
-                  <div className="map-callout" style={{top:'62%',left:'12%'}}>
-                    <div className="mc-title">🔥 High Wind Area</div>
-                    <div className="mc-sub">Wind shanop possible</div>
-                  </div>
-                )}
-
-                {/* No resort selected */}
-                {!activeFav && (
-                  <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(240,245,251,0.85)',borderRadius:16}}>
-                    <div style={{textAlign:'center'}}>
-                      <div style={{fontSize:48,marginBottom:8}}>⛷️</div>
-                      <div style={{fontSize:16,fontWeight:700,color:'var(--text)'}}>Save a resort to get started</div>
-                      <Link href="/mountains" style={{color:'var(--blue)',fontSize:13,marginTop:8,display:'block',fontWeight:600}}>Browse mountains →</Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* Mapbox attribution */}
-                <div className="map-attrib">
-                  <span style={{fontSize:14}}>🗺</span> mapbox
-                </div>
-              </div>
+          {/* Map controls bar */}
+          <div className="map-ctrl-bar">
+            <div className="mode-group">
+              {(['trail','satellite','hybrid'] as const).map(m => (
+                <button key={m} className={`mode-btn${mapMode===m?' act':''}`} onClick={() => setMapMode(m)}>
+                  {m==='trail' ? '🗺 Trail Map' : m==='satellite' ? '🛰 Satellite' : '🌐 Hybrid'}
+                </button>
+              ))}
             </div>
-
-            {/* ── RIGHT PANEL ── */}
-            <div className="rpanel">
-
-              {/* Card 1: Resort name + Weather */}
-              <div className="rcard">
-                <div className="rpanel-resort-name">{activeFav?.mountain.name ?? '—'} Resort</div>
-                <div className="weather-grid">
-                  {([
-                    ['summit','🏔','Summit'],
-                    ['mid',   '⛷','Mid'],
-                    ['base',  '🏠','Base'],
-                  ] as const).map(([key,icon,label]) => {
-                    const z = weatherZones[key];
-                    const temp = z?.tempF ?? (key==='summit' ? scoreData?.tempF : null);
-                    const wind = z?.windMph ?? (key==='summit' ? scoreData?.windMph : null);
-                    return (
-                      <div key={key} className="weather-zone">
-                        <div className="wz-label"><span>{icon}</span>{label}</div>
-                        <div className="wz-temp">
-                          {temp != null ? Math.round(temp) : '--'}<span className="wz-unit">°F</span>
-                        </div>
-                        <div className="wz-wind">{wind != null ? `${Math.round(wind)} mph` : '--'}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Card 2: Lift Status */}
-              <div className="rcard">
-                <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14}}>
-                  <span className="rcard-hdr" style={{margin:0}}>Lift Status</span>
-                  {liftieStats && (
-                    <div style={{display:'flex',gap:8,fontSize:11,fontWeight:600}}>
-                      <span style={{color:'#22c55e'}}>{liftieStats.open} open</span>
-                      {liftieStats.hold > 0 && <span style={{color:'#f59e0b'}}>{liftieStats.hold} hold</span>}
-                      {liftieStats.scheduled > 0 && <span style={{color:'#3b82f6'}}>{liftieStats.scheduled} sched</span>}
-                      <span style={{color:'#ef4444'}}>{liftieStats.closed} closed</span>
-                    </div>
-                  )}
-                </div>
-                {scoreLoading && <div style={{fontSize:12,color:'var(--text-3)'}}>Loading…</div>}
-                {!scoreLoading && lifts.length === 0 && (
-                  <div style={{fontSize:12,color:'var(--text-3)'}}>No lift data available</div>
-                )}
-                {lifts.slice(0,6).map((l,i) => {
-                  const col = LIFT_COLOR[l.status] || '#6b849a';
-                  const num = l.status === 'open' ? (i === 0 ? 3 : i === 1 ? 1 : 0) : 0;
-                  const iconBg = l.status === 'open' ? '#dcfce7' : l.status === 'on_hold' ? '#fef9c3' : '#f3f4f6';
-                  const iconColor = l.status === 'open' ? '#16a34a' : l.status === 'on_hold' ? '#854d0e' : '#9ca3af';
-                  const iconChar = l.status === 'open' ? '▣' : l.status === 'on_hold' ? '✉' : '⊖';
-                  return (
-                    <div key={l.id} className="lift-row">
-                      <div className="lift-dot" style={{background:col}}/>
-                      <span className="lift-name">{l.liftName}</span>
-                      <div className="lift-pill">
-                        <span className="lift-pill-num">{num}</span>
-                        <div className="lift-pill-icon" style={{background:iconBg,color:iconColor}}>{iconChar}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Card 3: Trail Status */}
-              <div className="rcard">
-                <div className="rcard-hdr">Trail Status</div>
-                {[
-                  {label:'Open',   color:'#22c55e', count: trails.filter(t=>t.status==='open'||t.status==='groomed').length},
-                  {label:'Closed', color:'#ef4444', count: trails.filter(t=>t.status==='closed').length},
-                ].map(r => (
-                  <div key={r.label} className="trail-row">
-                    <div className="ts-dot" style={{background:r.color}}/>
-                    <span className="ts-name">{r.label}</span>
-                    <div className="ts-right">
-                      <span className="ts-count">{r.count}</span>
-                      <div className="ts-check">✓</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Card 4: Powder Score + PowderIQ logo */}
-              <div className="score-card">
-                <div className="score-hdr">Powder Score</div>
-                {scoreLoading
-                  ? <div style={{width:150,height:150,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-3)',fontSize:12}}>Loading…</div>
-                  : <ScoreRing score={score}/>
-                }
-                <div className="score-logo-row">
-                  <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
-                  <span className="score-logo-brand">PowderIQ</span>
-                </div>
-              </div>
-
+            <div className="diff-group">
+              <span className="diff-lbl">Difficulty:</span>
+              <div className="diff-sep"/>
+              {[
+                {key:'green',       icon:<div style={{width:11,height:11,borderRadius:2,background:'#16a34a',flexShrink:0}}/>,       label:'Easy'},
+                {key:'blue',        icon:<div style={{width:11,height:11,borderRadius:'50%',background:'#2563eb',flexShrink:0}}/>,    label:'Intermediate'},
+                {key:'black',       icon:<svg width={11} height={11} viewBox="0 0 11 11"><rect x={5.5} y={0} width={7.5} height={7.5} rx={1} transform="rotate(45 5.5 0)" fill="#111827"/></svg>, label:'Advanced'},
+                {key:'double_black',icon:<svg width={18} height={11} viewBox="0 0 18 11"><rect x={5.5} y={0} width={7.5} height={7.5} rx={1} transform="rotate(45 5.5 0)" fill="#111827"/><rect x={12} y={0} width={7.5} height={7.5} rx={1} transform="rotate(45 12 0)" fill="#111827"/></svg>, label:'Expert'},
+              ].map(d => (
+                <button key={d.key} className={`diff-chip${diffFilter.includes(d.key)?' act':''}`}
+                  onClick={() => setDiffFilter(p => p.includes(d.key) ? p.filter(x=>x!==d.key) : [...p,d.key])}>
+                  {d.icon}{d.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* ── BOTTOM STRIP ── */}
-          <div className="bottom-strip">
+          {/* Map */}
+          <div className="map-area">
+            <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
+              onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
 
-            {/* 10-day forecast */}
-            <div className="fc-section">
-              <div className="fc-inner">
-                {forecast.length === 0
-                  ? <div style={{padding:'12px 0',fontSize:12,color:'var(--text-3)'}}>Select a resort to see the forecast</div>
-                  : forecast.map(f => {
-                    const wcode = f.conditionDesc ?? '';
-                    const icon = wcode.toLowerCase().includes('snow') ? '🌨️'
-                      : wcode.toLowerCase().includes('cloud') ? '⛅'
-                      : wcode.toLowerCase().includes('clear') ? '☀️'
-                      : wcode.toLowerCase().includes('rain') ? '🌧️'
-                      : '🌤️';
+            {/* Best Area insight card */}
+            {activeFav && (
+              <div className="best-area-card">
+                <div className="bac-label">🔥 Best Area Right Now</div>
+                <div className="bac-title">
+                  {(() => {
+                    const summit = weatherZones['summit'];
+                    if (summit && (scoreData?.snowfall24hIn ?? 0) > 3) return 'Summit Zone';
+                    if (groomedCount > 0) return 'Groomed Runs';
+                    return activeFav.mountain.name;
+                  })()}
+                </div>
+                {(scoreData?.snowfall24hIn ?? 0) > 0 && (
+                  <div className="bac-row">
+                    <div className="bac-icon" style={{background:'rgba(59,130,246,0.2)'}}>❄</div>
+                    <span>{scoreData!.snowfall24hIn!.toFixed(1)}" in last 12 hours</span>
+                  </div>
+                )}
+                {(scoreData?.windMph ?? 0) <= 15 && (
+                  <div className="bac-row">
+                    <div className="bac-icon" style={{background:'rgba(34,197,94,0.2)'}}>✓</div>
+                    <span>Low wind, {groomedCount > 0 ? 'groomed' : 'good visibility'}</span>
+                  </div>
+                )}
+                {openLifts > 0 && (
+                  <div className="bac-row">
+                    <div className="bac-icon" style={{background:'rgba(29,110,245,0.2)'}}>✓</div>
+                    <span>Ideal for {(scoreData?.tempF ?? 28) > 34 ? 'groomers' : 'all levels'}</span>
+                  </div>
+                )}
+                <div className="bac-btns">
+                  <button className="bac-btn-primary" onClick={() => setActivePanel('trails')}>View Runs</button>
+                  <button className="bac-btn-secondary">Navigate on Map</button>
+                </div>
+              </div>
+            )}
+
+            {/* Zone pins — only show if we have data */}
+            {activeFav && weatherZones['summit'] && (
+              <div className="map-pin" style={{top:'22%',right:'18%'}}>
+                ⛰️ {activeFav.mountain.name.split(' ')[0]} Peak
+              </div>
+            )}
+
+            {!activeFav && (
+              <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(240,245,251,0.85)',borderRadius:16}}>
+                <div style={{textAlign:'center'}}>
+                  <div style={{fontSize:44,marginBottom:8}}>⛷️</div>
+                  <div style={{fontSize:16,fontWeight:700,color:'var(--text)'}}>Save a resort to get started</div>
+                  <Link href="/mountains" style={{color:'var(--blue)',fontSize:13,marginTop:8,display:'block',fontWeight:600}}>Browse resorts →</Link>
+                </div>
+              </div>
+            )}
+
+            <div className="map-attrib">🗺 mapbox</div>
+          </div>
+
+          {/* Bottom section */}
+          <div className="bottom">
+
+            {/* Top Runs Right Now */}
+            <div className="top-runs-card">
+              <div className="trc-hdr">
+                <span style={{fontSize:15}}>⛷️</span>
+                <span className="trc-title">Top Runs Right Now</span>
+                <div className="trc-tabs">
+                  <button className={`trc-tab${activePanel==='trails'?' act':''}`} onClick={()=>setActivePanel('trails')}>Trails</button>
+                  <button className={`trc-tab${activePanel==='lifts'?' act':''}`} onClick={()=>setActivePanel('lifts')}>Lifts</button>
+                </div>
+                <span className="trc-dots">···</span>
+              </div>
+              <div className="trc-grid">
+                {activePanel === 'trails' && (() => {
+                  // Smart ranking: groomed > open, easiest conditions, pick top 3 for 3 columns
+                  const ranked = [...trails]
+                    .filter(t => t.status==='open'||t.status==='groomed')
+                    .sort((a,b) => {
+                      const aScore = (a.status==='groomed'?2:1) + (a.snowDepthIn??0)*0.01;
+                      const bScore = (b.status==='groomed'?2:1) + (b.snowDepthIn??0)*0.01;
+                      return bScore - aScore;
+                    })
+                    .slice(0,3);
+
+                  if (ranked.length === 0) return (
+                    <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontSize:12,color:'var(--text-3)',flexDirection:'column',gap:6}}>
+                      <span style={{fontSize:28}}>⛷️</span>
+                      {activeFav ? 'No trail data available for this resort' : 'Select a resort to see top runs'}
+                    </div>
+                  );
+
+                  const diffCls: Record<string,{bg:string,color:string,icon:string}> = {
+                    green:        {bg:'#dcfce7',color:'#16a34a',icon:'■'},
+                    blue:         {bg:'#dbeafe',color:'#2563eb',icon:'●'},
+                    black:        {bg:'#e5e7eb',color:'#111827',icon:'◆'},
+                    double_black: {bg:'#d1d5db',color:'#030712',icon:'◆◆'},
+                    terrain_park: {bg:'#ffedd5',color:'#ea580c',icon:'▲'},
+                    backcountry:  {bg:'#fef9c3',color:'#854d0e',icon:'⬡'},
+                  };
+
+                  // Best lift for each trail (first open lift)
+                  const openLift = lifts.find(l => l.status==='open');
+
+                  return ranked.map((t, i) => {
+                    const dc = diffCls[t.difficulty] ?? diffCls.blue;
+                    const zones = ['Summit','Midmtn','Base'];
                     return (
-                      <div key={f.date} className="fc-day">
-                        <div className="fc-label">{f.dayLabel}</div>
-                        <div className="fc-icon">{icon}</div>
-                        <div className={`fc-snow${f.snowIn===0?' zero':''}`}>
-                          {f.snowIn > 0 ? `${f.snowIn.toFixed(1)}"` : '—'}
+                      <div key={t.id} className="trc-col">
+                        <div className="trc-run">
+                          <div className="trc-run-hdr">
+                            <div className="trc-diff" style={{background:dc.bg,color:dc.color}}>{dc.icon}</div>
+                            <span className="trc-run-name">{t.trailName}</span>
+                            <span className="trc-zone-badge">{zones[i%3]}</span>
+                          </div>
+                          <div className="trc-run-sub">
+                            {t.status==='groomed'?'Groomed · ':'Open · '}
+                            {t.snowDepthIn ? `${t.snowDepthIn}" depth` : t.status==='groomed' ? 'Soft powder' : 'Good conditions'}
+                          </div>
                         </div>
-                        <div className="fc-temp">{f.tempHighF?.toFixed(0) ?? '--'}° / {f.tempLowF?.toFixed(0) ?? '--'}°</div>
+                        {openLift && (
+                          <div className="trc-lift">
+                            <div className="trc-lift-dot" style={{background:'#22c55e'}}/>
+                            <span className="trc-lift-name">{openLift.liftName}</span>
+                            <span className="trc-lift-wait">{openLift.waitMinutes ? `~${openLift.waitMinutes} min` : '~10 min'}</span>
+                            <span className="trc-lift-eye">👁</span>
+                          </div>
+                        )}
                       </div>
                     );
-                  })
+                  });
+                })()}
+
+                {activePanel === 'lifts' && (() => {
+                  const openOnes = lifts.filter(l=>l.status==='open').slice(0,3);
+                  const holdOnes = lifts.filter(l=>l.status==='on_hold').slice(0,1);
+                  const schedOnes = lifts.filter(l=>l.status==='scheduled').slice(0,1);
+                  const display = [...openOnes,...holdOnes,...schedOnes].slice(0,3);
+
+                  if (display.length === 0) return (
+                    <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px',fontSize:12,color:'var(--text-3)',flexDirection:'column',gap:6}}>
+                      <span style={{fontSize:28}}>🚡</span>
+                      {activeFav ? 'No lift data available' : 'Select a resort to see lifts'}
+                    </div>
+                  );
+
+                  return display.map((l,i) => (
+                    <div key={l.id} className="trc-col">
+                      <div className="trc-run">
+                        <div className="trc-run-hdr">
+                          <div className="trc-diff" style={{background:`${LIFT_COLOR[l.status]||'#6b7280'}22`,color:LIFT_COLOR[l.status]||'#6b7280'}}>🚡</div>
+                          <span className="trc-run-name">{l.liftName}</span>
+                          <span className="trc-zone-badge" style={{color:LIFT_COLOR[l.status]||'#6b7280',background:`${LIFT_COLOR[l.status]||'#6b7280'}15`}}>
+                            {LIFT_LABEL[l.status]}
+                          </span>
+                        </div>
+                        <div className="trc-run-sub">
+                          {l.liftType ?? 'Chairlift'}{l.waitMinutes ? ` · ~${l.waitMinutes} min wait` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+
+            {/* 7-day forecast mini card */}
+            <div className="fc-card">
+              <div className="fc-hdr">
+                <span style={{fontSize:14}}>📅</span>
+                <span className="fc-hdr-title">Next 7 Days</span>
+              </div>
+              <div className="fc-scroll">
+                {forecast.length === 0
+                  ? <div style={{padding:'12px',fontSize:11,color:'var(--text-3)',textAlign:'center'}}>Select a resort</div>
+                  : (() => {
+                    const maxSnow = Math.max(...forecast.map(f=>f.snowIn), 0.1);
+                    return forecast.map(f => {
+                      const icon = f.conditionDesc?.toLowerCase().includes('snow') ? '🌨️'
+                        : (f.snowIn??0) > 0 ? '🌦️'
+                        : f.conditionDesc?.toLowerCase().includes('clear') ? '☀️'
+                        : f.conditionDesc?.toLowerCase().includes('cloud') ? '⛅'
+                        : '🌤️';
+                      return (
+                        <div key={f.date} className="fc-row">
+                          <span className="fc-day">{f.dayLabel?.slice(0,3)}</span>
+                          <span className="fc-icon">{icon}</span>
+                          <div className="fc-bar-wrap">
+                            <div className="fc-bar" style={{width:`${(f.snowIn/maxSnow)*100}%`,background:f.snowIn>3?'#3b82f6':'#93c5fd'}}/>
+                          </div>
+                          <span className="fc-snow-val" style={{color:f.snowIn>0?'#2563eb':'var(--text-3)'}}>
+                            {f.snowIn > 0 ? `${f.snowIn.toFixed(1)}"` : '—'}
+                          </span>
+                          <span className="fc-temp">{f.tempHighF?.toFixed(0)?? '--'}°/{f.tempLowF?.toFixed(0)??'--'}°</span>
+                        </div>
+                      );
+                    });
+                  })()
                 }
               </div>
             </div>
 
-            {/* Trails & Lifts */}
-            <div className="tl-section">
+          </div>
+        </div>
 
-              {/* Main table card */}
-              <div className="tl-main">
-                <div className="tl-header">
-                  <div className="tl-title-icon">⊞</div>
-                  <span className="tl-title">Trails &amp; Lifts</span>
-                  <div className="tl-tabs">
-                    <button className={`tl-tab${activePanel==='trails'?' act':''}`} onClick={()=>setActivePanel('trails')}>Trails</button>
-                    <button className={`tl-tab${activePanel==='lifts'?' act':''}`} onClick={()=>setActivePanel('lifts')}>Lifts</button>
+        {/* ── RIGHT PANEL ── */}
+        <div className="rpanel">
+
+          {/* Resort name + weather */}
+          <div className="rcard">
+            <div className="rc-resort-name">{activeFav?.mountain.name ?? '—'}</div>
+            <div className="rc-resort-sub">Resort</div>
+            <div className="rc-weather-grid">
+              {([['summit','🏔','Summit'],['mid','⛷','Mid'],['base','🏠','Base']] as const).map(([key,icon,label]) => {
+                const z = weatherZones[key];
+                const temp = z?.tempF ?? (key==='summit' ? scoreData?.tempF : null);
+                const wind = z?.windMph ?? (key==='summit' ? scoreData?.windMph : null);
+                return (
+                  <div key={key} className="rc-zone">
+                    <div className="rc-zone-lbl"><span>{icon}</span>{label}</div>
+                    <div className="rc-zone-temp">{temp != null ? Math.round(temp) : '--'}<span className="rc-zone-unit">°F</span></div>
+                    <div className="rc-zone-wind">{wind != null ? `${Math.round(wind)} mph` : '--'}</div>
                   </div>
-                  <div style={{marginLeft:'auto',position:'relative'}} onBlur={(e)=>{ if(!e.currentTarget.contains(e.relatedTarget as Node)) setSortOpen(false); }} tabIndex={-1}>
-                    <button className="sort-btn" onClick={(e)=>{e.stopPropagation();setSortOpen(p=>!p);}}>
-                      ⇅ Sort
-                      {sortBy !== 'name' || sortDir !== 'asc'
-                        ? <span style={{width:6,height:6,background:'var(--blue)',borderRadius:'50%',flexShrink:0}}/>
-                        : null}
-                    </button>
-                    {sortOpen && (
-                      <div className="sort-dropdown">
-                        <div style={{padding:'8px 14px 4px',fontSize:10,fontWeight:700,color:'var(--text-3)',textTransform:'uppercase',letterSpacing:'.06em'}}>Sort by</div>
-                        {[
-                          {key:'name',      label:'Name (A–Z)',      dir:'asc'},
-                          {key:'name',      label:'Name (Z–A)',      dir:'desc'},
-                          {key:'difficulty',label:'Easiest first',   dir:'asc'},
-                          {key:'difficulty',label:'Hardest first',   dir:'desc'},
-                        ].map((opt,i) => {
-                          const isAct = sortBy === opt.key && sortDir === opt.dir;
-                          return (
-                            <div key={i} className={`sort-opt${isAct?' act':''}`}
-                              onClick={()=>{ setSortBy(opt.key as 'name'|'difficulty'); setSortDir(opt.dir as 'asc'|'desc'); setSortOpen(false); }}>
-                              {opt.label}
-                              {isAct && <span className="sort-opt-check">✓</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Powder Score */}
+          <div className="score-card">
+            <div className="score-hdr">Powder Score</div>
+            {scoreLoading
+              ? <div style={{width:130,height:130,display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:28,height:28,border:'3px solid #dbeafe',borderTopColor:'var(--blue)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/></div>
+              : <ScoreRing score={score}/>
+            }
+            <div className="score-label" style={{color:getScoreColor(score)}}>
+              {score>=80?'Outstanding':score>=65?'Great Day':score>=50?'Good':score>=35?'Fair':'Challenging'}
+            </div>
+            <div className="score-sub">{scoreData?.conditionDesc ?? (activeFav ? 'Loading conditions…' : 'Select a resort')}</div>
+            {scoreData && (
+              <div className="score-meta">
+                <div className="score-meta-item">
+                  <div className="score-meta-val" style={{color:'#3b82f6'}}>{scoreData.snowfall24hIn?.toFixed(1) ?? '0'}"</div>
+                  <div className="score-meta-lbl">24h Snow</div>
                 </div>
-
-                <div className="tl-grid">
-                  {/* Show trails by default like the mockup */}
-                  {filteredTrails.length === 0 && lifts.length === 0 && (
-                    <div style={{padding:'20px',fontSize:12,color:'var(--text-3)',gridColumn:'1/-1',textAlign:'center'}}>
-                      Select a resort to see trails &amp; lifts
-                    </div>
-                  )}
-
-                  {/* Trails */}
-                  {sortedTrails.map(t => {
-                    const diffClass = t.difficulty==='green'?'easy':t.difficulty==='blue'?'blue':t.difficulty==='black'?'black':t.difficulty==='double_black'?'dblack':t.difficulty==='terrain_park'?'park':'bc';
-                    const diffIcon = t.difficulty==='green'?'■':t.difficulty==='blue'?'●':t.difficulty==='black'?'◆':t.difficulty==='double_black'?'◆◆':t.difficulty==='terrain_park'?'▲':'⬡';
-                    const isOpen = t.status==='open'||t.status==='groomed';
-                    const badgeCls = t.status==='open'?'open':t.status==='groomed'?'groomed':t.status==='on_hold'?'hold':'closed';
-                    const barColor = DIFF_COLOR[t.difficulty]||'#6b849a';
-                    return (
-                      <div key={t.id} className="tl-row">
-                        <div className={`diff-icon ${diffClass}`}>{diffIcon}</div>
-                        <div className="tl-name-col">
-                          <div className="tl-name">{t.trailName}</div>
-                          <div className="tl-sub-bar" style={{background:barColor}}/>
-                        </div>
-                        <div className="tl-badges">
-                          <span className={`tl-badge ${badgeCls}`}>
-                            {t.status==='on_hold'?'Hold':t.status.charAt(0).toUpperCase()+t.status.slice(1)}
-                          </span>
-                          {t.status==='groomed' && <span className="tl-badge groomed">Groomed</span>}
-                        </div>
-                        <div className={`tl-check ${isOpen?'on':'off'}`}>{isOpen?'✓':'○'}</div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Lifts (after trails) */}
-                  {sortedLifts.map(l => {
-                    const isOpen = l.status==='open';
-                    const badgeCls = l.status==='open'?'open':l.status==='on_hold'?'hold':l.status==='scheduled'?'sched':'closed';
-                    const liftNum = isOpen ? 1 : 0;
-                    return (
-                      <div key={l.id} className="tl-row">
-                        <div className="diff-icon black" style={{background:'#dbeafe',color:'#2563eb',borderRadius:'50%'}}>🚡</div>
-                        <div className="tl-name-col">
-                          <div className="tl-name">{l.liftName}</div>
-                          <div className="tl-sub-bar" style={{background:LIFT_COLOR[l.status]||'#6b849a'}}/>
-                        </div>
-                        <div className="tl-badges">
-                          <span className={`tl-badge ${badgeCls}`}>
-                            {LIFT_LABEL[l.status]||l.status}
-                          </span>
-                          {l.status==='groomed' && <span className="tl-badge groomed">Groomed</span>}
-                        </div>
-                        {isOpen
-                          ? <div className="tl-num">{liftNum}</div>
-                          : <div className={`tl-check off`}>○</div>
-                        }
-                      </div>
-                    );
-                  })}
+                <div className="score-meta-item">
+                  <div className="score-meta-val">{scoreData.snowDepthIn?.toFixed(0) ?? '—'}"</div>
+                  <div className="score-meta-lbl">Base</div>
+                </div>
+                <div className="score-meta-item">
+                  <div className="score-meta-val">{scoreData.windMph?.toFixed(0) ?? '—'}</div>
+                  <div className="score-meta-lbl">Wind mph</div>
                 </div>
               </div>
+            )}
+          </div>
 
-              {/* Right mini panel */}
-              <div className="tl-mini">
-                <div className="tl-mini-hdr">
-                  <span className="tl-mini-search">🔍</span>
-                  <span className="tl-mini-title">Lifts</span>
-                  {liftieStats ? <span className="tl-mini-count">{liftieStats.open}/{lifts.length}</span> : lifts.length > 0 ? <span className="tl-mini-count">{lifts.filter(l=>l.status==='open').length}/{lifts.length}</span> : null}
-                  <span className="tl-mini-chevron">∨</span>
-                </div>
-
-                {/* Trail summary by lift/zone */}
-                {lifts.slice(0,3).map((l,i) => {
-                  const col = LIFT_COLOR[l.status]||'#6b849a';
-                  const diffClass = i===0?'easy':i===1?'blue':'black';
-                  const diffIcon = i===0?'■':i===1?'●':'◆';
-                  const statusLabel = l.status==='on_hold'?'Hold':l.status==='scheduled'?'Scheduled':l.status.charAt(0).toUpperCase()+l.status.slice(1);
+          {/* Next 6 Hours */}
+          {forecast.length > 0 && (
+            <div className="hours-card">
+              <div className="hours-hdr">Next 6 Hours</div>
+              <div className="hours-row">
+                {['8 AM','12 PM','3 PM','6 PM'].map((t,i) => {
+                  const f = forecast[0];
+                  const icons = ['☀️','⛅','🌨️','🌤️'];
+                  const temps = [
+                    f?.tempHighF ?? 35,
+                    ((f?.tempHighF??35) + (f?.tempLowF??25)) / 2,
+                    (f?.tempLowF??25) + 3,
+                    f?.tempLowF ?? 25,
+                  ];
                   return (
-                    <div key={l.id} className="tl-mini-row">
-                      <div className={`diff-icon ${diffClass}`} style={{width:18,height:18,fontSize:9}}>{diffIcon}</div>
-                      <span className="tl-mini-name">{l.liftName}</span>
-                      <span className="tl-mini-status">{statusLabel}</span>
-                      <span className="tl-mini-num">{l.status==='open'?3:l.status==='on_hold'?1:0}</span>
+                    <div key={t} className="hour-col">
+                      <span className="hour-time">{t}</span>
+                      <span className="hour-icon">{icons[i]}</span>
+                      <span className="hour-temp">{Math.round(temps[i])}°</span>
+                      {i===2 && (f?.snowIn??0)>0 && <span className="hour-snow">{(f!.snowIn*0.3).toFixed(1)}"</span>}
                     </div>
                   );
                 })}
-                {lifts.length === 0 && trails.length === 0 && (
-                  <div style={{padding:'12px',fontSize:11,color:'var(--text-3)',textAlign:'center'}}>No data</div>
-                )}
-
-                <div className="tl-mini-footer">
-                  <span className="tl-mini-footer-icon">⊟</span>
-                  <span className="tl-mini-footer-lbl">Trail map</span>
-                  <span className="tl-mini-footer-dash">—</span>
-                </div>
               </div>
-
             </div>
+          )}
+
+          {/* Crowd Insights */}
+          {(trails.length > 0 || lifts.length > 0) && (
+            <div className="crowd-card">
+              <div className="crowd-hdr">Crowd Insights</div>
+              {(() => {
+                // Build crowd insight rows from real data
+                const insights: {diff:string;name:string;level:'low'|'mod'|'high'|'avoid';sub:string}[] = [];
+
+                // Lifts on hold = high traffic/wind
+                lifts.filter(l=>l.status==='on_hold').slice(0,1).forEach(l => {
+                  insights.push({diff:'black',name:l.liftName,level:'avoid',sub:'Wind hold — check conditions'});
+                });
+
+                // Groomed trails = moderate crowd expected
+                trails.filter(t=>t.status==='groomed').slice(0,2).forEach(t => {
+                  const dc: Record<string,string> = {green:'#dcfce7',blue:'#dbeafe',black:'#e5e7eb',double_black:'#d1d5db',terrain_park:'#ffedd5',backcountry:'#fef9c3'};
+                  insights.push({diff:t.difficulty,name:t.trailName,level:'mod',sub:'Groomed · Moderate traffic'});
+                });
+
+                // Open trails with no grooming = lower crowds
+                trails.filter(t=>t.status==='open').slice(0,2).forEach(t => {
+                  insights.push({diff:t.difficulty,name:t.trailName,level:'low',sub:'Open · Lower crowds'});
+                });
+
+                // Wind warning if summit wind high
+                if ((weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0) > 25) {
+                  insights.unshift({diff:'black',name:'Summit Area',level:'avoid',sub:'High wind — avoid upper runs'});
+                }
+
+                if (insights.length === 0) return (
+                  <div style={{fontSize:11,color:'var(--text-3)',textAlign:'center',padding:'8px 0'}}>No crowd data available</div>
+                );
+
+                const diffCls: Record<string,{bg:string,color:string,icon:string}> = {
+                  green:{bg:'#dcfce7',color:'#16a34a',icon:'■'},
+                  blue:{bg:'#dbeafe',color:'#2563eb',icon:'●'},
+                  black:{bg:'#e5e7eb',color:'#111827',icon:'◆'},
+                  double_black:{bg:'#d1d5db',color:'#030712',icon:'◆◆'},
+                  terrain_park:{bg:'#ffedd5',color:'#ea580c',icon:'▲'},
+                  backcountry:{bg:'#fef9c3',color:'#854d0e',icon:'⬡'},
+                };
+
+                return insights.slice(0,4).map((ins,i) => {
+                  const dc = diffCls[ins.diff] ?? diffCls.blue;
+                  return (
+                    <div key={i} className="crowd-row">
+                      <div className="crowd-diff" style={{background:dc.bg,color:dc.color}}>{dc.icon}</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div className="crowd-name">{ins.name}</div>
+                        <div className="crowd-sub">{ins.sub}</div>
+                      </div>
+                      <div className={`crowd-badge ${ins.level}`}>
+                        {ins.level==='low'?'Low 🟢':ins.level==='mod'?'Moderate 🟡':ins.level==='avoid'?'Avoid: High':'High 🔴'}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
+
+          {/* PowderIQ footer */}
+          <div className="rcard-footer">
+            <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
+            <span className="rcard-footer-brand">PowderIQ</span>
           </div>
 
         </div>
