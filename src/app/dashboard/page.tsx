@@ -515,12 +515,31 @@ export default function DashboardPage() {
       if (!hasResortData) {
         try {
           const slug = deriveLiftieSlug(fav.mountain.name);
-          const liftieRes = await fetch(`/api/lifts/${slug}`);
+          const liftieRes = await fetch(`/api/lifts/${slug}?mountainId=${fav.mountain.id}`);
           if (liftieRes.ok) {
             const liftieData = await liftieRes.json();
             const liftList = liftieData.lifts ?? [];
             if (liftList.length > 0) setLifts(liftList);
-            if (liftieData.stats) setLiftieStats(liftieData.stats);
+            if (liftieData.stats) {
+              setLiftieStats(liftieData.stats);
+              // If lifts are open but score shows 0/closed, re-fetch score
+              // The proxy persisted stats to DB so now scoreService will see them
+              if ((liftieData.stats.open ?? 0) > 0) {
+                try {
+                  const freshScore = await fetch(
+                    `/api/mountains/${fav.mountain.id}/score`,
+                    { headers: h }
+                  );
+                  if (freshScore.ok) {
+                    const sd = await freshScore.json();
+                    const newScore = sd.data?.score ?? 0;
+                    if (newScore > 0) {
+                      setScoreData(prev => prev ? { ...prev, score: newScore } : prev);
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
           }
         } catch (e) {
           console.warn('[Liftie] fetch failed:', e);
