@@ -5,7 +5,8 @@ import { getSnowDataCached } from './snowProvider';
 import { computeScore, isSkiSeason } from './scoreEngine';
 import type { RiderProfile } from '@prisma/client';
 
-const SCORE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const SCORE_TTL_MS     = 60 * 60 * 1000; // 1 hour
+const CLOSED_TTL_MS    = 30 * 60 * 1000;  // 30 min for season=false (re-checks quickly)
 
 export async function getMountainScore(
   mountainId: string,
@@ -40,7 +41,7 @@ export async function getMountainScore(
   let inSeason = isSkiSeason(now, verticalFt);
 
   if (!inSeason) {
-    // Cross-check: if there are open LiftStatus records in the DB, resort is open
+    // Override 1: Resort has open LiftStatus records in DB (resort account)
     const resort = await prisma.resort.findFirst({
       where: { mountainId },
       select: { id: true },
@@ -50,6 +51,23 @@ export async function getMountainScore(
         where: { resortId: resort.id, status: 'open' },
       });
       if (openLifts > 0) inSeason = true;
+    }
+
+    // Override 2: Recent Liftie snapshot shows open lifts
+    // Check SnowSnapshot for cached Liftie stats (stored by dashboard)
+    if (!inSeason) {
+      const liftieSnap = await prisma.snowSnapshot.findFirst({
+        where: {
+          mountainId,
+          provider: 'liftie',
+          expiresAt: { gt: now },
+        },
+        orderBy: { fetchedAt: 'desc' },
+      });
+      if (liftieSnap) {
+        const payload = liftieSnap.payload as any;
+        if ((payload?.stats?.open ?? 0) > 0) inSeason = true;
+      }
     }
   }
 
@@ -70,7 +88,7 @@ export async function getMountainScore(
           score:       0,
           breakdown:   result.breakdown as object,
           explanation: result.explanation,
-          expiresAt:   new Date(now.getTime() + SCORE_TTL_MS),
+          expiresAt:   new Date(now.getTime() + CLOSED_TTL_MS),
         },
       });
     }

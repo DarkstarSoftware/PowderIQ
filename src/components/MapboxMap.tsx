@@ -69,35 +69,42 @@ function parseOverpass(data: any): { runs: any; lifts: any } {
   };
 }
 
-// ── Compute bearing so the camera faces DOWN the mountain ────────────────────
-// We look at the centroid of all piste coordinates and find the direction
-// that points most "downhill" (toward lower latitude = south = typical fall line).
-// If no OSM data, we default bearing to face south (most mountains face south).
+// ── Compute bearing so the camera faces the SKI FRONT of the mountain ────────
+// Strategy: find the summit (highest lat point cluster) and the base (lowest).
+// The camera sits at/near the base and looks TOWARD the summit.
+// Bearing = direction FROM base TO summit = looking UP the mountain face.
 function computeBearing(runs: any): number {
   const features = runs?.features ?? [];
-  if (features.length === 0) return 180; // default: face south
+  if (features.length === 0) return 180; // default south-facing
 
-  // Collect all coords
   const allCoords: [number, number][] = [];
   for (const f of features) {
     for (const c of f.geometry?.coordinates ?? []) {
       allCoords.push(c as [number, number]);
     }
   }
-  if (allCoords.length < 2) return 180;
+  if (allCoords.length < 4) return 180;
 
-  // Find highest and lowest lat points (summit → base)
-  const sorted = [...allCoords].sort((a, b) => b[1] - a[1]); // highest lat first
-  const top    = sorted[0];
-  const bottom = sorted[sorted.length - 1];
+  // Sort by elevation proxy (lat — higher lat ≈ further north, but elevation
+  // varies; we use the spread of coordinates to find the dominant slope direction)
+  const sorted = [...allCoords].sort((a, b) => b[1] - a[1]);
+  // Take centroid of top 20% coords as "summit cluster"
+  const topN   = Math.max(1, Math.floor(sorted.length * 0.2));
+  const botN   = Math.max(1, Math.floor(sorted.length * 0.2));
+  const summit = sorted.slice(0, topN);
+  const base   = sorted.slice(sorted.length - botN);
 
-  // Bearing from top → bottom (the direction you'd ski)
-  const dLon = bottom[0] - top[0];
-  const dLat = bottom[1] - top[1];
+  const sumLon = summit.reduce((s, c) => s + c[0], 0) / summit.length;
+  const sumLat = summit.reduce((s, c) => s + c[1], 0) / summit.length;
+  const basLon = base.reduce((s, c)   => s + c[0], 0) / base.length;
+  const basLat = base.reduce((s, c)   => s + c[1], 0) / base.length;
+
+  // Bearing FROM base centroid TO summit centroid
+  // Camera sits near base and looks toward summit → this is the bearing we want
+  const dLon = sumLon - basLon;
+  const dLat = sumLat - basLat;
   const bearing = (Math.atan2(dLon, dLat) * 180) / Math.PI;
-
-  // Camera faces the mountain, so opposite direction (viewer is below, looking up)
-  return (bearing + 180) % 360;
+  return (bearing + 360) % 360; // normalize 0-360, no +180 flip
 }
 
 // ── 3D terrain + sky + fog + piste/lift layers ───────────────────────────────
@@ -111,6 +118,54 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
     });
   }
   map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+
+  // ── Hillshade for shadow depth — traditional trail map feel ──────────────
+  if (!map.getLayer('piq-hillshade')) {
+    if (!map.getSource('piq-hillshade-src')) {
+      map.addSource('piq-hillshade-src', {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+      });
+    }
+    map.addLayer({
+      id: 'piq-hillshade', type: 'hillshade',
+      source: 'piq-hillshade-src',
+      paint: {
+        'hillshade-illumination-direction': 315, // NW light source
+        'hillshade-illumination-anchor':    'map',
+        'hillshade-exaggeration':           0.55,
+        'hillshade-shadow-color':           '#1e3a5f',  // cool blue shadow
+        'hillshade-highlight-color':        '#ffffff',
+        'hillshade-accent-color':           '#9ec5e8',
+      },
+    }, 'waterway-label'); // insert below labels
+  }
+
+  // ── Snow white fill over terrain ─────────────────────────────────────────
+  // On satellite mode skip (real imagery already shows snow)
+  // On outdoors/trail mode: add a semi-transparent white layer above terrain
+  // to give the traditional "white mountain with shadows" trail-map look
+  if (!map.getLayer('piq-snow-fill')) {
+    if (!map.getSource('piq-snow-src')) {
+      map.addSource('piq-snow-src', {
+        type: 'raster-dem',
+        url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+        tileSize: 512,
+      });
+    }
+    // Use fill-extrusion trick: flat terrain colored white with hillshade
+    // Actually we layer a light snow-colored raster tint using a background layer
+    if (!map.getLayer('piq-snow-tint')) {
+      map.addLayer({
+        id: 'piq-snow-tint', type: 'background',
+        paint: {
+          'background-color': '#eef6ff',   // soft snow white-blue
+          'background-opacity': 0.18,       // subtle — terrain still shows through
+        },
+      }, 'piq-hillshade');
+    }
+  }
 
   // Sky layer — only works on outdoor/satellite styles
   if (!map.getLayer('sky')) {
