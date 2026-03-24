@@ -227,6 +227,8 @@ export default function DashboardPage() {
   const [userRole,     setUserRole]     = useState('user');
   const [userName,     setUserName]     = useState('');
   const [avatarUrl,    setAvatarUrl]    = useState('');
+  const [riderStyle,   setRiderStyle]   = useState('all_mountain'); // powder|all_mountain|freestyle|beginner
+  const [skillLevel,   setSkillLevel]   = useState('intermediate'); // beginner|intermediate|advanced|expert
   const [hasResort,    setHasResort]    = useState(false);
   const [token,        setToken]        = useState('');
   const [selectedFav,  setSelectedFav]  = useState<FavoriteItem | null>(null);
@@ -266,6 +268,8 @@ export default function DashboardPage() {
         setUserName(me.data?.profile?.displayName || '');
         const url = me.data?.profile?.avatarUrl || '';
         if (url) { setAvatarUrl(url); localStorage.setItem('powderiq_avatar', url); }
+        if (me.data?.profile?.style)      setRiderStyle(me.data.profile.style);
+        if (me.data?.profile?.skillLevel) setSkillLevel(me.data.profile.skillLevel);
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -493,19 +497,29 @@ export default function DashboardPage() {
         /* "Best Area" insight card on the map */
         .best-area-card {
           position:absolute;top:16px;left:16px;z-index:10;
-          background:rgba(13,27,46,0.88);backdrop-filter:blur(12px);
-          border:1px solid rgba(255,255,255,0.12);border-radius:14px;
-          padding:14px 16px;min-width:220px;max-width:280px;
-          box-shadow:0 8px 32px rgba(0,0,0,0.3);
+          background:rgba(10,22,40,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+          border:1px solid rgba(255,255,255,0.10);border-radius:16px;
+          padding:16px 18px;min-width:240px;max-width:295px;
+          box-shadow:0 12px 40px rgba(0,0,0,0.35);
         }
-        .bac-label { font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px; }
-        .bac-title { font-size:18px;font-weight:800;color:#fff;margin-bottom:8px; }
-        .bac-row { display:flex;align-items:center;gap:7px;font-size:12px;color:rgba(255,255,255,0.7);margin-bottom:4px; }
-        .bac-row:last-of-type { margin-bottom:10px; }
-        .bac-icon { width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0; }
-        .bac-btns { display:flex;gap:7px;margin-top:2px; }
-        .bac-btn-primary { flex:1;padding:7px 0;background:var(--blue);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;text-align:center; }
-        .bac-btn-secondary { flex:1;padding:7px 0;background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;text-align:center; }
+        .bac-eyebrow { display:flex;align-items:center;gap:6px;margin-bottom:8px; }
+        .bac-eyebrow-dot { width:6px;height:6px;background:#22c55e;border-radius:50%;box-shadow:0 0 6px #22c55e; }
+        .bac-eyebrow-text { font-size:10px;font-weight:700;color:rgba(255,255,255,0.45);text-transform:uppercase;letter-spacing:.09em; }
+        .bac-title { font-size:19px;font-weight:800;color:#fff;line-height:1.2;margin-bottom:12px; }
+        .bac-title span { color:#93c5fd; }
+        .bac-chips { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px; }
+        .bac-chip { display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid transparent; }
+        .bac-chip.snow   { background:rgba(59,130,246,0.18);color:#93c5fd;border-color:rgba(59,130,246,0.3); }
+        .bac-chip.wind   { background:rgba(34,197,94,0.15);color:#86efac;border-color:rgba(34,197,94,0.25); }
+        .bac-chip.cond   { background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.65);border-color:rgba(255,255,255,0.12); }
+        .bac-chip.warn   { background:rgba(245,158,11,0.15);color:#fcd34d;border-color:rgba(245,158,11,0.25); }
+        .bac-why { font-size:11px;color:rgba(255,255,255,0.55);line-height:1.5;margin-bottom:12px;padding:8px 10px;background:rgba(255,255,255,0.05);border-radius:8px;border-left:2px solid rgba(147,197,253,0.4); }
+        .bac-why strong { color:rgba(255,255,255,0.85);font-weight:600; }
+        .bac-btns { display:flex;gap:7px; }
+        .bac-btn-primary { flex:1;padding:8px 0;background:var(--blue);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;transition:opacity .15s; }
+        .bac-btn-primary:hover { opacity:.9; }
+        .bac-btn-secondary { flex:1;padding:8px 0;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:all .15s; }
+        .bac-btn-secondary:hover { background:rgba(255,255,255,0.16); }
 
         /* zone label pins on map */
         .map-pin { position:absolute;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);border-radius:8px;padding:4px 9px;font-size:11px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(15,40,80,0.15);pointer-events:none;border:1px solid var(--border-2); }
@@ -731,42 +745,89 @@ export default function DashboardPage() {
             <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
               onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
 
-            {/* Best Area insight card */}
-            {activeFav && (
-              <div className="best-area-card">
-                <div className="bac-label">🔥 Best Area Right Now</div>
-                <div className="bac-title">
-                  {(() => {
-                    const summit = weatherZones['summit'];
-                    if (summit && (scoreData?.snowfall24hIn ?? 0) > 3) return 'Summit Zone';
-                    if (groomedCount > 0) return 'Groomed Runs';
-                    return activeFav.mountain.name;
-                  })()}
+            {/* Best Area insight card — personalized */}
+            {activeFav && (() => {
+              const snow24  = scoreData?.snowfall24hIn ?? 0;
+              const wind    = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
+              const temp    = scoreData?.tempF ?? 28;
+              const base    = scoreData?.snowDepthIn ?? 0;
+
+              // ── Determine best area name based on conditions + skill ──────────
+              let areaName = 'Main Mountain';
+              let areaHighlight = '';
+              if (snow24 > 4 && (skillLevel === 'advanced' || skillLevel === 'expert')) {
+                areaName = 'Summit & Trees'; areaHighlight = 'Powder';
+              } else if (snow24 > 2 && groomedCount > 0) {
+                areaName = 'Upper Groomed Runs'; areaHighlight = 'Fresh Corduroy';
+              } else if (groomedCount > 0 && (skillLevel === 'beginner' || skillLevel === 'intermediate')) {
+                areaName = 'Groomed Terrain'; areaHighlight = 'Groomed';
+              } else if (wind > 25) {
+                areaName = 'Lower Mountain'; areaHighlight = 'Sheltered';
+              } else if (trails.find(t => t.status === 'groomed')) {
+                const t = trails.find(t => t.status === 'groomed');
+                areaName = t!.trailName; areaHighlight = 'Groomed';
+              } else if (trails.find(t => t.status === 'open')) {
+                const t = trails.find(t => t.status === 'open');
+                areaName = t!.trailName; areaHighlight = '';
+              }
+
+              // ── Build chips from real data ────────────────────────────────────
+              const chips: {label:string; cls:string}[] = [];
+              if (snow24 > 0) chips.push({label:`❄ ${snow24.toFixed(1)}" in last 12h`, cls:'snow'});
+              if (wind <= 10) chips.push({label:'💨 Calm winds', cls:'wind'});
+              else if (wind <= 20) chips.push({label:`💨 Light wind ${Math.round(wind)} mph`, cls:'wind'});
+              else chips.push({label:`⚠ Gusts ${Math.round(wind)} mph`, cls:'warn'});
+              if (groomedCount > 0) chips.push({label:'✓ Groomed', cls:'cond'});
+              if (temp >= 20 && temp <= 32) chips.push({label:`🌡 ${Math.round(temp)}°F ideal`, cls:'cond'});
+              else if (temp > 36) chips.push({label:`🌡 ${Math.round(temp)}°F warm`, cls:'warn'});
+
+              // ── Personalized "why" explanation ──────────────────────────────
+              const styleLabel: Record<string,string> = {
+                powder:'powder hound', all_mountain:'all-mountain rider',
+                freestyle:'freestyle rider', beginner:'beginner'
+              };
+              const skillLabel: Record<string,string> = {
+                beginner:'beginner', intermediate:'intermediate',
+                advanced:'advanced', expert:'expert'
+              };
+              const me = styleLabel[riderStyle] ?? 'skier';
+              const sk = skillLabel[skillLevel] ?? 'intermediate';
+
+              let why = '';
+              if (snow24 > 5 && (skillLevel === 'advanced' || skillLevel === 'expert')) {
+                why = `As an <strong>${sk} ${me}</strong>, this is your window — untracked lines are opening right now.`;
+              } else if (snow24 > 2 && riderStyle === 'powder') {
+                why = `${snow24.toFixed(1)}" overnight — ideal for a <strong>${me}</strong>. Hit the trees early before it tracks out.`;
+              } else if (groomedCount > 0 && (skillLevel === 'intermediate' || skillLevel === 'beginner')) {
+                why = `Groomed and fast — the ideal terrain for an <strong>${sk} rider</strong> today.`;
+              } else if (wind <= 10 && groomedCount > 0) {
+                why = `Calm winds and groomed runs — great all-mountain day for <strong>${sk}s</strong>.`;
+              } else if (wind > 25) {
+                why = `Upper mountain is gusty today. <strong>${sk}s</strong> will find better conditions lower down.`;
+              } else if (temp > 36) {
+                why = `Spring conditions with ${Math.round(temp)}°F temps. <strong>${sk}s</strong> will want to ski early before slush.`;
+              } else {
+                why = `Solid conditions across the mountain — a good day for an <strong>${sk} ${me}</strong>.`;
+              }
+
+              return (
+                <div className="best-area-card">
+                  <div className="bac-eyebrow">
+                    <div className="bac-eyebrow-dot"/>
+                    <span className="bac-eyebrow-text">Best Area Right Now</span>
+                  </div>
+                  <div className="bac-title">{areaName}{areaHighlight && <span> · {areaHighlight}</span>}</div>
+                  <div className="bac-chips">
+                    {chips.map((c,i) => <span key={i} className={`bac-chip ${c.cls}`}>{c.label}</span>)}
+                  </div>
+                  <div className="bac-why" dangerouslySetInnerHTML={{__html: why}}/>
+                  <div className="bac-btns">
+                    <button className="bac-btn-primary" onClick={() => setActivePanel('trails')}>View Runs</button>
+                    <button className="bac-btn-secondary" onClick={() => setMapMode('trail')}>Navigate on Map</button>
+                  </div>
                 </div>
-                {(scoreData?.snowfall24hIn ?? 0) > 0 && (
-                  <div className="bac-row">
-                    <div className="bac-icon" style={{background:'rgba(59,130,246,0.2)'}}>❄</div>
-                    <span>{scoreData!.snowfall24hIn!.toFixed(1)}" in last 12 hours</span>
-                  </div>
-                )}
-                {(scoreData?.windMph ?? 0) <= 15 && (
-                  <div className="bac-row">
-                    <div className="bac-icon" style={{background:'rgba(34,197,94,0.2)'}}>✓</div>
-                    <span>Low wind, {groomedCount > 0 ? 'groomed' : 'good visibility'}</span>
-                  </div>
-                )}
-                {openLifts > 0 && (
-                  <div className="bac-row">
-                    <div className="bac-icon" style={{background:'rgba(29,110,245,0.2)'}}>✓</div>
-                    <span>Ideal for {(scoreData?.tempF ?? 28) > 34 ? 'groomers' : 'all levels'}</span>
-                  </div>
-                )}
-                <div className="bac-btns">
-                  <button className="bac-btn-primary" onClick={() => setActivePanel('trails')}>View Runs</button>
-                  <button className="bac-btn-secondary">Navigate on Map</button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Zone pins — only show if we have data */}
             {activeFav && weatherZones['summit'] && (
@@ -840,7 +901,7 @@ export default function DashboardPage() {
                     const dow    = new Date().getDay();
                     const isWeekend = dow === 0 || dow === 6;
 
-                    // Smart ranking: assign a reason + score to each open trail
+                    // Personalized smart ranking based on rider profile + real conditions
                     type RunCard = {trail:typeof trails[0]; reason:string; reasonCls:string; condition:string; liftName?:string; liftColor?:string; accessTime:string};
                     const scored: RunCard[] = trails
                       .filter(t => t.status==='open'||t.status==='groomed')
@@ -849,28 +910,49 @@ export default function DashboardPage() {
                         let reason = 'Good conditions'; let reasonCls = 'best';
                         let condition = t.status==='groomed' ? 'Groomed · Soft snow' : 'Open · Packed powder';
 
-                        // Powder logic
-                        if (snow24 > 5) { reason = `${snow24.toFixed(1)}" fresh powder`; reasonCls = 'powder'; rank += 30; }
-                        else if (snow24 > 2) { reason = 'Light powder dusting'; reasonCls = 'powder'; rank += 20; }
-                        else if (t.status === 'groomed') { reason = 'Groomed & fast'; reasonCls = 'groomed'; rank += 15; }
+                        // ── Profile-based difficulty preference ──────────────
+                        const prefDiffs: Record<string,string[]> = {
+                          beginner:     ['green'],
+                          intermediate: ['green','blue'],
+                          advanced:     ['blue','black'],
+                          expert:       ['black','double_black'],
+                        };
+                        const preferred = prefDiffs[skillLevel] ?? ['blue'];
+                        if (preferred.includes(t.difficulty)) rank += 20;
+                        else if (t.difficulty === 'green' && skillLevel === 'advanced') rank -= 5; // too easy
 
-                        // Crowd logic
-                        if (!isWeekend && t.status === 'open') { reason = reason === 'Good conditions' ? 'Low traffic weekday' : reason; reasonCls = reasonCls === 'best' ? 'crowd' : reasonCls; rank += 10; }
+                        // ── Riding style boost ──────────────────────────────
+                        if (riderStyle === 'powder' && snow24 > 2) {
+                          if (t.difficulty === 'black' || t.difficulty === 'double_black') rank += 15;
+                          reason = snow24 > 5 ? `${snow24.toFixed(1)}" fresh powder` : 'Powder conditions'; reasonCls = 'powder';
+                        } else if (riderStyle === 'freestyle' && t.difficulty === 'terrain_park') {
+                          rank += 25; reason = 'Park terrain'; reasonCls = 'best';
+                        } else if (riderStyle === 'beginner' || skillLevel === 'beginner') {
+                          if (t.status === 'groomed' && t.difficulty === 'green') { rank += 20; reason = 'Ideal for beginners'; reasonCls = 'groomed'; }
+                        }
+
+                        // ── Conditions boost ────────────────────────────────
+                        if (snow24 > 5 && reason === 'Good conditions') { reason = `${snow24.toFixed(1)}" fresh powder`; reasonCls = 'powder'; rank += 25; }
+                        else if (snow24 > 2 && reason === 'Good conditions') { reason = 'Light powder dusting'; reasonCls = 'powder'; rank += 15; }
+                        else if (t.status === 'groomed' && reason === 'Good conditions') { reason = 'Groomed & fast'; reasonCls = 'groomed'; rank += 12; }
+
+                        // Weekday crowd bonus
+                        if (!isWeekend && t.status === 'open') { rank += 8; if (reason === 'Good conditions') { reason = 'Low traffic now'; reasonCls = 'crowd'; } }
 
                         // Snow depth
-                        if ((t.snowDepthIn ?? 0) > 0) condition = `${t.status==='groomed'?'Groomed · ':'Open · '}${t.snowDepthIn}"  base`;
+                        if ((t.snowDepthIn ?? 0) > 0) condition = `${t.status==='groomed'?'Groomed · ':'Open · '}${t.snowDepthIn}" base`;
 
-                        // Difficulty-specific reasons
-                        if (t.difficulty === 'double_black' && snow24 > 3) { reason = 'Best advanced terrain now'; reasonCls = 'expert'; rank += 25; }
-                        else if (t.difficulty === 'black' && snow24 > 2) { reason = 'Best advanced terrain now'; reasonCls = 'expert'; rank += 20; }
-                        else if ((t.difficulty==='green'||t.difficulty==='blue') && t.status==='groomed') { reason = 'Best for intermediates'; reasonCls = 'groomed'; rank += 12; }
+                        // Difficulty-specific labels
+                        if ((t.difficulty === 'double_black'||t.difficulty === 'black') && snow24 > 3 && (skillLevel==='advanced'||skillLevel==='expert')) {
+                          reason = 'Best advanced terrain now'; reasonCls = 'expert'; rank += 20;
+                        } else if ((t.difficulty==='green'||t.difficulty==='blue') && t.status==='groomed' && skillLevel==='intermediate') {
+                          reason = 'Best for intermediates'; reasonCls = 'groomed';
+                        }
 
-                        // Wind penalty for open exposed terrain
-                        if (wind > 25 && t.difficulty === 'double_black') rank -= 15;
+                        // Wind penalty
+                        if (wind > 25 && (t.difficulty==='double_black'||t.difficulty==='black')) rank -= 12;
 
-                        // Nearest open lift
                         const openLift = lifts.find(l => l.status === 'open');
-
                         return { trail:t, reason, reasonCls, condition, liftName:openLift?.liftName, liftColor:'#22c55e', accessTime: openLift?.waitMinutes ? `~${openLift.waitMinutes} min` : '~10 min', rank } as any;
                       })
                       .sort((a:any,b:any) => b.rank - a.rank)
