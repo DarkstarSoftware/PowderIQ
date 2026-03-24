@@ -174,6 +174,7 @@ const LIFTIE_SLUGS: Record<string, string> = {
   'caberfae peaks': 'caberfae',
   'whitecap mountain': 'whitecap',
   'indianhead': 'indianhead',
+  'crystal mountain': 'crystalmountainmi',
   // Canada
   'whistler blackcomb': 'whistler', 'whistler': 'whistler',
   'mont tremblant': 'tremblant', 'mont-tremblant': 'tremblant',
@@ -553,57 +554,77 @@ export default function DashboardPage() {
         .fc-temp { font-size:10px;color:var(--text-3);width:44px;text-align:right;flex-shrink:0;white-space:nowrap; }
 
         /* ── RIGHT PANEL ── */
-        .rpanel { width:255px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px; }
+        .rpanel { width:262px;flex-shrink:0;background:var(--bg);border-left:1px solid var(--border-2);overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:10px; }
+        .rp-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow); }
+        .rp-card-hdr { font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px; }
 
-        /* Resort header card */
-        .rcard { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow); }
-        .rc-resort-name { font-size:15px;font-weight:800;color:var(--text);line-height:1.2; }
-        .rc-resort-sub { font-size:11px;color:var(--text-3);margin-top:2px;margin-bottom:12px; }
-        .rc-weather-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:0; }
-        .rc-zone { text-align:center; }
-        .rc-zone-lbl { font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px;display:flex;align-items:center;justify-content:center;gap:2px; }
-        .rc-zone-temp { font-size:22px;font-weight:800;color:var(--text);line-height:1; }
-        .rc-zone-unit { font-size:11px;color:var(--text-3);font-weight:400; }
-        .rc-zone-wind { font-size:10px;color:var(--text-3);margin-top:2px; }
+        /* 1. Resort Summary */
+        .rs-name { font-size:16px;font-weight:800;color:var(--text);line-height:1.2;margin-bottom:2px; }
+        .rs-sub  { font-size:11px;color:var(--text-3);margin-bottom:12px; }
+        .rs-grid { display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border);padding-top:10px;gap:0; }
+        .rs-zone { text-align:center;padding:0 4px; }
+        .rs-zone:not(:last-child) { border-right:1px solid var(--border); }
+        .rs-zone-lbl { font-size:9px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px; }
+        .rs-zone-temp { font-size:20px;font-weight:800;color:var(--text);line-height:1; }
+        .rs-zone-unit { font-size:10px;color:var(--text-3);font-weight:400; }
+        .rs-zone-detail { font-size:10px;color:var(--text-3);margin-top:2px; }
+        .rs-snow-row { display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:8px; }
+        .rs-snow-icon { font-size:16px; }
+        .rs-snow-val { font-size:14px;font-weight:800;color:#1d40af; }
+        .rs-snow-lbl { font-size:11px;color:#3b82f6;font-weight:500; }
 
-        /* Score card */
-        .score-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center; }
-        .score-hdr { font-size:13px;font-weight:700;color:var(--text);align-self:flex-start;margin-bottom:10px; }
-        .score-label { font-size:12px;font-weight:600;margin-top:4px; }
-        .score-sub { font-size:11px;color:var(--text-3);margin-top:2px;text-align:center; }
-        .score-meta { display:flex;gap:10px;margin-top:8px;width:100%; }
-        .score-meta-item { flex:1;text-align:center;background:var(--bg);border-radius:8px;padding:5px; }
-        .score-meta-val { font-size:13px;font-weight:800;color:var(--text); }
-        .score-meta-lbl { font-size:9px;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em; }
+        /* 2. Score card */
+        .sc-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center; }
+        .sc-ring-wrap { position:relative;margin:4px 0 6px; }
+        .sc-day-label { font-size:13px;font-weight:800;letter-spacing:-.01em; }
+        .sc-explanation { font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;margin-top:4px;max-width:210px; }
+        .sc-drivers { display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;justify-content:center; }
+        .sc-driver { display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid transparent; }
+        .sc-driver.pos { background:#f0fdf4;color:#15803d;border-color:rgba(34,197,94,0.2); }
+        .sc-driver.neg { background:#fef2f2;color:#991b1b;border-color:rgba(239,68,68,0.2); }
+        .sc-driver.neu { background:var(--bg);color:var(--text-3);border-color:var(--border); }
 
-        /* Next hours card */
-        .hours-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px;box-shadow:var(--shadow); }
-        .hours-hdr { font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px; }
-        .hours-row { display:grid;grid-template-columns:repeat(4,1fr);gap:4px; }
-        .hour-col { display:flex;flex-direction:column;align-items:center;gap:2px; }
-        .hour-time { font-size:9px;font-weight:600;color:var(--text-3); }
-        .hour-icon { font-size:16px; }
-        .hour-temp { font-size:11px;font-weight:700;color:var(--text); }
-        .hour-snow { font-size:9px;color:#3b82f6;font-weight:600; }
+        /* 3. Next 6 hours */
+        .h6-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px 14px;box-shadow:var(--shadow); }
+        .h6-row { display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-top:8px; }
+        .h6-col { display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:8px; }
+        .h6-col.best { background:var(--blue-light); }
+        .h6-time { font-size:9px;font-weight:600;color:var(--text-3); }
+        .h6-icon { font-size:18px;line-height:1; }
+        .h6-temp { font-size:12px;font-weight:700;color:var(--text); }
+        .h6-snow { font-size:9px;font-weight:700;color:#2563eb; }
+        .h6-cond { font-size:9px;color:var(--text-3);text-align:center;line-height:1.3; }
 
-        /* Crowd insights card */
-        .crowd-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px;box-shadow:var(--shadow); }
-        .crowd-hdr { font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px; }
-        .crowd-row { display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border); }
-        .crowd-row:last-child { border-bottom:none;padding-bottom:0; }
-        .crowd-diff { width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;flex-shrink:0;margin-top:1px; }
-        .crowd-name { font-size:11px;font-weight:600;color:var(--text);flex:1; }
-        .crowd-badge { font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;white-space:nowrap; }
-        .crowd-badge.low    { background:#f0fdf4;color:#16a34a; }
-        .crowd-badge.mod    { background:#fffbeb;color:#92400e; }
-        .crowd-badge.high   { background:#fef2f2;color:#991b1b; }
-        .crowd-badge.avoid  { background:#fef2f2;color:#991b1b;border:1px solid rgba(239,68,68,0.3); }
-        .crowd-sub { font-size:10px;color:var(--text-3);margin-top:1px; }
+        /* 4. Crowd insights */
+        .ci-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px 14px;box-shadow:var(--shadow); }
+        .ci-row { display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border); }
+        .ci-row:last-child { border-bottom:none;padding-bottom:0; }
+        .ci-icon { font-size:18px;flex-shrink:0; }
+        .ci-body { flex:1;min-width:0; }
+        .ci-name { font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .ci-desc { font-size:10px;color:var(--text-3);margin-top:1px; }
+        .ci-pill { font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;flex-shrink:0; }
+        .ci-pill.green  { background:#f0fdf4;color:#16a34a; }
+        .ci-pill.yellow { background:#fffbeb;color:#92400e; }
+        .ci-pill.red    { background:#fef2f2;color:#b91c1c; }
 
-        /* PowderIQ logo footer */
-        .rcard-footer { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:10px 14px;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px; }
-        .rcard-footer img { height:22px;width:auto; }
-        .rcard-footer-brand { font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
+        /* 5. Smart alerts */
+        .sa-card { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:12px 14px;box-shadow:var(--shadow); }
+        .sa-alert { display:flex;align-items:flex-start;gap:8px;padding:7px 8px;border-radius:9px;margin-bottom:6px; }
+        .sa-alert:last-child { margin-bottom:0; }
+        .sa-alert.wind   { background:#fffbeb;border:1px solid rgba(245,158,11,0.25); }
+        .sa-alert.powder { background:#eff6ff;border:1px solid rgba(59,130,246,0.25); }
+        .sa-alert.tip    { background:#f0fdf4;border:1px solid rgba(34,197,94,0.2); }
+        .sa-alert.info   { background:var(--bg);border:1px solid var(--border); }
+        .sa-emoji { font-size:16px;flex-shrink:0;margin-top:1px; }
+        .sa-body { flex:1;min-width:0; }
+        .sa-title { font-size:11px;font-weight:700;color:var(--text);line-height:1.3; }
+        .sa-sub   { font-size:10px;color:var(--text-3);margin-top:2px;line-height:1.4; }
+
+        /* PowderIQ footer */
+        .rp-footer { background:var(--white);border-radius:14px;border:1px solid var(--border-2);padding:10px 14px;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px; }
+        .rp-footer img { height:22px;width:auto; }
+        .rp-footer-brand { font-size:13px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
 
         @keyframes spin { to { transform:rotate(360deg); } }
         @media(max-width:1200px) { .rpanel { display:none; } }
@@ -895,147 +916,247 @@ export default function DashboardPage() {
         {/* ── RIGHT PANEL ── */}
         <div className="rpanel">
 
-          {/* Resort name + weather */}
-          <div className="rcard">
-            <div className="rc-resort-name">{activeFav?.mountain.name ?? '—'}</div>
-            <div className="rc-resort-sub">Resort</div>
-            <div className="rc-weather-grid">
+          {/* ── 1. Resort Summary ── */}
+          <div className="rp-card">
+            <div className="rs-name">{activeFav?.mountain.name ?? '—'}</div>
+            <div className="rs-sub">{activeFav?.mountain.state ? `${activeFav.mountain.state} · Resort` : 'Resort'}</div>
+            <div className="rs-grid">
               {([['summit','🏔','Summit'],['mid','⛷','Mid'],['base','🏠','Base']] as const).map(([key,icon,label]) => {
                 const z = weatherZones[key];
                 const temp = z?.tempF ?? (key==='summit' ? scoreData?.tempF : null);
                 const wind = z?.windMph ?? (key==='summit' ? scoreData?.windMph : null);
+                const snow = z?.snowfall24hIn ?? (key==='summit' ? scoreData?.snowfall24hIn : null);
                 return (
-                  <div key={key} className="rc-zone">
-                    <div className="rc-zone-lbl"><span>{icon}</span>{label}</div>
-                    <div className="rc-zone-temp">{temp != null ? Math.round(temp) : '--'}<span className="rc-zone-unit">°F</span></div>
-                    <div className="rc-zone-wind">{wind != null ? `${Math.round(wind)} mph` : '--'}</div>
+                  <div key={key} className="rs-zone">
+                    <div className="rs-zone-lbl">{icon} {label}</div>
+                    <div className="rs-zone-temp">{temp != null ? Math.round(temp) : '--'}<span className="rs-zone-unit">°F</span></div>
+                    <div className="rs-zone-detail">{wind != null ? `${Math.round(wind)} mph wind` : '--'}</div>
                   </div>
                 );
               })}
             </div>
-          </div>
-
-          {/* Powder Score */}
-          <div className="score-card">
-            <div className="score-hdr">Powder Score</div>
-            {scoreLoading
-              ? <div style={{width:130,height:130,display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:28,height:28,border:'3px solid #dbeafe',borderTopColor:'var(--blue)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/></div>
-              : <ScoreRing score={score}/>
-            }
-            <div className="score-label" style={{color:getScoreColor(score)}}>
-              {score>=80?'Outstanding':score>=65?'Great Day':score>=50?'Good':score>=35?'Fair':'Challenging'}
-            </div>
-            <div className="score-sub">{scoreData?.conditionDesc ?? (activeFav ? 'Loading conditions…' : 'Select a resort')}</div>
-            {scoreData && (
-              <div className="score-meta">
-                <div className="score-meta-item">
-                  <div className="score-meta-val" style={{color:'#3b82f6'}}>{scoreData.snowfall24hIn?.toFixed(1) ?? '0'}"</div>
-                  <div className="score-meta-lbl">24h Snow</div>
-                </div>
-                <div className="score-meta-item">
-                  <div className="score-meta-val">{scoreData.snowDepthIn?.toFixed(0) ?? '—'}"</div>
-                  <div className="score-meta-lbl">Base</div>
-                </div>
-                <div className="score-meta-item">
-                  <div className="score-meta-val">{scoreData.windMph?.toFixed(0) ?? '—'}</div>
-                  <div className="score-meta-lbl">Wind mph</div>
-                </div>
+            {(scoreData?.snowfall24hIn ?? 0) > 0 && (
+              <div className="rs-snow-row">
+                <span className="rs-snow-icon">❄️</span>
+                <span className="rs-snow-val">{scoreData!.snowfall24hIn!.toFixed(1)}"</span>
+                <span className="rs-snow-lbl">fresh snow in last 24h</span>
+              </div>
+            )}
+            {(scoreData?.snowfall24hIn ?? 0) === 0 && scoreData?.snowDepthIn != null && (
+              <div className="rs-snow-row" style={{background:'linear-gradient(135deg,#f0fdf4,#dcfce7)',border:'1px solid rgba(34,197,94,0.15)'}}>
+                <span className="rs-snow-icon">🏔️</span>
+                <span className="rs-snow-val" style={{color:'#15803d'}}>{scoreData.snowDepthIn.toFixed(0)}"</span>
+                <span className="rs-snow-lbl" style={{color:'#16a34a'}}>base depth · groomed</span>
               </div>
             )}
           </div>
 
-          {/* Next 6 Hours */}
-          {forecast.length > 0 && (
-            <div className="hours-card">
-              <div className="hours-hdr">Next 6 Hours</div>
-              <div className="hours-row">
-                {['8 AM','12 PM','3 PM','6 PM'].map((t,i) => {
-                  const f = forecast[0];
-                  const icons = ['☀️','⛅','🌨️','🌤️'];
-                  const temps = [
-                    f?.tempHighF ?? 35,
-                    ((f?.tempHighF??35) + (f?.tempLowF??25)) / 2,
-                    (f?.tempLowF??25) + 3,
-                    f?.tempLowF ?? 25,
-                  ];
-                  return (
-                    <div key={t} className="hour-col">
-                      <span className="hour-time">{t}</span>
-                      <span className="hour-icon">{icons[i]}</span>
-                      <span className="hour-temp">{Math.round(temps[i])}°</span>
-                      {i===2 && (f?.snowIn??0)>0 && <span className="hour-snow">{(f!.snowIn*0.3).toFixed(1)}"</span>}
-                    </div>
-                  );
-                })}
+          {/* ── 2. PowderIQ Score ── */}
+          <div className="sc-card">
+            <div className="rp-card-hdr" style={{margin:0,marginBottom:8}}>PowderIQ Score</div>
+            {scoreLoading ? (
+              <div style={{height:130,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <div style={{width:28,height:28,border:'3px solid #dbeafe',borderTopColor:'var(--blue)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
               </div>
-            </div>
-          )}
+            ) : (
+              <>
+                <ScoreRing score={score}/>
+                <div className="sc-day-label" style={{color:getScoreColor(score)}}>
+                  {score>=80?'Outstanding Day 🔥':score>=65?'Great Day ✓':score>=50?'Good Day':score>=35?'Fair Day':'Challenging Day'}
+                </div>
+                <div className="sc-explanation">
+                  {scoreData?.conditionDesc ?? (activeFav ? 'Computing conditions…' : 'Select a resort to see score')}
+                </div>
+                {scoreData && (
+                  <div className="sc-drivers">
+                    {(scoreData.snowfall24hIn ?? 0) > 2 && <span className="sc-driver pos">❄ Fresh snow</span>}
+                    {(scoreData.snowfall24hIn ?? 0) === 0 && groomedCount > 0 && <span className="sc-driver pos">🎿 Groomed</span>}
+                    {(scoreData.windMph ?? 0) <= 10 && <span className="sc-driver pos">💨 Calm winds</span>}
+                    {(scoreData.windMph ?? 0) > 25 && <span className="sc-driver neg">⚠ High wind</span>}
+                    {(scoreData.tempF ?? 28) >= 20 && (scoreData.tempF ?? 28) <= 32 && <span className="sc-driver pos">🌡 Ideal temp</span>}
+                    {(scoreData.tempF ?? 28) > 36 && <span className="sc-driver neg">🌡 Warm/slushy</span>}
+                    {openLifts > 0 && <span className="sc-driver neu">🚡 {openLifts} lifts open</span>}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-          {/* Crowd Insights */}
-          {(trails.length > 0 || lifts.length > 0) && (
-            <div className="crowd-card">
-              <div className="crowd-hdr">Crowd Insights</div>
-              {(() => {
-                // Build crowd insight rows from real data
-                const insights: {diff:string;name:string;level:'low'|'mod'|'high'|'avoid';sub:string}[] = [];
-
-                // Lifts on hold = high traffic/wind
-                lifts.filter(l=>l.status==='on_hold').slice(0,1).forEach(l => {
-                  insights.push({diff:'black',name:l.liftName,level:'avoid',sub:'Wind hold — check conditions'});
-                });
-
-                // Groomed trails = moderate crowd expected
-                trails.filter(t=>t.status==='groomed').slice(0,2).forEach(t => {
-                  const dc: Record<string,string> = {green:'#dcfce7',blue:'#dbeafe',black:'#e5e7eb',double_black:'#d1d5db',terrain_park:'#ffedd5',backcountry:'#fef9c3'};
-                  insights.push({diff:t.difficulty,name:t.trailName,level:'mod',sub:'Groomed · Moderate traffic'});
-                });
-
-                // Open trails with no grooming = lower crowds
-                trails.filter(t=>t.status==='open').slice(0,2).forEach(t => {
-                  insights.push({diff:t.difficulty,name:t.trailName,level:'low',sub:'Open · Lower crowds'});
-                });
-
-                // Wind warning if summit wind high
-                if ((weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0) > 25) {
-                  insights.unshift({diff:'black',name:'Summit Area',level:'avoid',sub:'High wind — avoid upper runs'});
-                }
-
-                if (insights.length === 0) return (
-                  <div style={{fontSize:11,color:'var(--text-3)',textAlign:'center',padding:'8px 0'}}>No crowd data available</div>
-                );
-
-                const diffCls: Record<string,{bg:string,color:string,icon:string}> = {
-                  green:{bg:'#dcfce7',color:'#16a34a',icon:'■'},
-                  blue:{bg:'#dbeafe',color:'#2563eb',icon:'●'},
-                  black:{bg:'#e5e7eb',color:'#111827',icon:'◆'},
-                  double_black:{bg:'#d1d5db',color:'#030712',icon:'◆◆'},
-                  terrain_park:{bg:'#ffedd5',color:'#ea580c',icon:'▲'},
-                  backcountry:{bg:'#fef9c3',color:'#854d0e',icon:'⬡'},
-                };
-
-                return insights.slice(0,4).map((ins,i) => {
-                  const dc = diffCls[ins.diff] ?? diffCls.blue;
-                  return (
-                    <div key={i} className="crowd-row">
-                      <div className="crowd-diff" style={{background:dc.bg,color:dc.color}}>{dc.icon}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div className="crowd-name">{ins.name}</div>
-                        <div className="crowd-sub">{ins.sub}</div>
-                      </div>
-                      <div className={`crowd-badge ${ins.level}`}>
-                        {ins.level==='low'?'Low 🟢':ins.level==='mod'?'Moderate 🟡':ins.level==='avoid'?'Avoid: High':'High 🔴'}
-                      </div>
+          {/* ── 3. Next 6 Hours ── */}
+          {forecast.length > 0 && (() => {
+            const f = forecast[0];
+            const f1 = forecast[1];
+            // Build 4 time slots from today's data
+            const hi = f?.tempHighF ?? 35;
+            const lo = f?.tempLowF  ?? 22;
+            const mid = (hi + lo) / 2;
+            const hasSnow = (f?.snowIn ?? 0) > 0;
+            const slots = [
+              { time:'Now',   temp: hi,                 icon: hasSnow?'🌨️':'☀️', snow: hasSnow?(f!.snowIn*0.15).toFixed(1):null, cond: hasSnow?'Snowing':'Clear' },
+              { time:'3h',    temp: Math.round(mid+1),  icon: hasSnow?'🌦️':'⛅',  snow: null, cond: hasSnow?'Flurries':'Partly cloudy' },
+              { time:'6h',    temp: Math.round(mid-1),  icon: hasSnow?'🌨️':'🌤️',  snow: hasSnow?(f!.snowIn*0.1).toFixed(1):null, cond: hasSnow?'Snow':'Clearing' },
+              { time:'12h',   temp: lo,                 icon: f1 && (f1.snowIn??0)>0?'🌨️':'🌤️', snow: f1&&(f1.snowIn??0)>0?(f1.snowIn*0.2).toFixed(1):null, cond: f1&&(f1.snowIn??0)>0?'Snow likely':'Clear' },
+            ];
+            const bestIdx = slots.findIndex(s => s.snow != null) ?? -1;
+            return (
+              <div className="h6-card">
+                <div className="rp-card-hdr">Next 6 Hours</div>
+                <div className="h6-row">
+                  {slots.map((s,i) => (
+                    <div key={s.time} className={`h6-col${i===bestIdx?' best':''}`}>
+                      <span className="h6-time">{s.time}</span>
+                      <span className="h6-icon">{s.icon}</span>
+                      <span className="h6-temp">{Math.round(s.temp)}°</span>
+                      {s.snow && <span className="h6-snow">{s.snow}"</span>}
+                      <span className="h6-cond">{s.cond}</span>
                     </div>
-                  );
-                });
-              })()}
-            </div>
-          )}
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── 4. Crowd Insights ── */}
+          {(trails.length > 0 || lifts.length > 0) && (() => {
+            const wind = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
+            // Curated insight rows — max 3, each tells a story
+            const rows: {icon:string; name:string; desc:string; pill:string; cls:'green'|'yellow'|'red'}[] = [];
+
+            // Low crowd: first open non-groomed trail (raw powder seekers go there, fewer intermediates)
+            const rawOpen = trails.find(t => t.status==='open' && t.difficulty !== 'green');
+            if (rawOpen) rows.push({
+              icon: rawOpen.difficulty==='black'||rawOpen.difficulty==='double_black' ? '💎' : '🔵',
+              name: rawOpen.trailName,
+              desc: 'Open · Lower crowds expected',
+              pill: 'Low crowd', cls: 'green',
+            });
+
+            // Moderate: groomed trail
+            const groomed = trails.find(t => t.status==='groomed');
+            if (groomed) rows.push({
+              icon: groomed.difficulty==='green' ? '🟩' : '🔵',
+              name: groomed.trailName,
+              desc: 'Groomed · Moderate traffic',
+              pill: 'Moderate', cls: 'yellow',
+            });
+
+            // Wind hold lift
+            const holdLift = lifts.find(l => l.status==='on_hold');
+            if (holdLift) rows.push({
+              icon: '⚠️',
+              name: holdLift.liftName,
+              desc: 'Wind hold — conditions changing',
+              pill: 'Avoid', cls: 'red',
+            });
+
+            // High wind = summit avoid
+            if (wind > 28 && rows.length < 3) rows.push({
+              icon: '🌬️',
+              name: 'Summit Zone',
+              desc: `${Math.round(wind)} mph winds — upper lifts at risk`,
+              pill: 'High risk', cls: 'red',
+            });
+
+            // Groomed green = beginner congestion on weekends
+            const greenGroomed = trails.find(t => t.status==='groomed' && t.difficulty==='green');
+            if (greenGroomed && rows.length < 3) rows.push({
+              icon: '🟩',
+              name: greenGroomed.trailName,
+              desc: 'Beginner area — expect congestion',
+              pill: 'Busy', cls: 'yellow',
+            });
+
+            if (rows.length === 0) return null;
+            return (
+              <div className="ci-card">
+                <div className="rp-card-hdr">Crowd Insights</div>
+                {rows.slice(0,3).map((r,i) => (
+                  <div key={i} className="ci-row">
+                    <span className="ci-icon">{r.icon}</span>
+                    <div className="ci-body">
+                      <div className="ci-name">{r.name}</div>
+                      <div className="ci-desc">{r.desc}</div>
+                    </div>
+                    <span className={`ci-pill ${r.cls}`}>{r.pill}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── 5. Smart Alerts ── */}
+          {activeFav && (() => {
+            const wind      = weatherZones['summit']?.windMph ?? scoreData?.windMph ?? 0;
+            const snow24h   = scoreData?.snowfall24hIn ?? 0;
+            const snow48h   = scoreData?.snowfall48hIn ?? 0;
+            const temp      = scoreData?.tempF ?? 28;
+            const hasHold   = lifts.some(l => l.status === 'on_hold');
+            const alerts: {type:'wind'|'powder'|'tip'|'info'; emoji:string; title:string; sub:string}[] = [];
+
+            // Wind hold risk
+            if (wind > 25 || hasHold) alerts.push({
+              type:'wind', emoji:'💨',
+              title: hasHold ? 'Wind Hold Active' : 'Wind Hold Risk',
+              sub: hasHold
+                ? `${lifts.filter(l=>l.status==='on_hold').length} lift(s) on hold — check before heading up`
+                : `Summit gusts at ${Math.round(wind)} mph — upper lifts may close`,
+            });
+
+            // Powder window
+            if (snow24h > 4) alerts.push({
+              type:'powder', emoji:'❄️',
+              title: 'Powder Window Open',
+              sub: `${snow24h.toFixed(1)}" fresh — hit the trees and off-piste runs early`,
+            });
+            else if (snow48h > 3 && snow24h === 0) alerts.push({
+              type:'powder', emoji:'🌨️',
+              title: 'Powder Setting Up',
+              sub: `${snow48h.toFixed(1)}" over 48h — off-piste may still have untracked snow`,
+            });
+
+            // Best time tip
+            const groomedOpen = trails.filter(t => t.status==='groomed');
+            if (groomedOpen.length > 0 && wind <= 15) alerts.push({
+              type:'tip', emoji:'🎿',
+              title: 'Best Time: Early Morning',
+              sub: `${groomedCount} groomed runs — corduroy is freshest before 10 AM`,
+            });
+
+            // Warm weather warning
+            if (temp > 36) alerts.push({
+              type:'info', emoji:'🌡️',
+              title: 'Warm Conditions',
+              sub: `${Math.round(temp)}°F — spring skiing, expect soft snow by midday`,
+            });
+
+            // All clear
+            if (alerts.length === 0 && score > 50) alerts.push({
+              type:'tip', emoji:'✅',
+              title: 'All Clear',
+              sub: 'No significant hazards. Good conditions across the mountain.',
+            });
+
+            if (alerts.length === 0) return null;
+            return (
+              <div className="sa-card">
+                <div className="rp-card-hdr">Smart Alerts</div>
+                {alerts.slice(0,3).map((a,i) => (
+                  <div key={i} className={`sa-alert ${a.type}`}>
+                    <span className="sa-emoji">{a.emoji}</span>
+                    <div className="sa-body">
+                      <div className="sa-title">{a.title}</div>
+                      <div className="sa-sub">{a.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* PowderIQ footer */}
-          <div className="rcard-footer">
+          <div className="rp-footer">
             <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
-            <span className="rcard-footer-brand">PowderIQ</span>
+            <span className="rp-footer-brand">PowderIQ</span>
           </div>
 
         </div>
