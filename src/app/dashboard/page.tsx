@@ -370,42 +370,91 @@ export default function DashboardPage() {
         fetch(`/api/mountains/${fav.mountain.id}/forecast`, { headers: h }),
       ]);
 
+      // ── Score ────────────────────────────────────────────────────────────────
+      let scoreVal = fav.score ?? 0;
+      if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
+        const sd = await scoreRes.value.json();
+        scoreVal = sd.data?.score ?? scoreVal;
+      }
+
+      // ── Forecast + weather data ───────────────────────────────────────────
+      // Pull snow conditions from forecast API (works for all mountains)
+      let snow: Record<string,any> = {};
+      let mtnData: Record<string,any> = {};
+      let zones: Record<string,any> = {};
       if (forecastRes.status === 'fulfilled' && forecastRes.value.ok) {
         const fd = await forecastRes.value.json();
-        const snow = fd.data?.snow ?? {};
-        const mountain = fd.data?.mountain ?? {};
-        const snow24h = snow.snowfall24h ?? 0;
-        const wind = snow.windMph ?? 0;
-        const temp = snow.tempF ?? 28;
-        let condDesc = snow24h > 6 ? 'Heavy snow' : snow24h > 2 ? 'Snow showers' : snow24h > 0 ? 'Light snow' : wind > 35 ? 'Windy' : temp > 34 ? 'Partly cloudy' : 'Clear & cold';
-        let scoreVal = fav.score ?? 0;
-        if (scoreRes.status === 'fulfilled' && scoreRes.value.ok) {
-          const sd = await scoreRes.value.json();
-          scoreVal = sd.data?.score ?? scoreVal;
-        }
-        setScoreData({ score: scoreVal, snowfall24hIn: snow.snowfall24h, snowfall48hIn: snow.snowfall48h, windMph: snow.windMph, tempF: snow.tempF, snowDepthIn: snow.baseDepthIn, conditionDesc: condDesc });
+        snow    = fd.data?.snow ?? {};
+        mtnData = fd.data?.mountain ?? {};
+      }
 
-        // Open-Meteo forecast
-        const lat = mountain.latitude, lon = mountain.longitude;
-        if (lat && lon) {
-          const summitElevM = Math.round((mountain.topElevFt ?? 8000) * 0.3048);
-          const omUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=7&elevation=${summitElevM}`;
-          const omRes = await fetch(omUrl);
-          if (omRes.ok) {
-            const om = await omRes.json();
-            const daily = om.daily ?? {};
-            const WMO: Record<number,string> = { 0:'Clear',1:'Clear',2:'Partly cloudy',3:'Overcast',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',85:'Snow showers',86:'Heavy snow' };
-            const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-            setForecast((daily.time ?? []).slice(0,7).map((d: string, i: number) => ({
-              date: d, dayLabel: i === 0 ? 'Today' : days[new Date(d+'T12:00:00').getDay()],
-              snowIn: daily.snowfall_sum?.[i] ?? 0,
-              tempHighF: daily.temperature_2m_max?.[i], tempLowF: daily.temperature_2m_min?.[i],
-              conditionDesc: WMO[daily.weathercode?.[i]] ?? 'Mixed',
-              precipPct: daily.precipitation_probability_max?.[i],
-            })));
-          }
+      // Use mountain lat/lon from either the forecast response or the favorite
+      const lat = mtnData.latitude  ?? fav.mountain.latitude;
+      const lon = mtnData.longitude ?? fav.mountain.longitude;
+      const topElevFt  = mtnData.topElevFt  ?? fav.mountain.topElevFt  ?? 8000;
+      const baseElevFt = mtnData.baseElevFt ?? fav.mountain.baseElevFt ?? 6000;
+      const midElevFt  = Math.round((topElevFt + baseElevFt) / 2);
+
+      // Fetch elevation-stratified weather from Open-Meteo for summit/mid/base
+      // Uses three requests at different elevations — fully public, no auth needed
+      if (lat && lon) {
+        const summitM = Math.round(topElevFt  * 0.3048);
+        const midM    = Math.round(midElevFt  * 0.3048);
+        const baseM   = Math.round(baseElevFt * 0.3048);
+
+        const [summitWeather, midWeather, baseWeather, forecastData] = await Promise.allSettled([
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,windspeed_10m,snowfall,snow_depth&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto&elevation=${summitM}`),
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,windspeed_10m,snow_depth&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto&elevation=${midM}`),
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,windspeed_10m,snow_depth&temperature_unit=fahrenheit&windspeed_unit=mph&precipitation_unit=inch&timezone=auto&elevation=${baseM}`),
+          fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=temperature_2m_max,temperature_2m_min,snowfall_sum,precipitation_probability_max,weathercode&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto&forecast_days=10&elevation=${summitM}`),
+        ]);
+
+        // Parse zone weather
+        if (summitWeather.status === 'fulfilled' && summitWeather.value.ok) {
+          const d = await summitWeather.value.json();
+          const c = d.current ?? {};
+          zones['summit'] = { tempF: c.temperature_2m, windMph: c.windspeed_10m, snowfall24hIn: c.snowfall ?? 0, snowDepthIn: (c.snow_depth ?? 0) * 39.3701 };
+          // Use summit as primary snow data if API snow is empty
+          if (!snow.windMph)   snow.windMph   = c.windspeed_10m;
+          if (!snow.tempF)     snow.tempF     = c.temperature_2m;
+          if (snow.snowfall24h == null) snow.snowfall24h = c.snowfall ?? 0;
+          if (!snow.baseDepthIn) snow.baseDepthIn = (c.snow_depth ?? 0) * 39.3701;
+        }
+        if (midWeather.status === 'fulfilled' && midWeather.value.ok) {
+          const d = await midWeather.value.json();
+          const c = d.current ?? {};
+          zones['mid'] = { tempF: c.temperature_2m, windMph: c.windspeed_10m, snowDepthIn: (c.snow_depth ?? 0) * 39.3701 };
+        }
+        if (baseWeather.status === 'fulfilled' && baseWeather.value.ok) {
+          const d = await baseWeather.value.json();
+          const c = d.current ?? {};
+          zones['base'] = { tempF: c.temperature_2m, windMph: c.windspeed_10m, snowDepthIn: (c.snow_depth ?? 0) * 39.3701 };
+        }
+        if (Object.keys(zones).length > 0) setWeatherZones(zones);
+
+        // Parse 10-day forecast
+        if (forecastData.status === 'fulfilled' && forecastData.value.ok) {
+          const om = await forecastData.value.json();
+          const daily = om.daily ?? {};
+          const WMO: Record<number,string> = { 0:'Clear',1:'Clear',2:'Partly cloudy',3:'Overcast',71:'Light snow',73:'Snow',75:'Heavy snow',77:'Snow grains',85:'Snow showers',86:'Heavy snow' };
+          const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+          setForecast((daily.time ?? []).slice(0,10).map((d: string, i: number) => ({
+            date: d, dayLabel: i === 0 ? 'Today' : days[new Date(d+'T12:00:00').getDay()],
+            snowIn: daily.snowfall_sum?.[i] ?? 0,
+            tempHighF: daily.temperature_2m_max?.[i], tempLowF: daily.temperature_2m_min?.[i],
+            conditionDesc: WMO[daily.weathercode?.[i]] ?? 'Mixed',
+            precipPct: daily.precipitation_probability_max?.[i],
+          })));
         }
       }
+
+      // Build scoreData from all available sources
+      const snow24h = snow.snowfall24h ?? 0;
+      const wind  = (snow.windMph ?? zones['summit']?.windMph ?? 0) as number;
+      const temp  = (snow.tempF   ?? zones['summit']?.tempF   ?? 28) as number;
+      const depth = (snow.baseDepthIn ?? zones['base']?.snowDepthIn ?? 0) as number;
+      const condDesc = snow24h > 6 ? 'Heavy snow' : snow24h > 2 ? 'Snow showers' : snow24h > 0 ? 'Light snow' : wind > 35 ? 'Windy' : temp > 34 ? 'Partly cloudy' : 'Clear & cold';
+      setScoreData({ score: scoreVal, snowfall24hIn: snow24h, snowfall48hIn: snow.snowfall48h, windMph: wind, tempF: temp, snowDepthIn: depth, conditionDesc: condDesc });
 
       // Try resort API first (resorts with PowderIQ accounts have full data)
       const resortRes = await fetch(`/api/resort?mountainId=${fav.mountain.id}`, { headers: h });
