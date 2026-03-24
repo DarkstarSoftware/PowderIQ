@@ -1124,6 +1124,7 @@ export default function DashboardPage() {
             <div className="bottom-panels">
 
               {/* Top Runs Right Now */}
+              <ProGate isPro={isPro} title="Top Runs Personalization" desc="Smart trail ranking based on your skill level, riding style, and live conditions.">
               <div className="runs-card">
                 <div className="runs-hdr">
                   <span style={{fontSize:16}}>⛷️</span>
@@ -1134,7 +1135,6 @@ export default function DashboardPage() {
                       <span className="runs-hdr-badge">{trails.filter(t=>t.status==='open'||t.status==='groomed').length} open</span>
                   }
                 </div>
-                <ProGate isPro={isPro} title="Top Runs Personalization" desc="Smart trail ranking based on your skill level, riding style, and live conditions.">
                 <div className="runs-grid">
                   {(() => {
                     const DCLS: Record<string,{bg:string,col:string,icon:string}> = {
@@ -1246,7 +1246,7 @@ export default function DashboardPage() {
                   })()}
                 </div>
               </div>
-                </ProGate>
+              </ProGate>
 
               {/* Smart Lift Access */}
               <div className="lifts-card">
