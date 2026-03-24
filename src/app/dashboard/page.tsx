@@ -539,6 +539,8 @@ export default function DashboardPage() {
   // ── Derived ──────────────────────────────────────────────────────────────────
   const activeFav   = selectedFav ?? favorites[0] ?? null;
   const score       = scoreData?.score ?? activeFav?.score ?? 0;
+  const isClosed    = score === 0 && scoreData?.conditionDesc?.includes('closed') || 
+                      (scoreData?.conditionDesc === 'This resort is currently closed for the season.');
   const scoreColor  = getScoreColor(score);
   const openLifts   = lifts.filter(l => l.status === 'open').length;
   const openTrails  = trails.filter(t => t.status === 'open' || t.status === 'groomed').length;
@@ -913,7 +915,13 @@ export default function DashboardPage() {
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
-                zoom={13}
+                zoom={(() => {
+                  const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
+                  if (vft < 400)  return 14.5; // tiny hills like Pine Knob
+                  if (vft < 1000) return 13.5; // small regionals
+                  if (vft < 2000) return 13;   // mid-size
+                  return 12.5;                  // large western resorts
+                })()}
                 mode={mapMode}
                 trails={trails}
                 diffFilter={diffFilter}
@@ -1062,8 +1070,11 @@ export default function DashboardPage() {
                 <div className="runs-hdr">
                   <span style={{fontSize:16}}>⛷️</span>
                   <span className="runs-hdr-title">Top Runs Right Now</span>
-                  {trails.filter(t=>t.status==='open'||t.status==='groomed').length > 0 &&
-                    <span className="runs-hdr-badge">{trails.filter(t=>t.status==='open'||t.status==='groomed').length} open</span>}
+                  {isClosed
+                    ? <span style={{fontSize:10,fontWeight:600,background:'#fef2f2',color:'#b91c1c',padding:'2px 8px',borderRadius:10}}>Season Closed</span>
+                    : trails.filter(t=>t.status==='open'||t.status==='groomed').length > 0 &&
+                      <span className="runs-hdr-badge">{trails.filter(t=>t.status==='open'||t.status==='groomed').length} open</span>
+                  }
                 </div>
                 <div className="runs-grid">
                   {(() => {
@@ -1137,6 +1148,13 @@ export default function DashboardPage() {
                       .sort((a:any,b:any) => b.rank - a.rank)
                       .slice(0,3);
 
+                    if (isClosed) return (
+                      <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8,padding:'20px',color:'var(--text-3)'}}>
+                        <span style={{fontSize:32}}>🏔️</span>
+                        <span style={{fontSize:13,fontWeight:600,color:'var(--text-2)'}}>Resort Closed for the Season</span>
+                        <span style={{fontSize:11,textAlign:'center',maxWidth:220}}>Check back when the season opens in November.</span>
+                      </div>
+                    );
                     if (scored.length === 0) return (
                       <div style={{gridColumn:'1/-1',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:8,padding:'20px',color:'var(--text-3)'}}>
                         <span style={{fontSize:32}}>⛷️</span>

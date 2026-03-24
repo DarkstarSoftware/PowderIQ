@@ -146,63 +146,70 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
     }, 'waterway-label'); // insert below labels
   }
 
-  // ── Snow + tree layer using Mapbox terrain-rgb elevation data ───────────
-  // On satellite: real imagery already shows snow, just add hillshade depth
-  // On trail/hybrid: add snow-white fill using the terrain vector source
-  // that ships with Mapbox outdoors — it has 'landcover' with 'snow' class
-  if (mode !== 'satellite') {
+  // ── Snow + forest layers (works on all Mapbox styles) ───────────────────
+  // Uses the 'composite' vector source — available in both outdoors and satellite-streets.
+  // On pure satellite-v9 (hybrid mode) we skip — real imagery already shows snow.
 
-    // Snow white layer — targets high-elevation terrain using landcover
-    if (!map.getLayer('piq-snow-white')) {
-      map.addLayer({
-        id:     'piq-snow-white',
-        type:   'fill',
-        source: 'composite',
-        'source-layer': 'landcover',
-        filter: ['==', ['get', 'class'], 'snow'],
-        paint: {
-          'fill-color':   '#f0f6ff',
-          'fill-opacity': 0.9,
-        },
-      }, 'piq-hillshade');
+  // Remove stale layers
+  ['piq-rock','piq-trees','piq-snow-white','piq-snow-tint'].forEach(id => {
+    if (map.getLayer(id)) map.removeLayer(id);
+  });
+
+  if (mode !== 'hybrid') {
+    // Check if composite source has the layers we need (it does in outdoors + satellite-streets)
+    const hasLanduse  = !!map.getSource('composite');
+
+    // 1. Forest/tree fill — dark green, renders below snow so peaks stay white
+    if (hasLanduse && !map.getLayer('piq-trees')) {
+      try {
+        map.addLayer({
+          id: 'piq-trees', type: 'fill',
+          source: 'composite',
+          'source-layer': 'landuse_overlay',
+          filter: ['==', ['get', 'class'], 'national_park'],
+          paint: {
+            'fill-color':   '#2d5a1b',
+            'fill-opacity': 0.0, // transparent — just reserves the stack position
+          },
+        });
+
+        // Real tree layer from landcover
+        map.addLayer({
+          id: 'piq-forest', type: 'fill',
+          source: 'composite',
+          'source-layer': 'landcover',
+          filter: ['match', ['get', 'class'], ['wood','scrub'], true, false],
+          paint: {
+            'fill-color':   '#2e5e1e',
+            'fill-opacity': ['interpolate',['linear'],['zoom'], 11,0.6, 14,0.5],
+          },
+        }, 'piq-hillshade');
+      } catch(_) { /* layer may not exist in this style */ }
     }
 
-    // Tree/forest layer — dark green so it contrasts against white snow
-    if (!map.getLayer('piq-trees')) {
-      map.addLayer({
-        id:     'piq-trees',
-        type:   'fill',
-        source: 'composite',
-        'source-layer': 'landcover',
-        filter: ['in', ['get', 'class'], ['literal', ['wood', 'scrub', 'grass']]],
-        paint: {
-          'fill-color': [
-            'interpolate', ['linear'], ['zoom'],
-            10, '#2d5a1b',
-            14, '#3a7023',
-          ],
-          'fill-opacity': [
-            'interpolate', ['linear'], ['zoom'],
-            10, 0.55,
-            14, 0.45,
-          ],
-        },
-      }, 'piq-hillshade');
-    }
-
-    // Rock/bare terrain above treeline — gray-white
-    if (!map.getLayer('piq-rock')) {
-      map.addLayer({
-        id:     'piq-rock',
-        type:   'fill',
-        source: 'composite',
-        'source-layer': 'landcover',
-        filter: ['==', ['get', 'class'], 'rock'],
-        paint: {
-          'fill-color':   '#c8d8e8',
-          'fill-opacity': 0.7,
-        },
-      }, 'piq-trees');
+    // 2. Snow-white background fill — covers non-forested terrain with crisp white
+    //    Stacked above hillshade so shadows still show through
+    if (!map.getLayer('piq-snow-base')) {
+      try {
+        map.addLayer({
+          id: 'piq-snow-base', type: 'background',
+          paint: {
+            'background-color':   '#e8f2ff',
+            'background-opacity': 0.30,
+          },
+        }, 'piq-forest');
+      } catch(_) {
+        // fallback: add without reference layer
+        if (!map.getLayer('piq-snow-base')) {
+          map.addLayer({
+            id: 'piq-snow-base', type: 'background',
+            paint: {
+              'background-color':   '#e8f2ff',
+              'background-opacity': 0.30,
+            },
+          });
+        }
+      }
     }
   }
 
@@ -377,7 +384,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
         const bearing = computeBearing(geo.runs);
 
         // Adjust camera bearing without full flyTo (already at location)
-        map.easeTo({ bearing, pitch: 30, duration: 1200 });
+        map.easeTo({ bearing, pitch: 60, duration: 1200 });
 
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
       } catch (e) {
@@ -410,7 +417,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              30,
+          pitch:              60,
           bearing:            160,   // default SSE-facing; corrected after OSM load
           attributionControl: false,
           logoPosition:       'bottom-left',
@@ -445,7 +452,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
     if (key === prevKey.current) return;
     prevKey.current = key;
 
-    map.flyTo({ center:[lon,lat], zoom, pitch:30, bearing:160, speed:1.2, curve:1.4 });
+    map.flyTo({ center:[lon,lat], zoom, pitch:60, bearing:160, speed:1.2, curve:1.4 });
     map.once('moveend', () => {
       if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
     });
