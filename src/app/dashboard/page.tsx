@@ -2,7 +2,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { supabase } from '@/lib/supabase/client';
+
+// Mapbox CSS — loaded dynamically to avoid SSR issues
+// (imported inside MapboxMap component via useEffect)
+
+// Mapbox loaded client-only — prevents SSR crash
+const MapboxMap = dynamic(() => import('@/components/MapboxMap'), {
+  ssr: false,
+  loading: () => (
+    <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0f5fb',borderRadius:16}}>
+      <div style={{width:32,height:32,border:'3px solid #dbeafe',borderTopColor:'#1d6ef5',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+    </div>
+  ),
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -275,6 +289,7 @@ function mapLiftieStatus(s: string): 'open' | 'on_hold' | 'closed' | 'scheduled'
 
 export default function DashboardPage() {
   const router = useRouter();
+  const TOKEN_OK = typeof process !== 'undefined' && !!process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
   const [favorites,    setFavorites]    = useState<FavoriteItem[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -298,6 +313,7 @@ export default function DashboardPage() {
   const [sortBy,       setSortBy]       = useState<'name'|'difficulty'>('name');
   const [sortDir,      setSortDir]      = useState<'asc'|'desc'>('asc');
   const [sortOpen,     setSortOpen]     = useState(false);
+  const [mapLoaded,    setMapLoaded]    = useState(false);
   const [weatherZones, setWeatherZones] = useState<Record<string,any>>({});
 
   // ── Auth + data load ────────────────────────────────────────────────────────
@@ -844,8 +860,20 @@ export default function DashboardPage() {
 
           {/* Map */}
           <div className="map-area">
-            <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
-              onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
+            {activeFav?.mountain.latitude && TOKEN_OK ? (
+              <MapboxMap
+                lat={activeFav.mountain.latitude}
+                lon={activeFav.mountain.longitude ?? 0}
+                zoom={13}
+                mode={mapMode}
+                trails={trails}
+                diffFilter={diffFilter}
+                onLoad={() => setMapLoaded(true)}
+              />
+            ) : (
+              <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
+                onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
+            )}
 
             {/* Best Area insight card — personalized */}
             {activeFav && (() => {
