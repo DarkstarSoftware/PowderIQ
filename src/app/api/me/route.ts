@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       prisma.riderProfile.findUnique({ where: { userId: user.id } }),
       prisma.subscription.findUnique({ where: { userId: user.id },
         select: { status: true, stripePriceId: true, currentPeriodEnd: true } }),
-      prisma.resort.findFirst({ where: { userId: user.id }, select: { id: true } }),
+      prisma.resortOperator.findFirst({ where: { userId: user.id }, select: { resortId: true } }),
     ]);
 
     return ok({
