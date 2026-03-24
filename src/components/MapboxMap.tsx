@@ -66,8 +66,8 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
           link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css';
           document.head.appendChild(link);
         }
+        // @ts-ignore — dynamic import, types resolved via @types/mapbox-gl
         const mapboxgl = (await import('mapbox-gl')).default;
-        // @ts-ignore — mapbox-gl typings quirk
         mapboxgl.accessToken = TOKEN;
 
         map = new mapboxgl.Map({
