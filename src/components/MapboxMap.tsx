@@ -24,7 +24,10 @@ export interface TrailFeature {
 }
 
 interface Props {
-  lat: number; lon: number; zoom?: number; mode: MapMode; // zoom default 12 = whole resort visible
+  lat: number; lon: number; zoom?: number; mode: MapMode;
+  resortName?: string;        // shown in summit pin label
+  summitLat?: number;         // actual summit coordinates for the peak pin
+  summitLon?: number;
   trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
@@ -67,6 +70,24 @@ function parseOverpass(data: any): { runs: any; lifts: any } {
     runs:  { type:'FeatureCollection', features: runs  },
     lifts: { type:'FeatureCollection', features: lifts },
   };
+}
+
+// ── Extract summit coordinates from OSM piste data ──────────────────────────
+// Returns the centroid of the top 10% of piste coordinates by latitude
+// (highest lat ≈ highest on the mountain for most N-hemisphere resorts)
+function extractSummitCoords(runs: any): [number, number] | null {
+  const all: [number, number][] = [];
+  for (const f of runs?.features ?? []) {
+    for (const c of f.geometry?.coordinates ?? []) all.push(c as [number, number]);
+  }
+  if (all.length < 4) return null;
+  const sorted = [...all].sort((a, b) => b[1] - a[1]);
+  const n = Math.max(1, Math.floor(sorted.length * 0.1));
+  const top = sorted.slice(0, n);
+  return [
+    top.reduce((s, c) => s + c[0], 0) / top.length,
+    top.reduce((s, c) => s + c[1], 0) / top.length,
+  ];
 }
 
 // ── Compute the map bearing so the ski face is front-and-center ─────────────
@@ -336,13 +357,34 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
   });
 }
 
+// ── Summit pin helper ────────────────────────────────────────────────────────
+function createPinEl(label: string): HTMLElement {
+  const el = document.createElement('div');
+  el.style.cssText = [
+    'display:flex','align-items:center','gap:5px',
+    'background:rgba(255,255,255,0.95)',
+    'backdrop-filter:blur(8px)','-webkit-backdrop-filter:blur(8px)',
+    'border:1px solid rgba(100,150,200,0.25)',
+    'border-radius:8px','padding:4px 10px',
+    'font-size:11px','font-weight:700',
+    'color:#0d1b2e','white-space:nowrap',
+    'box-shadow:0 2px 10px rgba(15,40,80,0.18)',
+    'pointer-events:none',
+  ].join(';');
+  el.innerHTML = `<span style="font-size:14px">⛰️</span><span>${label} Peak</span>`;
+  return el;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diffFilter = [], onLoad }: Props) {
+export default function MapboxMap({ lat, lon, zoom = 13, mode,
+  resortName, summitLat, summitLon,
+  trails = [], diffFilter = [], onLoad }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const mapRef        = useRef<any>(null);
   const readyRef      = useRef(false);
   const osmCache      = useRef<Map<string,{runs:any;lifts:any}>>(new Map());
   const prevKey       = useRef('');
+  const markerRef = useRef<any>(null);
   const [error,   setError]   = useState('');
   const [ready,   setReady]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -380,13 +422,21 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
 
     if (readyRef.current) {
       try {
-        // Compute the best bearing to face the mountain front
         const bearing = computeBearing(geo.runs);
-
-        // Adjust camera bearing without full flyTo (already at location)
         map.easeTo({ bearing, pitch: 60, duration: 1200 });
-
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
+
+        // Place summit marker at the actual highest OSM coordinate
+        const summitCoords = extractSummitCoords(geo.runs);
+        if (summitCoords) {
+          const mglMod = (await import('mapbox-gl')).default;
+          markerRef.current?.remove();
+          const label = resortName?.split(' ')[0] ?? 'Summit';
+          const el = createPinEl(label);
+          markerRef.current = new mglMod.Marker({ element: el, anchor: 'bottom' })
+            .setLngLat(summitCoords)
+            .addTo(map);
+        }
       } catch (e) {
         console.warn('[MapboxMap] setup3D:', e);
       }
@@ -441,7 +491,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
         setError(e?.message ?? 'Map failed to load');
       }
     })();
-    return () => { readyRef.current = false; mapRef.current = null; map?.remove(); };
+    return () => { readyRef.current = false; markerRef.current?.remove(); mapRef.current = null; map?.remove(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fly to new resort ─────────────────────────────────────────────────────

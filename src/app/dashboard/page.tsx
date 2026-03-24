@@ -668,8 +668,7 @@ export default function DashboardPage() {
         .bac-btn-secondary { flex:1;padding:8px 0;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;font-family:Inter,sans-serif;transition:all .15s; }
         .bac-btn-secondary:hover { background:rgba(255,255,255,0.16); }
 
-        /* zone label pins on map */
-        .map-pin { position:absolute;background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);border-radius:8px;padding:4px 9px;font-size:11px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:4px;box-shadow:0 2px 8px rgba(15,40,80,0.15);pointer-events:none;border:1px solid var(--border-2); }
+        /* Summit pin rendered via Mapbox Marker in MapboxMap.tsx */
 
         /* Mapbox attribution */
         .map-attrib { position:absolute;bottom:10px;left:14px;display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.8);backdrop-filter:blur(6px);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--text-3); }
@@ -917,14 +916,15 @@ export default function DashboardPage() {
                 lon={activeFav.mountain.longitude ?? 0}
                 zoom={(() => {
                   const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
-                  if (vft < 400)  return 14.5; // tiny hills like Pine Knob
-                  if (vft < 1000) return 13.5; // small regionals
-                  if (vft < 2000) return 13;   // mid-size
-                  return 12.5;                  // large western resorts
+                  if (vft < 400)  return 14.5;
+                  if (vft < 1000) return 13.5;
+                  if (vft < 2000) return 13;
+                  return 12.5;
                 })()}
                 mode={mapMode}
                 trails={trails}
                 diffFilter={diffFilter}
+                resortName={activeFav.mountain.name}
                 onLoad={() => setMapLoaded(true)}
               />
             ) : (
@@ -1016,12 +1016,7 @@ export default function DashboardPage() {
               );
             })()}
 
-            {/* Zone pins — only show if we have data */}
-            {activeFav && weatherZones['summit'] && (
-              <div className="map-pin" style={{top:'22%',right:'18%'}}>
-                ⛰️ {activeFav.mountain.name.split(' ')[0]} Peak
-              </div>
-            )}
+            {/* Summit pin is now rendered as a Mapbox Marker inside MapboxMap */}
 
             {!activeFav && (
               <div style={{position:'absolute',inset:0,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(240,245,251,0.85)',borderRadius:16}}>
