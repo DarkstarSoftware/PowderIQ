@@ -79,34 +79,39 @@ export function isSkiSeason(now: Date = new Date(), verticalFt = 1000): boolean 
   const month = now.getMonth(); // 0-indexed Jan=0
   const day   = now.getDate();
 
-  // Off-season months: May 16 – Nov 14 (always closed)
-  const afterMay15  = (month === 4 && day > 15) || month > 4;
-  const beforeNov15 = month < 10 || (month === 10 && day < 15);
-  if (afterMay15 && beforeNov15) return false;
+  // Hard off-season: Jun 1 – Oct 31 (nothing is open)
+  if (month >= 5 && month <= 9) return false;
 
   // Helper: is today after a given month/day?
   const afterDate = (m: number, d: number) =>
     month > m || (month === m && day >= d);
 
-  // Small Midwest / low-elevation hills: close ~Mar 20
+  // Nov 1–14: only year-round/high-altitude resorts open early
+  if (month === 10 && day < 15) {
+    return verticalFt >= 2000; // large resorts may be open, small ones not yet
+  }
+
+  // Nov 15 onward: all resorts in season until spring close dates below
+
+  // Small Midwest hills (Pine Knob ~300ft): close Mar 20
   if (verticalFt < 500) {
-    if (afterDate(2, 20)) return false; // after Mar 20
+    if (afterDate(2, 20)) return false;
   }
-  // Mid-size regionals: close ~Apr 1
+  // Mid-size regionals (< 1500ft): close Apr 1
   else if (verticalFt < 1500) {
-    if (afterDate(3, 1)) return false;  // after Apr 1
+    if (afterDate(3, 1)) return false;
   }
-  // Large destination resorts (Steamboat 3668ft, Park City, etc.): close ~Apr 20
-  else if (verticalFt < 2500) {
-    if (afterDate(3, 20)) return false; // after Apr 20
+  // Large regionals + destination resorts (Steamboat 3668ft, Park City 3100ft): close Apr 20
+  else if (verticalFt < 3000) {
+    if (afterDate(3, 20)) return false;
   }
-  // Major western resorts (Vail 3450ft, Jackson 4139ft): close ~Apr 27
-  else if (verticalFt < 4000) {
-    if (afterDate(3, 27)) return false; // after Apr 27
+  // Major high-altitude (Vail 3450ft, Jackson 4139ft, Snowmass 4406ft): close Apr 27
+  else if (verticalFt < 4500) {
+    if (afterDate(3, 27)) return false;
   }
-  // Very high / year-round (Mammoth 3100+, Timberline): close ~May 15
+  // Year-round / extreme altitude (Mammoth, Timberline): close May 31
   else {
-    if (afterDate(4, 15)) return false; // after May 15
+    if (afterDate(4, 31)) return false;
   }
 
   return true;

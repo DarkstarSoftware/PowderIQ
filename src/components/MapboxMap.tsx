@@ -167,71 +167,69 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
     }, 'waterway-label'); // insert below labels
   }
 
-  // ── Snow + forest layers (works on all Mapbox styles) ───────────────────
-  // Uses the 'composite' vector source — available in both outdoors and satellite-streets.
-  // On pure satellite-v9 (hybrid mode) we skip — real imagery already shows snow.
+  // ── Snow + forest layers ─────────────────────────────────────────────────
+  // Strategy: use Mapbox's built-in terrain DEM source for fill-extrusion
+  // to create a white "snow cap" on the mountain. Trees/forest come from
+  // the 'landuse' vector source which is available in all standard styles.
+  // We always try-catch each layer addition since availability varies by style.
 
-  // Remove stale layers
-  ['piq-rock','piq-trees','piq-snow-white','piq-snow-tint'].forEach(id => {
-    if (map.getLayer(id)) map.removeLayer(id);
+  // Clean up stale layers first
+  ['piq-snow-cap','piq-forest','piq-trees','piq-snow-white',
+   'piq-snow-tint','piq-snow-base','piq-rock'].forEach(id => {
+    try { if (map.getLayer(id)) map.removeLayer(id); } catch(_) {}
   });
 
   if (mode !== 'hybrid') {
-    // Check if composite source has the layers we need (it does in outdoors + satellite-streets)
-    const hasLanduse  = !!map.getSource('composite');
-
-    // 1. Forest/tree fill — dark green, renders below snow so peaks stay white
-    if (hasLanduse && !map.getLayer('piq-trees')) {
+    // ── Forest layer from Mapbox's standard landuse source ────────────────
+    // 'landuse' source-layer exists in outdoors-v12 and satellite-streets-v12
+    try {
+      map.addLayer({
+        id: 'piq-forest', type: 'fill',
+        source: 'composite',
+        'source-layer': 'landuse',
+        filter: ['match', ['get', 'class'],
+          ['wood', 'scrub', 'grass', 'forest'], true, false],
+        paint: {
+          'fill-color': '#2d5a1b',
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'],
+            10, 0.65, 13, 0.55, 15, 0.45],
+        },
+      });
+    } catch(_) {
+      // Try alternate source-layer name
       try {
-        map.addLayer({
-          id: 'piq-trees', type: 'fill',
-          source: 'composite',
-          'source-layer': 'landuse_overlay',
-          filter: ['==', ['get', 'class'], 'national_park'],
-          paint: {
-            'fill-color':   '#2d5a1b',
-            'fill-opacity': 0.0, // transparent — just reserves the stack position
-          },
-        });
-
-        // Real tree layer from landcover
         map.addLayer({
           id: 'piq-forest', type: 'fill',
           source: 'composite',
           'source-layer': 'landcover',
-          filter: ['match', ['get', 'class'], ['wood','scrub'], true, false],
+          filter: ['match', ['get', 'class'],
+            ['wood', 'scrub'], true, false],
           paint: {
-            'fill-color':   '#2e5e1e',
-            'fill-opacity': ['interpolate',['linear'],['zoom'], 11,0.6, 14,0.5],
+            'fill-color': '#2d5a1b',
+            'fill-opacity': 0.55,
           },
-        }, 'piq-hillshade');
-      } catch(_) { /* layer may not exist in this style */ }
+        });
+      } catch(_2) { /* not available in this style */ }
     }
 
-    // 2. Snow-white background fill — covers non-forested terrain with crisp white
-    //    Stacked above hillshade so shadows still show through
-    if (!map.getLayer('piq-snow-base')) {
-      try {
-        map.addLayer({
-          id: 'piq-snow-base', type: 'background',
-          paint: {
-            'background-color':   '#e8f2ff',
-            'background-opacity': 0.30,
-          },
-        }, 'piq-forest');
-      } catch(_) {
-        // fallback: add without reference layer
-        if (!map.getLayer('piq-snow-base')) {
-          map.addLayer({
-            id: 'piq-snow-base', type: 'background',
-            paint: {
-              'background-color':   '#e8f2ff',
-              'background-opacity': 0.30,
-            },
-          });
-        }
-      }
-    }
+    // ── Snow-white terrain tint ───────────────────────────────────────────
+    // A light blue-white background at ~25% opacity gives non-forested
+    // terrain the white snow look while letting hillshade shadows through.
+    // Inserted BELOW piste lines but above the base map.
+    try {
+      const insertBefore = map.getLayer('piq-runs-case') ? 'piq-runs-case'
+                         : map.getLayer('piq-hillshade') ? undefined
+                         : undefined;
+      const layerDef: any = {
+        id: 'piq-snow-cap', type: 'background',
+        paint: {
+          'background-color':   '#ddeeff',
+          'background-opacity': 0.28,
+        },
+      };
+      if (insertBefore) map.addLayer(layerDef, insertBefore);
+      else map.addLayer(layerDef);
+    } catch(_) { /* ignore */ }
   }
 
   // Sky layer — only works on outdoor/satellite styles
@@ -390,7 +388,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
   const [loading, setLoading] = useState(false);
 
   // ── Fetch OSM + render ────────────────────────────────────────────────────
-  const loadAndRender = useCallback(async (_lat: number, _lon: number, _df: string[], _mode: MapMode) => {
+  const loadAndRender = useCallback(async (_lat: number, _lon: number, _df: string[], _mode: MapMode, _name?: string) => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
@@ -423,7 +421,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
     if (readyRef.current) {
       try {
         const bearing = computeBearing(geo.runs);
-        map.easeTo({ bearing, pitch: 60, duration: 1200 });
+        map.easeTo({ bearing, pitch: 75, duration: 1200 });
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
 
         // Place summit marker at the actual highest OSM coordinate
@@ -431,7 +429,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
         if (summitCoords) {
           const mglMod = (await import('mapbox-gl')).default;
           markerRef.current?.remove();
-          const label = resortName?.split(' ')[0] ?? 'Summit';
+          const label = (_name ?? resortName ?? 'Summit').replace(/ (Resort|Mountain|Ski Area)$/i, '');
           const el = createPinEl(label);
           markerRef.current = new mglMod.Marker({ element: el, anchor: 'bottom' })
             .setLngLat(summitCoords)
@@ -467,7 +465,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              60,
+          pitch:              75,
           bearing:            160,   // default SSE-facing; corrected after OSM load
           attributionControl: false,
           logoPosition:       'bottom-left',
@@ -482,7 +480,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
           readyRef.current = true;
           setReady(true);
           onLoad?.();
-          loadAndRender(lat, lon, diffFilter, mode);
+          loadAndRender(lat, lon, diffFilter, mode, resortName);
         });
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
@@ -502,9 +500,9 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
     if (key === prevKey.current) return;
     prevKey.current = key;
 
-    map.flyTo({ center:[lon,lat], zoom, pitch:60, bearing:160, speed:1.2, curve:1.4 });
+    map.flyTo({ center:[lon,lat], zoom, pitch:75, bearing:160, speed:1.2, curve:1.4 });
     map.once('moveend', () => {
-      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
+      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode, resortName);
     });
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -514,7 +512,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode,
     if (!map || !readyRef.current) return;
     map.setStyle(MAP_STYLE[mode]);
     map.once('styledata', () => {
-      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
+      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode, resortName);
     });
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
