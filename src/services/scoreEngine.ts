@@ -64,29 +64,49 @@ function adjustWeights(profile: RiderProfile | null): Weights {
 }
 
 // ── Season detection ──────────────────────────────────────────────────────────
-// Returns true if it's currently ski season for a given hemisphere/latitude.
-// Uses Northern Hemisphere ski season: Nov 15 – Apr 15.
-// Resorts at low elevation (< 2000ft vertical) tend to close earlier.
+// Returns true if it's currently ski season for a given resort.
+//
+// Close-date tiers based on vertical drop (proxy for resort size/elevation):
+//   < 500 ft   — small Midwest hills (Pine Knob, Brighton MI): close ~Mar 20
+//   500–1499   — mid-size regional:                            close ~Apr 1
+//   1500–2499  — large regionals (Steamboat 3668ft):           close ~Apr 20
+//   2500–3499  — major destination (Vail, Mammoth):            close ~Apr 27
+//   3500+      — high-altitude / year-round (Mammoth, Timberline): close ~May 15
+//
+// IMPORTANT: If the caller knows lifts are actually open (from Liftie),
+// pass isOpenSeason=true in SnowData to override this heuristic entirely.
 export function isSkiSeason(now: Date = new Date(), verticalFt = 1000): boolean {
-  const month = now.getMonth(); // 0-indexed
+  const month = now.getMonth(); // 0-indexed Jan=0
   const day   = now.getDate();
 
-  // Northern hemisphere ski season: Nov 15 – Apr 15
-  const afterNov15  = month === 10 && day >= 15 || month > 10;
-  const beforeApr15 = month === 3  && day <= 15 || month < 3;
-  const inSeason    = afterNov15 || beforeApr15;
+  // Off-season months: May 16 – Nov 14 (always closed)
+  const afterMay15  = (month === 4 && day > 15) || month > 4;
+  const beforeNov15 = month < 10 || (month === 10 && day < 15);
+  if (afterMay15 && beforeNov15) return false;
 
-  if (!inSeason) return false;
+  // Helper: is today after a given month/day?
+  const afterDate = (m: number, d: number) =>
+    month > m || (month === m && day >= d);
 
-  // Small/low-vertical resorts (< 500ft like Pine Knob) close by late March
+  // Small Midwest / low-elevation hills: close ~Mar 20
   if (verticalFt < 500) {
-    const afterMar20 = month === 2 && day >= 20 || month > 2;
-    if (afterMar20) return false;
+    if (afterDate(2, 20)) return false; // after Mar 20
   }
-  // Mid-sized resorts close by early April
-  if (verticalFt < 1500) {
-    const afterApr1 = month === 3 && day >= 1 || month > 3;
-    if (afterApr1) return false;
+  // Mid-size regionals: close ~Apr 1
+  else if (verticalFt < 1500) {
+    if (afterDate(3, 1)) return false;  // after Apr 1
+  }
+  // Large destination resorts (Steamboat 3668ft, Park City, etc.): close ~Apr 20
+  else if (verticalFt < 2500) {
+    if (afterDate(3, 20)) return false; // after Apr 20
+  }
+  // Major western resorts (Vail 3450ft, Jackson 4139ft): close ~Apr 27
+  else if (verticalFt < 4000) {
+    if (afterDate(3, 27)) return false; // after Apr 27
+  }
+  // Very high / year-round (Mammoth 3100+, Timberline): close ~May 15
+  else {
+    if (afterDate(4, 15)) return false; // after May 15
   }
 
   return true;

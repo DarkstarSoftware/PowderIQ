@@ -1,427 +1,386 @@
 // src/components/MapboxMap.tsx
 // 3D ski resort map — Mapbox GL JS, client-only, never SSR'd.
 //
-// Features:
-//  - 3D terrain via Mapbox DEM source + exaggeration
-//  - Colored piste lines from Overpass OSM (real LineString geometry)
-//  - Aerial lift lines (gondola / chairlift / drag)
-//  - Difficulty-coded trail colors matching PowderIQ design system
-//  - 45° pitch with north-up bearing for mountain feel
-//  - flyTo() on resort change — never remounts
-//  - Trail/lift overlays update when diffFilter changes
+// Ikon/Epic-style 3D mountain map:
+//  - Real elevation via Mapbox DEM + 1.5x exaggeration
+//  - Camera auto-orients to face the mountain's fall line (downhill direction)
+//  - 65° pitch for dramatic mountain perspective
+//  - Atmospheric fog + sky layer for depth
+//  - OSM piste LineStrings with difficulty colors + white casing
+//  - Lift lines (red dashed) with name labels
+//  - flyTo() on resort change — never remounts the map
 
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const TOKEN     = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
-const BBOX_PAD  = 0.045; // ~5 km bounding box around resort
-const OVERPASS  = 'https://overpass-api.de/api/interpreter';
+const TOKEN    = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
+const BBOX_PAD = 0.05;
+const OVERPASS = 'https://overpass-api.de/api/interpreter';
 
 export type MapMode = 'trail' | 'satellite' | 'hybrid';
 
 export interface TrailFeature {
-  id: string;
-  trailName: string;
-  difficulty: string;
-  status: string;
+  id: string; trailName: string; difficulty: string; status: string;
 }
 
 interface Props {
-  lat:         number;
-  lon:         number;
-  zoom?:       number;
-  mode:        MapMode;
-  trails?:     TrailFeature[];
-  diffFilter?: string[];
-  onLoad?:     () => void;
+  lat: number; lon: number; zoom?: number; mode: MapMode;
+  trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
-// ── Color system — matches PowderIQ design ────────────────────────────────────
-const PISTE_COLOR: Record<string, string> = {
-  novice:       '#22c55e',   // bright green
-  easy:         '#22c55e',
-  intermediate: '#3b82f6',   // blue
-  advanced:     '#1f2937',   // dark / black
-  expert:       '#111827',
-  freeride:     '#eab308',   // backcountry amber
-};
-const PISTE_WIDTH: Record<string, number> = {
-  novice: 2.5, easy: 2.5, intermediate: 2.5, advanced: 3, expert: 3, freeride: 2,
-};
-const LIFT_COLOR = '#ef4444'; // red for lifts — easy to spot
-
-// ── Map styles ────────────────────────────────────────────────────────────────
 const MAP_STYLE: Record<MapMode, string> = {
   trail:     'mapbox://styles/mapbox/outdoors-v12',
   satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
   hybrid:    'mapbox://styles/mapbox/satellite-v9',
 };
 
-// ── OSM Overpass query: pistes + aerialways with full geometry ─────────────
+// ── Overpass query — pistes + lifts with full node geometry ─────────────────
 function buildQuery(s: number, w: number, n: number, e: number) {
-  const bbox = `${s},${w},${n},${e}`;
-  return `[out:json][timeout:25];
+  return `[out:json][timeout:28];
 (
-  way["piste:type"~"downhill|nordic|snow_park|terrain_park"](${bbox});
-  way["aerialway"~"gondola|chair_lift|drag_lift|t-bar|magic_carpet|rope_tow|cable_car|mixed_lift"](${bbox});
-);\nout body geom;`;
+  way["piste:type"~"downhill|nordic|snow_park|terrain_park"](${s},${w},${n},${e});
+  way["aerialway"~"gondola|chair_lift|drag_lift|t-bar|magic_carpet|rope_tow|cable_car|mixed_lift"](${s},${w},${n},${e});
+);
+out body geom;`;
 }
 
-// ── Parse Overpass response into two GeoJSON FeatureCollections ───────────
-function parseOverpass(data: any) {
-  const runs:  any[] = [];
-  const lifts: any[] = [];
-
+// ── Parse Overpass → two GeoJSON FeatureCollections ─────────────────────────
+function parseOverpass(data: any): { runs: any; lifts: any } {
+  const runs: any[] = [], lifts: any[] = [];
   for (const el of data.elements ?? []) {
     if (el.type !== 'way' || !el.geometry?.length) continue;
     const coords = el.geometry.map((p: any) => [p.lon, p.lat]);
-    const tags   = el.tags ?? {};
-
-    if (tags['piste:type']) {
-      runs.push({
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coords },
-        properties: {
-          name:       tags.name ?? tags['piste:name'] ?? '',
-          difficulty: tags['piste:difficulty'] ?? 'easy',
-          grooming:   tags['piste:grooming'] ?? '',
-          pisteType:  tags['piste:type'],
-        },
-      });
-    } else if (tags.aerialway) {
-      lifts.push({
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: coords },
-        properties: {
-          name:    tags.name ?? '',
-          type:    tags.aerialway,
-        },
-      });
+    const t = el.tags ?? {};
+    if (t['piste:type']) {
+      runs.push({ type:'Feature',
+        geometry:   { type:'LineString', coordinates: coords },
+        properties: { name: t.name ?? t['piste:name'] ?? '',
+          difficulty: t['piste:difficulty'] ?? 'easy',
+          grooming:   t['piste:grooming']   ?? '' }});
+    } else if (t.aerialway) {
+      lifts.push({ type:'Feature',
+        geometry:   { type:'LineString', coordinates: coords },
+        properties: { name: t.name ?? '', aerialway: t.aerialway }});
     }
   }
-
   return {
-    runs:  { type: 'FeatureCollection', features: runs  },
-    lifts: { type: 'FeatureCollection', features: lifts },
+    runs:  { type:'FeatureCollection', features: runs  },
+    lifts: { type:'FeatureCollection', features: lifts },
   };
 }
 
-// ── Add/update 3D terrain + ski layers ────────────────────────────────────
-function setup3D(map: any, runsGeo: any, liftsGeo: any, diffFilter: string[]) {
-  // 3D terrain
+// ── Compute bearing so the camera faces DOWN the mountain ────────────────────
+// We look at the centroid of all piste coordinates and find the direction
+// that points most "downhill" (toward lower latitude = south = typical fall line).
+// If no OSM data, we default bearing to face south (most mountains face south).
+function computeBearing(runs: any): number {
+  const features = runs?.features ?? [];
+  if (features.length === 0) return 180; // default: face south
+
+  // Collect all coords
+  const allCoords: [number, number][] = [];
+  for (const f of features) {
+    for (const c of f.geometry?.coordinates ?? []) {
+      allCoords.push(c as [number, number]);
+    }
+  }
+  if (allCoords.length < 2) return 180;
+
+  // Find highest and lowest lat points (summit → base)
+  const sorted = [...allCoords].sort((a, b) => b[1] - a[1]); // highest lat first
+  const top    = sorted[0];
+  const bottom = sorted[sorted.length - 1];
+
+  // Bearing from top → bottom (the direction you'd ski)
+  const dLon = bottom[0] - top[0];
+  const dLat = bottom[1] - top[1];
+  const bearing = (Math.atan2(dLon, dLat) * 180) / Math.PI;
+
+  // Camera faces the mountain, so opposite direction (viewer is below, looking up)
+  return (bearing + 180) % 360;
+}
+
+// ── 3D terrain + sky + fog + piste/lift layers ───────────────────────────────
+function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: MapMode) {
+  // Terrain DEM
   if (!map.getSource('mapbox-dem')) {
     map.addSource('mapbox-dem', {
       type: 'raster-dem',
-      url:  'mapbox://mapbox.mapbox-terrain-dem-v1',
-      tileSize: 512,
-      maxzoom: 14,
+      url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+      tileSize: 512, maxzoom: 14,
     });
   }
   map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
 
-  // Sky layer for atmosphere
+  // Sky layer — only works on outdoor/satellite styles
   if (!map.getLayer('sky')) {
-    map.addLayer({
-      id: 'sky', type: 'sky',
-      paint: {
-        'sky-type': 'atmosphere',
-        'sky-atmosphere-sun': [0, 60],
-        'sky-atmosphere-sun-intensity': 10,
-        'sky-atmosphere-color': 'rgba(135,206,235,1)',
-        'sky-atmosphere-halo-color': 'rgba(255,255,255,0.5)',
-      },
-    });
+    map.addLayer({ id:'sky', type:'sky', paint: {
+      'sky-type':                    'atmosphere',
+      'sky-atmosphere-sun':          [0.0, 80.0],
+      'sky-atmosphere-sun-intensity': 15,
+      'sky-atmosphere-color':        'rgba(186,210,235,1)',
+      'sky-atmosphere-halo-color':   'rgba(255,255,255,0.6)',
+    }});
   }
 
-  // ── Piste (run) lines ─────────────────────────────────────────────────────
-  // Remove old layers first
-  ['piq-runs-casing','piq-runs','piq-runs-labels',
-   'piq-lifts-casing','piq-lifts','piq-lifts-labels'].forEach(id => {
+  // Fog for depth — makes distant peaks feel atmospheric
+  map.setFog({
+    color:            'rgba(220,235,248,0.6)',
+    'high-color':     'rgba(180,210,240,0.3)',
+    'horizon-blend':  0.06,
+    'space-color':    'rgba(100,160,210,0.8)',
+    'star-intensity': 0.08,
+  });
+
+  // Remove old layers/sources
+  ['piq-runs-case','piq-runs-line','piq-runs-lbl',
+   'piq-lifts-case','piq-lifts-line','piq-lifts-lbl'].forEach(id => {
     if (map.getLayer(id)) map.removeLayer(id);
   });
-  ['piq-runs-src','piq-lifts-src'].forEach(id => {
+  ['piq-runs','piq-lifts'].forEach(id => {
     if (map.getSource(id)) map.removeSource(id);
   });
 
-  // Filter runs by difficulty if filter active
-  const DIFF_MAP: Record<string,string> = {
+  // Difficulty filter
+  const DIFF_OSM: Record<string,string> = {
     green:'easy', blue:'intermediate', black:'advanced',
     double_black:'expert', terrain_park:'terrain_park', backcountry:'freeride',
   };
-  const filteredRuns = diffFilter.length > 0
-    ? {
-        ...runsGeo,
-        features: runsGeo.features.filter((f: any) => {
-          const d = f.properties.difficulty;
-          return diffFilter.some(df => DIFF_MAP[df] === d || df === d);
-        }),
-      }
-    : runsGeo;
+  const filteredRuns = diffFilter.length > 0 ? {
+    ...runs,
+    features: runs.features.filter((f: any) =>
+      diffFilter.some(d => DIFF_OSM[d] === f.properties.difficulty || d === f.properties.difficulty)
+    ),
+  } : runs;
 
-  map.addSource('piq-runs-src', { type: 'geojson', data: filteredRuns });
+  map.addSource('piq-runs',  { type:'geojson', data: filteredRuns });
+  map.addSource('piq-lifts', { type:'geojson', data: lifts });
 
-  // White casing for visibility on satellite
-  map.addLayer({
-    id: 'piq-runs-casing', type: 'line',
-    source: 'piq-runs-src',
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
+  // ── Piste white casing (contrast on satellite) ────────────────────────────
+  map.addLayer({ id:'piq-runs-case', type:'line', source:'piq-runs',
+    layout: { 'line-join':'round', 'line-cap':'round' },
     paint: {
       'line-color': '#ffffff',
-      'line-width': ['match', ['get','difficulty'],
-        'novice',3.5,'easy',3.5,'intermediate',3.5,'advanced',4,'expert',4, 3],
-      'line-opacity': 0.7,
-      'line-blur': 0.5,
+      'line-width': ['interpolate',['linear'],['zoom'], 10,3, 14,5, 16,7],
+      'line-opacity': 0.65,
     },
   });
 
-  // Colored run lines
-  map.addLayer({
-    id: 'piq-runs', type: 'line',
-    source: 'piq-runs-src',
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
+  // ── Piste colored lines ───────────────────────────────────────────────────
+  map.addLayer({ id:'piq-runs-line', type:'line', source:'piq-runs',
+    layout: { 'line-join':'round', 'line-cap':'round' },
     paint: {
       'line-color': ['match', ['get','difficulty'],
-        'novice',   '#22c55e',
-        'easy',     '#22c55e',
-        'intermediate', '#3b82f6',
-        'advanced', '#1f2937',
-        'expert',   '#111827',
-        'freeride', '#eab308',
-        '#3b82f6',
-      ],
-      'line-width': ['match', ['get','difficulty'],
-        'novice',2,'easy',2,'intermediate',2,'advanced',2.5,'expert',2.5, 2],
-      'line-opacity': 0.95,
+        'novice','#22c55e', 'easy','#22c55e',
+        'intermediate','#3b82f6',
+        'advanced','#1e293b', 'expert','#0f172a',
+        'freeride','#d97706',
+        '#3b82f6'],
+      'line-width': ['interpolate',['linear'],['zoom'], 10,1.5, 13,2.5, 15,3.5],
+      'line-opacity': 0.92,
     },
   });
 
-  // Run name labels
-  map.addLayer({
-    id: 'piq-runs-labels', type: 'symbol',
-    source: 'piq-runs-src',
+  // ── Piste name labels ─────────────────────────────────────────────────────
+  map.addLayer({ id:'piq-runs-lbl', type:'symbol', source:'piq-runs',
+    minzoom: 13,
     layout: {
-      'text-field': ['get', 'name'],
-      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-      'text-size': 10,
-      'text-max-width': 8,
       'symbol-placement': 'line-center',
-      'text-offset': [0, 0.6],
+      'text-field':       ['get','name'],
+      'text-font':        ['DIN Pro Bold','Arial Unicode MS Bold'],
+      'text-size':        10,
+      'text-max-width':   6,
+      'text-offset':      [0, 0.5],
     },
     paint: {
-      'text-color': '#ffffff',
-      'text-halo-color': '#000000',
-      'text-halo-width': 1.5,
-      'text-opacity': 0.9,
+      'text-color':       '#ffffff',
+      'text-halo-color':  '#000000',
+      'text-halo-width':  1.5,
+      'text-opacity':     0.95,
     },
   });
 
-  // ── Lift lines ────────────────────────────────────────────────────────────
-  map.addSource('piq-lifts-src', { type: 'geojson', data: liftsGeo });
-
-  // Lift casing
-  map.addLayer({
-    id: 'piq-lifts-casing', type: 'line',
-    source: 'piq-lifts-src',
-    layout: { 'line-join': 'round', 'line-cap': 'butt' },
-    paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.5 },
+  // ── Lift casing ───────────────────────────────────────────────────────────
+  map.addLayer({ id:'piq-lifts-case', type:'line', source:'piq-lifts',
+    layout: { 'line-cap':'butt' },
+    paint: { 'line-color':'#ffffff', 'line-width':4, 'line-opacity':0.4 },
   });
 
-  // Lift line
-  map.addLayer({
-    id: 'piq-lifts', type: 'line',
-    source: 'piq-lifts-src',
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
+  // ── Lift lines (red dashed) ───────────────────────────────────────────────
+  map.addLayer({ id:'piq-lifts-line', type:'line', source:'piq-lifts',
+    layout: { 'line-join':'round', 'line-cap':'round' },
     paint: {
-      'line-color': '#ef4444',
-      'line-width': 2,
-      'line-dasharray': [1.5, 1.5],
-      'line-opacity': 0.9,
+      'line-color':     '#ef4444',
+      'line-width':     2.5,
+      'line-dasharray': [2, 2],
+      'line-opacity':   0.9,
     },
   });
 
-  // Lift labels
-  map.addLayer({
-    id: 'piq-lifts-labels', type: 'symbol',
-    source: 'piq-lifts-src',
+  // ── Lift name labels ──────────────────────────────────────────────────────
+  map.addLayer({ id:'piq-lifts-lbl', type:'symbol', source:'piq-lifts',
+    minzoom: 12,
     layout: {
-      'text-field': ['get', 'name'],
-      'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
-      'text-size': 9,
       'symbol-placement': 'line-center',
+      'text-field':       ['get','name'],
+      'text-font':        ['DIN Pro Medium','Arial Unicode MS Regular'],
+      'text-size':        9,
     },
     paint: {
-      'text-color': '#ef4444',
+      'text-color':      '#ef4444',
       'text-halo-color': '#ffffff',
       'text-halo-width': 1.5,
-      'text-opacity': 0.85,
+      'text-opacity':    0.9,
     },
   });
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function MapboxMap({
-  lat, lon, zoom = 13, mode,
-  trails = [], diffFilter = [], onLoad,
-}: Props) {
+export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diffFilter = [], onLoad }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const mapRef        = useRef<any>(null);
   const readyRef      = useRef(false);
-  const osmCacheRef   = useRef<Map<string, {runs:any;lifts:any}>>(new Map());
-  const currentKeyRef = useRef('');
+  const osmCache      = useRef<Map<string,{runs:any;lifts:any}>>(new Map());
+  const prevKey       = useRef('');
+  const [error,   setError]   = useState('');
+  const [ready,   setReady]   = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const [error,    setError]    = useState('');
-  const [ready,    setReady]    = useState(false);
-  const [loading,  setLoading]  = useState(false);
-
-  // ── Fetch OSM piste/lift geometry and render ──────────────────────────────
-  const loadAndRender = useCallback(async (
-    map: any, _lat: number, _lon: number, df: string[]
-  ) => {
+  // ── Fetch OSM + render ────────────────────────────────────────────────────
+  const loadAndRender = useCallback(async (_lat: number, _lon: number, _df: string[], _mode: MapMode) => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
     setLoading(true);
 
-    let geo = osmCacheRef.current.get(key);
-
+    let geo = osmCache.current.get(key);
     if (!geo) {
       try {
         const s = _lat - BBOX_PAD, n = _lat + BBOX_PAD;
         const w = _lon - BBOX_PAD, e = _lon + BBOX_PAD;
         const res = await fetch(OVERPASS, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
-          signal:  AbortSignal.timeout(25_000),
+          method: 'POST',
+          headers: { 'Content-Type':'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
+          signal: AbortSignal.timeout(26_000),
         });
         if (res.ok) {
-          const data = await res.json();
-          geo = parseOverpass(data);
-          osmCacheRef.current.set(key, geo);
+          geo = parseOverpass(await res.json());
+          osmCache.current.set(key, geo);
         }
       } catch (e) {
-        console.warn('[MapboxMap] Overpass failed:', e);
-        geo = { runs: { type:'FeatureCollection', features:[] }, lifts: { type:'FeatureCollection', features:[] } };
+        console.warn('[MapboxMap] Overpass:', e);
       }
+      if (!geo) geo = {
+        runs:  { type:'FeatureCollection', features:[] },
+        lifts: { type:'FeatureCollection', features:[] },
+      };
     }
 
-    if (geo && readyRef.current) {
+    if (readyRef.current) {
       try {
-        setup3D(map, geo.runs, geo.lifts, df);
+        // Compute the best bearing to face the mountain front
+        const bearing = computeBearing(geo.runs);
+
+        // Adjust camera bearing without full flyTo (already at location)
+        map.easeTo({ bearing, pitch: 65, duration: 1200 });
+
+        setup3D(map, geo.runs, geo.lifts, _df, _mode);
       } catch (e) {
-        // Style may have changed mid-flight — ignore
+        console.warn('[MapboxMap] setup3D:', e);
       }
     }
     setLoading(false);
   }, []);
 
-  // ── One-time map init ─────────────────────────────────────────────────────
+  // ── Init map ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     if (!TOKEN) { setError('Mapbox token not configured'); return; }
-
     let map: any;
-
     (async () => {
       try {
-        if (typeof document !== 'undefined' && !document.getElementById('mapbox-gl-css')) {
-          const link = document.createElement('link');
-          link.id   = 'mapbox-gl-css';
-          link.rel  = 'stylesheet';
-          link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css';
-          document.head.appendChild(link);
+        if (!document.getElementById('mapbox-gl-css')) {
+          const l = document.createElement('link');
+          l.id = 'mapbox-gl-css'; l.rel = 'stylesheet';
+          l.href = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css';
+          document.head.appendChild(l);
         }
-
         // @ts-ignore
-        const mapboxgl = (await import('mapbox-gl')).default;
+        const mgl = (await import('mapbox-gl')).default;
         // @ts-ignore
-        mapboxgl.accessToken = TOKEN;
+        mgl.accessToken = TOKEN;
 
-        map = new mapboxgl.Map({
+        map = new mgl.Map({
           container:          containerRef.current!,
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              52,          // 3D camera angle
-          bearing:            -15,         // slight rotation looks great on mountains
+          pitch:              65,
+          bearing:            180,   // default south-facing; corrected after OSM load
           attributionControl: false,
           logoPosition:       'bottom-left',
           antialias:          true,
         });
 
-        map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
-        map.addControl(new mapboxgl.NavigationControl({ showCompass: true,  visualizePitch: true }), 'top-right');
+        map.addControl(new mgl.AttributionControl({ compact:true }), 'bottom-left');
+        map.addControl(new mgl.NavigationControl({ showCompass:true, visualizePitch:true }), 'top-right');
 
         map.on('load', () => {
           mapRef.current   = map;
           readyRef.current = true;
           setReady(true);
           onLoad?.();
-          loadAndRender(map, lat, lon, diffFilter);
+          loadAndRender(lat, lon, diffFilter, mode);
         });
-
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
         });
       } catch (e: any) {
-        console.error('[MapboxMap] init failed', e);
         setError(e?.message ?? 'Map failed to load');
       }
     })();
-
-    return () => {
-      readyRef.current = false;
-      mapRef.current = null;
-      map?.remove();
-    };
+    return () => { readyRef.current = false; mapRef.current = null; map?.remove(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Fly to new resort + reload OSM data ──────────────────────────────────
+  // ── Fly to new resort ─────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current || !lat || !lon) return;
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-    if (key === currentKeyRef.current) return;
-    currentKeyRef.current = key;
+    if (key === prevKey.current) return;
+    prevKey.current = key;
 
-    map.flyTo({
-      center:  [lon, lat],
-      zoom,
-      pitch:   52,
-      bearing: -15,
-      speed:   1.2,
-      curve:   1.4,
-    });
-
-    // Load OSM data for new resort after fly animation starts
+    map.flyTo({ center:[lon,lat], zoom, pitch:65, bearing:180, speed:1.2, curve:1.4 });
     map.once('moveend', () => {
-      if (readyRef.current) loadAndRender(map, lat, lon, diffFilter);
+      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
     });
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Switch style ──────────────────────────────────────────────────────────
+  // ── Style switch ──────────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     map.setStyle(MAP_STYLE[mode]);
     map.once('styledata', () => {
-      if (readyRef.current) loadAndRender(map, lat, lon, diffFilter);
+      if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
     });
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Update trail filter ───────────────────────────────────────────────────
+  // ── Diff filter update ────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-    const geo = osmCacheRef.current.get(key);
+    const geo = osmCache.current.get(key);
     if (geo) {
-      try { setup3D(map, geo.runs, geo.lifts, diffFilter); } catch (e) { /* style changing */ }
+      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode); } catch (_) { /* style changing */ }
     }
   }, [diffFilter, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return (
     <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',
-      justifyContent:'center',background:'#f0f5fb',borderRadius:16,
-      flexDirection:'column',gap:10}}>
+      justifyContent:'center',background:'#f0f5fb',borderRadius:16,flexDirection:'column',gap:10}}>
       <span style={{fontSize:32}}>🗺️</span>
       <span style={{fontSize:12,color:'#6b849a',maxWidth:220,textAlign:'center'}}>{error}</span>
     </div>
@@ -430,14 +389,14 @@ export default function MapboxMap({
   return (
     <div style={{position:'relative',width:'100%',height:'100%',borderRadius:16,overflow:'hidden'}}>
       <div ref={containerRef} style={{width:'100%',height:'100%'}}/>
-      {/* Loading spinner while fetching OSM data */}
       {loading && (
-        <div style={{position:'absolute',bottom:12,right:50,
-          background:'rgba(255,255,255,0.92)',backdropFilter:'blur(6px)',
-          borderRadius:8,padding:'5px 10px',display:'flex',alignItems:'center',
-          gap:6,fontSize:11,color:'#3d5166',boxShadow:'0 2px 8px rgba(15,40,80,0.12)'}}>
-          <div style={{width:10,height:10,border:'2px solid #dbeafe',
-            borderTopColor:'#1d6ef5',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+        <div style={{position:'absolute',bottom:14,right:52,background:'rgba(255,255,255,0.9)',
+          backdropFilter:'blur(8px)',borderRadius:8,padding:'5px 10px',
+          display:'flex',alignItems:'center',gap:6,
+          fontSize:11,color:'#3d5166',boxShadow:'0 2px 8px rgba(15,40,80,0.12)',
+          border:'1px solid rgba(100,150,200,0.2)'}}>
+          <div style={{width:10,height:10,border:'2px solid #dbeafe',borderTopColor:'#1d6ef5',
+            borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
           Loading trails…
         </div>
       )}

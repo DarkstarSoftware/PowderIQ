@@ -34,8 +34,25 @@ export async function getMountainScore(
   // Calculate vertical drop — used for calibrating thresholds and season detection
   const verticalFt = (mountain.topElevFt ?? 3000) - (mountain.baseElevFt ?? 1000);
 
-  // Season check before fetching weather data — no point hitting APIs for closed resorts
-  const inSeason = isSkiSeason(now, verticalFt);
+  // Season check — heuristic based on vertical drop.
+  // Override: if Liftie reports open lifts for this mountain, it's definitely open.
+  // We check the Liftie slug-based lift status as a live signal.
+  let inSeason = isSkiSeason(now, verticalFt);
+
+  if (!inSeason) {
+    // Cross-check: if there are open LiftStatus records in the DB, resort is open
+    const resort = await prisma.resort.findFirst({
+      where: { mountainId },
+      select: { id: true },
+    });
+    if (resort) {
+      const openLifts = await prisma.liftStatus.count({
+        where: { resortId: resort.id, status: 'open' },
+      });
+      if (openLifts > 0) inSeason = true;
+    }
+  }
+
   if (!inSeason) {
     const result = {
       score: 0,
