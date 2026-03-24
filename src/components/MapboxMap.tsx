@@ -24,14 +24,14 @@ export interface TrailFeature {
 }
 
 interface Props {
-  lat: number; lon: number; zoom?: number; mode: MapMode;
+  lat: number; lon: number; zoom?: number; mode: MapMode; // zoom default 12 = whole resort visible
   trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
 const MAP_STYLE: Record<MapMode, string> = {
   trail:     'mapbox://styles/mapbox/outdoors-v12',
-  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',
-  hybrid:    'mapbox://styles/mapbox/satellite-v9',
+  satellite: 'mapbox://styles/mapbox/satellite-streets-v12',  // labels + satellite
+  hybrid:    'mapbox://styles/mapbox/satellite-v9',            // pure satellite, cleanest
 };
 
 // ── Overpass query — pistes + lifts with full node geometry ─────────────────
@@ -69,42 +69,46 @@ function parseOverpass(data: any): { runs: any; lifts: any } {
   };
 }
 
-// ── Compute bearing so the camera faces the SKI FRONT of the mountain ────────
-// Strategy: find the summit (highest lat point cluster) and the base (lowest).
-// The camera sits at/near the base and looks TOWARD the summit.
-// Bearing = direction FROM base TO summit = looking UP the mountain face.
+// ── Compute the map bearing so the ski face is front-and-center ─────────────
+// The camera is positioned ABOVE the mountain looking DOWN at ~50° pitch.
+// "Bearing" rotates the map so the ski face points toward the viewer.
+// 
+// Strategy:
+//   1. Find summit cluster (top 15% by lat) and base cluster (bottom 15%).
+//   2. The ski face runs from summit → base. We want this vector pointing
+//      TOWARD the bottom of the screen (toward the viewer).
+//   3. So bearing = direction FROM summit TO base (downhill vector).
+//      That rotates the map so "downhill" points toward you.
 function computeBearing(runs: any): number {
   const features = runs?.features ?? [];
-  if (features.length === 0) return 180; // default south-facing
+  if (features.length < 3) return 160; // south-southeast default for most NA resorts
 
-  const allCoords: [number, number][] = [];
+  const all: [number, number][] = [];
   for (const f of features) {
-    for (const c of f.geometry?.coordinates ?? []) {
-      allCoords.push(c as [number, number]);
-    }
+    for (const c of f.geometry?.coordinates ?? []) all.push(c as [number, number]);
   }
-  if (allCoords.length < 4) return 180;
+  if (all.length < 8) return 160;
 
-  // Sort by elevation proxy (lat — higher lat ≈ further north, but elevation
-  // varies; we use the spread of coordinates to find the dominant slope direction)
-  const sorted = [...allCoords].sort((a, b) => b[1] - a[1]);
-  // Take centroid of top 20% coords as "summit cluster"
-  const topN   = Math.max(1, Math.floor(sorted.length * 0.2));
-  const botN   = Math.max(1, Math.floor(sorted.length * 0.2));
-  const summit = sorted.slice(0, topN);
-  const base   = sorted.slice(sorted.length - botN);
+  // Use lon as x, lat as y. Higher lat = further north = typically higher elevation.
+  const byLat = [...all].sort((a, b) => b[1] - a[1]);
+  const n     = Math.max(3, Math.floor(byLat.length * 0.15));
 
-  const sumLon = summit.reduce((s, c) => s + c[0], 0) / summit.length;
-  const sumLat = summit.reduce((s, c) => s + c[1], 0) / summit.length;
-  const basLon = base.reduce((s, c)   => s + c[0], 0) / base.length;
-  const basLat = base.reduce((s, c)   => s + c[1], 0) / base.length;
+  // Summit centroid (highest lat cluster)
+  const summit = byLat.slice(0, n);
+  const sLon   = summit.reduce((s, c) => s + c[0], 0) / summit.length;
+  const sLat   = summit.reduce((s, c) => s + c[1], 0) / summit.length;
 
-  // Bearing FROM base centroid TO summit centroid
-  // Camera sits near base and looks toward summit → this is the bearing we want
-  const dLon = sumLon - basLon;
-  const dLat = sumLat - basLat;
+  // Base centroid (lowest lat cluster)
+  const base   = byLat.slice(byLat.length - n);
+  const bLon   = base.reduce((s, c) => s + c[0], 0) / base.length;
+  const bLat   = base.reduce((s, c) => s + c[1], 0) / base.length;
+
+  // Direction from summit DOWN to base (this is the fall-line / ski direction)
+  // We rotate the map so this vector points toward the bottom of the screen
+  const dLon = bLon - sLon;
+  const dLat = bLat - sLat;
   const bearing = (Math.atan2(dLon, dLat) * 180) / Math.PI;
-  return (bearing + 360) % 360; // normalize 0-360, no +180 flip
+  return (bearing + 360) % 360;
 }
 
 // ── 3D terrain + sky + fog + piste/lift layers ───────────────────────────────
@@ -132,12 +136,12 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
       id: 'piq-hillshade', type: 'hillshade',
       source: 'piq-hillshade-src',
       paint: {
-        'hillshade-illumination-direction': 315, // NW light source
+        'hillshade-illumination-direction': 315, // NW light source — classic ski map lighting
         'hillshade-illumination-anchor':    'map',
-        'hillshade-exaggeration':           0.55,
-        'hillshade-shadow-color':           '#1e3a5f',  // cool blue shadow
-        'hillshade-highlight-color':        '#ffffff',
-        'hillshade-accent-color':           '#9ec5e8',
+        'hillshade-exaggeration':           0.7,  // strong shadows show terrain depth
+        'hillshade-shadow-color':           '#1a3a5c',  // deep blue shadow (like reference)
+        'hillshade-highlight-color':        '#f8fbff',  // bright white peaks
+        'hillshade-accent-color':           '#7bafd4',  // blue-gray mid tones
       },
     }, 'waterway-label'); // insert below labels
   }
@@ -160,8 +164,8 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
       map.addLayer({
         id: 'piq-snow-tint', type: 'background',
         paint: {
-          'background-color': '#eef6ff',   // soft snow white-blue
-          'background-opacity': 0.18,       // subtle — terrain still shows through
+          'background-color': '#ddeeff',   // cool snow-blue tint
+          'background-opacity': mode === 'satellite' ? 0 : 0.22, // skip on satellite
         },
       }, 'piq-hillshade');
     }
@@ -338,7 +342,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
         const bearing = computeBearing(geo.runs);
 
         // Adjust camera bearing without full flyTo (already at location)
-        map.easeTo({ bearing, pitch: 65, duration: 1200 });
+        map.easeTo({ bearing, pitch: 50, duration: 1200 });
 
         setup3D(map, geo.runs, geo.lifts, _df, _mode);
       } catch (e) {
@@ -371,8 +375,8 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
           style:              MAP_STYLE[mode],
           center:             [lon, lat],
           zoom,
-          pitch:              65,
-          bearing:            180,   // default south-facing; corrected after OSM load
+          pitch:              50,
+          bearing:            160,   // default SSE-facing; corrected after OSM load
           attributionControl: false,
           logoPosition:       'bottom-left',
           antialias:          true,
@@ -406,7 +410,7 @@ export default function MapboxMap({ lat, lon, zoom = 13, mode, trails = [], diff
     if (key === prevKey.current) return;
     prevKey.current = key;
 
-    map.flyTo({ center:[lon,lat], zoom, pitch:65, bearing:180, speed:1.2, curve:1.4 });
+    map.flyTo({ center:[lon,lat], zoom, pitch:50, bearing:160, speed:1.2, curve:1.4 });
     map.once('moveend', () => {
       if (readyRef.current) loadAndRender(lat, lon, diffFilter, mode);
     });

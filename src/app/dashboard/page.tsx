@@ -304,7 +304,7 @@ export default function DashboardPage() {
   const [scoreData,    setScoreData]    = useState<MountainScore | null>(null);
   const [forecast,     setForecast]     = useState<ForecastPeriod[]>([]);
   const [scoreLoading, setScoreLoading] = useState(false);
-  const [mapMode,      setMapMode]      = useState<'trail'|'satellite'|'hybrid'>('satellite');
+  const [mapMode,      setMapMode]      = useState<'trail'|'satellite'|'hybrid'>('hybrid');
   const [diffFilter,   setDiffFilter]   = useState<string[]>([]);
   const [lifts,        setLifts]        = useState<Lift[]>([]);
   const [liftieStats,  setLiftieStats]  = useState<{open:number;hold:number;scheduled:number;closed:number}|null>(null);
@@ -913,7 +913,7 @@ export default function DashboardPage() {
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
-                zoom={13}
+                zoom={12}
                 mode={mapMode}
                 trails={trails}
                 diffFilter={diffFilter}
