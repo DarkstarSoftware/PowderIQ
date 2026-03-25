@@ -589,7 +589,7 @@ export default function MapboxMap({
     const cachedGeo = osmCache.current.get(key) ?? null;
     const initCam = computeCamera(cachedGeo, lat, lon, zoom);
     map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });
-    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
+    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mode switch ───────────────────────────────────────────────────────
