@@ -566,7 +566,6 @@ export default function DashboardPage() {
   // OR when explanation explicitly says closed regardless of score value
   const isClosed = !scoreLoading && activeFav !== null && (
     (score === 0 && (
-      scoreData?.explanation?.toLowerCase().includes('closed') ||
       scoreData?.conditionDesc?.toLowerCase().includes('closed') ||
       // No live lifts open and heuristic says off-season
       (liftieStats !== null && (liftieStats.open ?? 0) === 0 &&
