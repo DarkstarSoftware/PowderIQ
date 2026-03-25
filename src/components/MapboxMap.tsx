@@ -433,6 +433,7 @@ export default function MapboxMap({
   const readyRef      = useRef(false);
   const osmCache      = useRef<Map<string, { runs: any; lifts: any }>>(new Map());
   const prevKey       = useRef('');
+  const activeKeyRef  = useRef('');
   const markerRef     = useRef<any>(null);
   const liftMarkersRef = useRef<any[]>([]);
   const [error,   setError]   = useState('');
