@@ -973,6 +973,20 @@ export default function DashboardPage() {
                   .filter(f => f.id !== activeFav.id && f.mountain.latitude)
                   .map(f => [f.mountain.latitude!, f.mountain.longitude ?? 0] as [number,number])
                   .slice(0, 4)}
+                bestZone={activeFav && score > 0 ? (() => {
+                  // Best zone = near summit if powder, near base if groomed
+                  const snow24 = scoreData?.snowfall24hIn ?? 0;
+                  const hasPowder = snow24 > 2;
+                  // Offset toward summit (north) for powder, stay near center for groomed
+                  const offsetLat = hasPowder ? 0.008 : 0.003;
+                  return {
+                    lat: activeFav.mountain.latitude + offsetLat,
+                    lon: activeFav.mountain.longitude ?? 0,
+                    radiusKm: hasPowder ? 1.5 : 1.0,
+                    label: hasPowder ? 'Powder Zone' : 'Groomed Zone',
+                  };
+                })() : null}
+                liftStatuses={Object.fromEntries(lifts.map(l => [l.liftName, l.status]))}
                 zoom={(() => {
                   const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
                   if (vft < 400)  return 14.5;

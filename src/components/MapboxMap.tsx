@@ -1,11 +1,22 @@
 // src/components/MapboxMap.tsx
-// 3D ski resort map — Mapbox GL JS, client-only, never SSR'd.
+// Ikon/Epic-style 3D ski resort map — Mapbox GL JS, client-only.
+//
+// Features:
+//   - Satellite imagery + 3D terrain (DEM exaggeration)
+//   - Colored piste lines + white casing (green/blue/black/red)
+//   - Lift lines (red dashed) with labels
+//   - Best Runs heat-map glow — orange/amber highlight over recommended zone
+//   - Live lift status dots at base stations
+//   - Summit peak pin at farthest ski coordinate
+//   - Full free-camera: user can pan/rotate/zoom/tilt anywhere
+//   - Base-anchored 45° pitch so full mountain face is visible
+//   - Prefetch OSM for all saved resorts on idle
 
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 const TOKEN    = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
-const BBOX_PAD = 0.04; // smaller bbox = faster Overpass
+const BBOX_PAD = 0.04;
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 
 export type MapMode = 'trail' | 'satellite' | 'hybrid';
@@ -14,10 +25,19 @@ export interface TrailFeature {
   id: string; trailName: string; difficulty: string; status: string;
 }
 
+// Best run zone passed from the parent (derived from score + trail data)
+export interface BestZone {
+  lat: number; lon: number; // center of the best zone
+  radiusKm: number;         // approx radius to highlight
+  label: string;            // e.g. "Sunshine Peak"
+}
+
 interface Props {
   lat: number; lon: number; zoom?: number; mode: MapMode;
   resortName?: string;
-  prefetchCoords?: [number, number][]; // other saved resort coords to pre-warm
+  bestZone?: BestZone | null;          // highlight zone for "Best Area Right Now"
+  liftStatuses?: Record<string, string>; // liftName → 'open'|'closed'|'on_hold'
+  prefetchCoords?: [number, number][];
   trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
@@ -27,7 +47,7 @@ const MAP_STYLE: Record<MapMode, string> = {
   hybrid:    'mapbox://styles/mapbox/satellite-v9',
 };
 
-// ── Overpass query ─────────────────────────────────────────────────────────
+// ── Overpass ──────────────────────────────────────────────────────────────
 function buildQuery(s: number, w: number, n: number, e: number) {
   return `[out:json][timeout:28];
 (
@@ -37,7 +57,6 @@ function buildQuery(s: number, w: number, n: number, e: number) {
 out body geom;`;
 }
 
-// ── Parse Overpass response ─────────────────────────────────────────────────
 function parseOverpass(data: any): { runs: any; lifts: any } {
   const runs: any[] = [], lifts: any[] = [];
   for (const el of data.elements ?? []) {
@@ -62,17 +81,17 @@ function parseOverpass(data: any): { runs: any; lifts: any } {
   };
 }
 
-// ── Summit pin element ─────────────────────────────────────────────────────
+// ── Summit pin ────────────────────────────────────────────────────────────
 function createPinEl(label: string): HTMLElement {
   const el = document.createElement('div');
   el.style.cssText = [
-    'display:flex', 'align-items:center', 'gap:5px',
+    'display:flex','align-items:center','gap:5px',
     'background:rgba(255,255,255,0.95)',
-    'backdrop-filter:blur(8px)', '-webkit-backdrop-filter:blur(8px)',
+    'backdrop-filter:blur(8px)','-webkit-backdrop-filter:blur(8px)',
     'border:1px solid rgba(100,150,200,0.25)',
-    'border-radius:8px', 'padding:4px 10px',
-    'font-size:11px', 'font-weight:700',
-    'color:#0d1b2e', 'white-space:nowrap',
+    'border-radius:8px','padding:4px 10px',
+    'font-size:11px','font-weight:700',
+    'color:#0d1b2e','white-space:nowrap',
     'box-shadow:0 2px 10px rgba(15,40,80,0.18)',
     'pointer-events:none',
   ].join(';');
@@ -80,9 +99,23 @@ function createPinEl(label: string): HTMLElement {
   return el;
 }
 
-// ── Find summit: farthest ski coordinate from resort center ─────────────────
-// Does NOT rely on OSM way encoding direction.
-// The summit is the point most distant from the resort's geographic center.
+// ── Live lift status dot ───────────────────────────────────────────────────
+function createLiftDot(status: string): HTMLElement {
+  const el = document.createElement('div');
+  const color = status === 'open' ? '#22c55e'
+              : status === 'on_hold' ? '#f59e0b'
+              : '#ef4444';
+  el.style.cssText = [
+    `width:10px`, `height:10px`,
+    `border-radius:50%`,
+    `background:${color}`,
+    `border:2px solid rgba(255,255,255,0.9)`,
+    `box-shadow:0 0 6px ${color}88`,
+  ].join(';');
+  return el;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
 function findSummitCoord(
   geo: { runs: any; lifts: any },
   centerLat: number, centerLon: number
@@ -101,26 +134,95 @@ function findSummitCoord(
   return best;
 }
 
-// ── Auto-zoom from ski area footprint ─────────────────────────────────────
 function computeAutoZoom(geo: { runs: any; lifts: any }, fallback: number): number {
   const all: [number, number][] = [];
   for (const f of [...(geo.runs?.features ?? []), ...(geo.lifts?.features ?? [])]) {
     for (const c of f.geometry?.coordinates ?? []) all.push(c as [number, number]);
   }
   if (all.length < 4) return fallback;
-  const lats = all.map(c => c[1]);
-  const lons = all.map(c => c[0]);
+  const lats = all.map(c => c[1]), lons = all.map(c => c[0]);
+  const midLat = (Math.max(...lats) + Math.min(...lats)) / 2;
   const dLat = (Math.max(...lats) - Math.min(...lats)) * 111;
-  const dLon = (Math.max(...lons) - Math.min(...lons)) * 111 *
-    Math.cos(((Math.max(...lats) + Math.min(...lats)) / 2) * Math.PI / 180);
+  const dLon = (Math.max(...lons) - Math.min(...lons)) * 111 * Math.cos(midLat * Math.PI / 180);
   const spanKm = Math.max(Math.hypot(dLat, dLon), 0.3);
-  // 0.3km → 14.5, 1km → 13.5, 3km → 12.5, 8km → 11.5, 20km → 10.5
   return Math.max(10.5, Math.min(14.5, 14.5 - Math.log2(spanKm / 0.3)));
 }
 
-// ── 3D layers ─────────────────────────────────────────────────────────────
-function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: MapMode) {
-  // Terrain
+// ── Camera from lift endpoints ─────────────────────────────────────────────
+interface CameraParams { center:[number,number]; bearing:number; zoom:number; pitch:number; }
+
+function computeCamera(
+  geo: { runs:any; lifts:any } | null,
+  resortLat: number, resortLon: number, fallbackZoom: number,
+): CameraParams {
+  const def: CameraParams = { center:[resortLon,resortLat], bearing:0, zoom:fallbackZoom, pitch:45 };
+  if (!geo) return def;
+  const allLifts = geo.lifts?.features ?? [];
+  if (allLifts.length === 0) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
+
+  const baseNodes: [number,number][] = allLifts
+    .map((f:any) => f.geometry?.coordinates?.[0]).filter(Boolean);
+  const sumNodes: [number,number][] = allLifts
+    .map((f:any) => { const c = f.geometry?.coordinates; return c?.[c.length-1]; }).filter(Boolean);
+
+  if (!baseNodes.length || !sumNodes.length)
+    return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
+
+  const baseLon = baseNodes.reduce((s,c)=>s+c[0],0)/baseNodes.length;
+  const baseLat = baseNodes.reduce((s,c)=>s+c[1],0)/baseNodes.length;
+  const sumLon  = sumNodes.reduce((s,c)=>s+c[0],0)/sumNodes.length;
+  const sumLat  = sumNodes.reduce((s,c)=>s+c[1],0)/sumNodes.length;
+
+  const dLon = sumLon - baseLon;
+  const dLat = sumLat - baseLat;
+  const bearing = ((Math.atan2(dLon, dLat) * 180 / Math.PI) + 360) % 360;
+
+  // Position camera BEHIND base at 45° — shows full mountain face like Image 2
+  const camLon = baseLon - dLon * 0.6;
+  const camLat = baseLat - dLat * 0.6;
+
+  return { center:[camLon,camLat], bearing, zoom:computeAutoZoom(geo,fallbackZoom), pitch:45 };
+}
+
+// ── Build best-zone heat map GeoJSON ──────────────────────────────────────
+// Creates a circle of points around the best zone center for a heatmap layer
+function buildBestZoneGeoJSON(zone: BestZone): any {
+  const points: any[] = [];
+  // Dense center point (highest weight)
+  for (let i = 0; i < 8; i++) {
+    points.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [zone.lon, zone.lat] },
+      properties: { weight: 1.0 },
+    });
+  }
+  // Ring of points around center
+  const steps = 16;
+  const degPerKm = 1 / 111;
+  for (let i = 0; i < steps; i++) {
+    const angle = (i / steps) * 2 * Math.PI;
+    const r = zone.radiusKm * degPerKm;
+    points.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [
+        zone.lon + Math.sin(angle) * r,
+        zone.lat + Math.cos(angle) * r,
+      ]},
+      properties: { weight: 0.4 },
+    });
+  }
+  return { type: 'FeatureCollection', features: points };
+}
+
+// ── Main 3D setup function ─────────────────────────────────────────────────
+function setup3D(
+  map: any,
+  runs: any, lifts: any,
+  diffFilter: string[],
+  mode: MapMode,
+  bestZone: BestZone | null | undefined,
+) {
+  // ── Terrain ───────────────────────────────────────────────────────────────
   if (!map.getSource('mapbox-dem')) {
     map.addSource('mapbox-dem', {
       type: 'raster-dem',
@@ -130,7 +232,7 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
   }
   map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
 
-  // Hillshade
+  // ── Hillshade ─────────────────────────────────────────────────────────────
   if (!map.getLayer('piq-hillshade')) {
     if (!map.getSource('piq-dem-src')) {
       map.addSource('piq-dem-src', {
@@ -144,34 +246,32 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
       paint: {
         'hillshade-illumination-direction': 315,
         'hillshade-illumination-anchor':    'map',
-        'hillshade-exaggeration':           0.7,
+        'hillshade-exaggeration':           0.65,
         'hillshade-shadow-color':           '#1a3a5c',
-        'hillshade-highlight-color':        '#f8fbff',
+        'hillshade-highlight-color':        '#f0f7ff',
         'hillshade-accent-color':           '#7bafd4',
       },
     });
   }
 
-  // Sky
+  // ── Sky + Fog ─────────────────────────────────────────────────────────────
   if (!map.getLayer('sky')) {
     map.addLayer({ id: 'sky', type: 'sky', paint: {
       'sky-type':                     'atmosphere',
-      'sky-atmosphere-sun':           [0.0, 80.0],
-      'sky-atmosphere-sun-intensity': 15,
+      'sky-atmosphere-sun':           [0.0, 75.0],
+      'sky-atmosphere-sun-intensity': 12,
       'sky-atmosphere-color':         'rgba(186,210,235,1)',
-      'sky-atmosphere-halo-color':    'rgba(255,255,255,0.6)',
+      'sky-atmosphere-halo-color':    'rgba(255,255,255,0.5)',
     }});
   }
-
-  // Fog
   map.setFog({
-    color:           'rgba(220,235,248,0.6)',
-    'high-color':    'rgba(180,210,240,0.3)',
-    'horizon-blend': 0.06,
+    color:           'rgba(220,235,248,0.5)',
+    'high-color':    'rgba(180,210,240,0.2)',
+    'horizon-blend': 0.05,
     'space-color':   'rgba(100,160,210,0.8)',
   });
 
-  // Snow tint + forest (trail/satellite-streets only — skip pure satellite)
+  // ── Snow tint + forest (non-satellite modes) ───────────────────────────────
   ['piq-forest','piq-snow-cap'].forEach(id => {
     try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) {}
   });
@@ -181,26 +281,70 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
         source: 'composite', 'source-layer': 'landcover',
         filter: ['match', ['get', 'class'], ['wood', 'scrub'], true, false],
         paint: { 'fill-color': '#2d5a1b',
-          'fill-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.6, 14, 0.45] },
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.55, 14, 0.4] },
       }, 'piq-hillshade');
     } catch (_) {}
     try {
       map.addLayer({ id: 'piq-snow-cap', type: 'background',
-        paint: { 'background-color': '#ddeeff', 'background-opacity': 0.25 },
+        paint: { 'background-color': '#ddeeff', 'background-opacity': 0.22 },
       });
     } catch (_) {}
   }
 
-  // Remove old piste/lift layers
-  ['piq-runs-case','piq-runs-line','piq-runs-lbl',
+  // ── Remove old layers ─────────────────────────────────────────────────────
+  ['piq-best-zone','piq-best-zone-glow',
+   'piq-runs-case','piq-runs-line','piq-runs-lbl',
    'piq-lifts-case','piq-lifts-line','piq-lifts-lbl'].forEach(id => {
     try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) {}
   });
-  ['piq-runs','piq-lifts'].forEach(id => {
+  ['piq-runs','piq-lifts','piq-best-zone-src'].forEach(id => {
     try { if (map.getSource(id)) map.removeSource(id); } catch (_) {}
   });
 
-  // Filter runs by difficulty
+  // ── Best Zone Heat Map ────────────────────────────────────────────────────
+  // Orange/amber glow over the recommended ski area — like Image 2
+  if (bestZone) {
+    map.addSource('piq-best-zone-src', {
+      type: 'geojson',
+      data: buildBestZoneGeoJSON(bestZone),
+    });
+
+    // Outer glow (wide, soft)
+    map.addLayer({ id: 'piq-best-zone-glow', type: 'heatmap',
+      source: 'piq-best-zone-src',
+      paint: {
+        'heatmap-weight':   ['get', 'weight'],
+        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 10, 0.8, 14, 1.5],
+        'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 10, 60, 14, 120],
+        'heatmap-opacity':  0.55,
+        'heatmap-color':    ['interpolate', ['linear'], ['heatmap-density'],
+          0,    'rgba(255,200,50,0)',
+          0.2,  'rgba(255,160,20,0.3)',
+          0.5,  'rgba(255,120,10,0.55)',
+          0.8,  'rgba(255,80,0,0.65)',
+          1.0,  'rgba(255,50,0,0.7)',
+        ],
+      },
+    });
+
+    // Inner bright core
+    map.addLayer({ id: 'piq-best-zone', type: 'heatmap',
+      source: 'piq-best-zone-src',
+      paint: {
+        'heatmap-weight':   ['get', 'weight'],
+        'heatmap-intensity': 2,
+        'heatmap-radius':   ['interpolate', ['linear'], ['zoom'], 10, 20, 14, 40],
+        'heatmap-opacity':  0.4,
+        'heatmap-color':    ['interpolate', ['linear'], ['heatmap-density'],
+          0,   'rgba(255,240,100,0)',
+          0.5, 'rgba(255,220,50,0.5)',
+          1.0, 'rgba(255,200,0,0.8)',
+        ],
+      },
+    });
+  }
+
+  // ── Piste runs ────────────────────────────────────────────────────────────
   const DIFF_OSM: Record<string, string> = {
     green: 'easy', blue: 'intermediate', black: 'advanced',
     double_black: 'expert', terrain_park: 'terrain_park', backcountry: 'freeride',
@@ -215,99 +359,73 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
   map.addSource('piq-runs',  { type: 'geojson', data: filteredRuns });
   map.addSource('piq-lifts', { type: 'geojson', data: lifts });
 
-  // Piste white casing
+  // White casing for contrast on satellite
   map.addLayer({ id: 'piq-runs-case', type: 'line', source: 'piq-runs',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#ffffff',
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 14, 5],
-      'line-opacity': 0.7 },
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 13, 4, 15, 5.5],
+      'line-opacity': 0.75 },
   });
 
-  // Piste colored lines
+  // Colored runs — matching Ikon/Epic visual system
   map.addLayer({ id: 'piq-runs-line', type: 'line', source: 'piq-runs',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
       'line-color': ['match', ['get', 'difficulty'],
-        'novice', '#22c55e', 'easy', '#22c55e',
-        'intermediate', '#3b82f6',
-        'advanced', '#1e293b', 'expert', '#0f172a',
-        'freeride', '#d97706', '#3b82f6'],
-      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 13, 2.5, 15, 3.5],
-      'line-opacity': 0.92,
+        'novice',       '#2ecc40',   // bright green
+        'easy',         '#2ecc40',
+        'intermediate', '#0074d9',   // vivid blue
+        'advanced',     '#111827',   // near-black
+        'expert',       '#111827',
+        'freeride',     '#ff851b',   // orange for backcountry
+        '#0074d9'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.2, 13, 2, 15, 3],
+      'line-opacity': 0.95,
     },
   });
 
-  // Piste labels
+  // Run name labels
   map.addLayer({ id: 'piq-runs-lbl', type: 'symbol', source: 'piq-runs',
     minzoom: 13,
-    layout: { 'symbol-placement': 'line-center', 'text-field': ['get', 'name'],
-      'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-      'text-size': 10, 'text-max-width': 6 },
-    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 1.5 },
+    layout: {
+      'symbol-placement': 'line-center',
+      'text-field':       ['get', 'name'],
+      'text-font':        ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+      'text-size':        10, 'text-max-width': 8,
+    },
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9 },
   });
 
-  // Lift casing
+  // Lift white casing
   map.addLayer({ id: 'piq-lifts-case', type: 'line', source: 'piq-lifts',
     layout: { 'line-cap': 'butt' },
-    paint: { 'line-color': '#ffffff', 'line-width': 4, 'line-opacity': 0.4 },
+    paint: { 'line-color': '#ffffff', 'line-width': 3.5, 'line-opacity': 0.45 },
   });
 
-  // Lift lines
+  // Lift lines — blue dashed (like Image 2)
   map.addLayer({ id: 'piq-lifts-line', type: 'line', source: 'piq-lifts',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': '#ef4444', 'line-width': 2.5,
-      'line-dasharray': [2, 2], 'line-opacity': 0.9 },
+    paint: {
+      'line-color':     '#0074d9',   // blue like Image 2
+      'line-width':     2,
+      'line-dasharray': [1.5, 1.5],
+      'line-opacity':   0.9,
+    },
   });
 
-  // Lift labels
+  // Lift name labels
   map.addLayer({ id: 'piq-lifts-lbl', type: 'symbol', source: 'piq-lifts',
     minzoom: 12,
     layout: { 'symbol-placement': 'line-center', 'text-field': ['get', 'name'],
       'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-size': 9 },
-    paint: { 'text-color': '#ef4444', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
+    paint: { 'text-color': '#0074d9', 'text-halo-color': '#fff', 'text-halo-width': 1.5, 'text-opacity': 0.9 },
   });
-}
-
-// ── Base-anchored camera from OSM lift endpoints ──────────────────────────
-interface CameraParams { center:[number,number]; bearing:number; zoom:number; pitch:number; }
-
-function computeCamera(
-  geo: { runs:any; lifts:any } | null,
-  resortLat: number, resortLon: number,
-  fallbackZoom: number,
-): CameraParams {
-  const def: CameraParams = { center:[resortLon,resortLat], bearing:0, zoom:fallbackZoom, pitch:75 };
-  if (!geo) return def;
-
-  const allLifts = geo.lifts?.features ?? [];
-  if (allLifts.length === 0) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
-
-  const baseNodes: [number,number][] = allLifts
-    .map((f:any) => f.geometry?.coordinates?.[0]).filter(Boolean);
-  const sumNodes:  [number,number][] = allLifts
-    .map((f:any) => { const c = f.geometry?.coordinates; return c?.[c.length-1]; }).filter(Boolean);
-
-  if (!baseNodes.length || !sumNodes.length) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
-
-  const baseLon = baseNodes.reduce((s,c)=>s+c[0],0)/baseNodes.length;
-  const baseLat = baseNodes.reduce((s,c)=>s+c[1],0)/baseNodes.length;
-  const sumLon  = sumNodes.reduce((s,c)=>s+c[0],0)/sumNodes.length;
-  const sumLat  = sumNodes.reduce((s,c)=>s+c[1],0)/sumNodes.length;
-
-  const dLon = sumLon - baseLon;
-  const dLat = sumLat - baseLat;
-  const bearing = ((Math.atan2(dLon, dLat) * 180 / Math.PI) + 360) % 360;
-
-  // Position camera behind the base so mountain fills view at 75° pitch
-  const camLon = baseLon - dLon * 0.55;
-  const camLat = baseLat - dLat * 0.55;
-
-  return { center:[camLon,camLat], bearing, zoom:computeAutoZoom(geo,fallbackZoom), pitch:75 };
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MapboxMap({
-  lat, lon, zoom = 13, mode, resortName, prefetchCoords,
+  lat, lon, zoom = 13, mode, resortName, bestZone,
+  liftStatuses, prefetchCoords,
   trails = [], diffFilter = [], onLoad,
 }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -316,17 +434,19 @@ export default function MapboxMap({
   const osmCache      = useRef<Map<string, { runs: any; lifts: any }>>(new Map());
   const prevKey       = useRef('');
   const markerRef     = useRef<any>(null);
+  const liftMarkersRef = useRef<any[]>([]);
   const [error,   setError]   = useState('');
   const [ready,   setReady]   = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // ── Fetch OSM + setup layers + update camera ────────────────────────────
   const loadAndRender = useCallback(async (
     map: any,
     _lat: number, _lon: number,
     _df: string[], _mode: MapMode,
     _name: string | undefined,
     _fallbackZoom: number,
+    _bestZone: BestZone | null | undefined,
+    _liftStatuses: Record<string,string> | undefined,
   ) => {
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
     setLoading(true);
@@ -334,15 +454,13 @@ export default function MapboxMap({
     let geo = osmCache.current.get(key);
     if (!geo) {
       try {
-        // Use AbortController so switching resorts cancels in-flight requests
-        const controller = new AbortController();
         const s = _lat - BBOX_PAD, n = _lat + BBOX_PAD;
         const w = _lon - BBOX_PAD, e = _lon + BBOX_PAD;
         const res = await fetch(OVERPASS, {
-          method:  'POST',
+          method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body:    `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
-          signal:  AbortSignal.timeout(20_000),
+          body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
+          signal: AbortSignal.timeout(20_000),
         });
         if (res.ok) {
           geo = parseOverpass(await res.json());
@@ -357,8 +475,8 @@ export default function MapboxMap({
       };
     }
 
-    // Abort if resort changed while we were fetching
-    if (_lat.toFixed(4) + ',' + _lon.toFixed(4) !== prevKey.current) {
+    // Abort if resort changed mid-fetch
+    if (`${_lat.toFixed(4)},${_lon.toFixed(4)}` !== prevKey.current) {
       setLoading(false);
       return;
     }
@@ -366,21 +484,37 @@ export default function MapboxMap({
     if (!readyRef.current) { setLoading(false); return; }
 
     try {
-      setup3D(map, geo.runs, geo.lifts, _df, _mode);
+      setup3D(map, geo.runs, geo.lifts, _df, _mode, _bestZone);
 
-      // Compute base-anchored camera from lift endpoints
+      // Camera: base-anchored, 45° pitch, facing ski face
       const cam = computeCamera(geo, _lat, _lon, _fallbackZoom);
       map.easeTo({ ...cam, duration: 1200 });
 
-      // Summit pin: farthest ski coordinate from resort center
+      // Summit pin
       const summit = findSummitCoord(geo, _lat, _lon);
       if (summit) {
         const mgl = (await import('mapbox-gl')).default;
         markerRef.current?.remove();
         const label = (_name ?? 'Summit').replace(/ (Resort|Mountain|Ski Area|Springs)$/i, '');
         markerRef.current = new mgl.Marker({ element: createPinEl(label), anchor: 'bottom' })
-          .setLngLat(summit)
-          .addTo(map);
+          .setLngLat(summit).addTo(map);
+      }
+
+      // Live lift status dots at base stations
+      liftMarkersRef.current.forEach(m => m.remove());
+      liftMarkersRef.current = [];
+      if (_liftStatuses && Object.keys(_liftStatuses).length > 0) {
+        const mgl2 = (await import('mapbox-gl')).default;
+        for (const f of geo.lifts?.features ?? []) {
+          const name = f.properties?.name ?? '';
+          const status = _liftStatuses[name];
+          if (!status) continue;
+          const baseCoord = f.geometry?.coordinates?.[0];
+          if (!baseCoord) continue;
+          const dot = new mgl2.Marker({ element: createLiftDot(status), anchor: 'center' })
+            .setLngLat(baseCoord).addTo(map);
+          liftMarkersRef.current.push(dot);
+        }
       }
     } catch (e) {
       console.warn('[MapboxMap] render:', e);
@@ -389,7 +523,7 @@ export default function MapboxMap({
     setLoading(false);
   }, []);
 
-  // ── Init map (once) ─────────────────────────────────────────────────────
+  // ── Init ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
     if (!TOKEN) { setError('Mapbox token not configured'); return; }
@@ -408,41 +542,42 @@ export default function MapboxMap({
         mgl.accessToken = TOKEN;
         map = new mgl.Map({
           container: containerRef.current!, style: MAP_STYLE[mode],
-          center: [lon, lat], zoom, pitch: 75, bearing: 0,  // refined after OSM loads
+          center: [lon, lat], zoom, pitch: 45, bearing: 0,
           attributionControl: false, logoPosition: 'bottom-left', antialias: true,
         });
         map.addControl(new mgl.AttributionControl({ compact: true }), 'bottom-left');
+        // Full navigation controls for free-camera: pan, zoom, rotate, tilt
         map.addControl(new mgl.NavigationControl({ showCompass: true, visualizePitch: true }), 'top-right');
+        map.scrollZoom.enable();
+        map.dragRotate.enable();
+        map.touchZoomRotate.enableRotation();
         map.on('load', () => {
           mapRef.current = map;
           readyRef.current = true;
           setReady(true);
           onLoad?.();
-          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
-        });
-        // Pre-warm Overpass cache for nearby/common resorts
-        // This runs silently in the background after the map loads
-        map.once('idle', () => {
-          if (prefetchCoords?.length) {
-            prefetchCoords.forEach(([pLat, pLon]: [number, number]) => {
-              const k = `${pLat.toFixed(4)},${pLon.toFixed(4)}`;
-              if (!osmCache.current.has(k)) {
-                const s = pLat - BBOX_PAD, n = pLat + BBOX_PAD;
-                const w = pLon - BBOX_PAD, e = pLon + BBOX_PAD;
-                fetch(OVERPASS, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                  body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
-                  signal: AbortSignal.timeout(15_000),
-                }).then(r => r.ok ? r.json() : null)
-                  .then(d => { if (d) osmCache.current.set(k, parseOverpass(d)); })
-                  .catch(() => {});
-              }
-            });
-          }
+          prevKey.current = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
         });
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
+        });
+        // Prefetch other resorts after idle
+        map.once('idle', () => {
+          (prefetchCoords ?? []).slice(0, 4).forEach(([pLat, pLon]: [number, number]) => {
+            const k = `${pLat.toFixed(4)},${pLon.toFixed(4)}`;
+            if (osmCache.current.has(k)) return;
+            const s = pLat - BBOX_PAD, n2 = pLat + BBOX_PAD;
+            const w = pLon - BBOX_PAD, e2 = pLon + BBOX_PAD;
+            fetch(OVERPASS, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: `data=${encodeURIComponent(buildQuery(s, w, n2, e2))}`,
+              signal: AbortSignal.timeout(15_000),
+            }).then(r => r.ok ? r.json() : null)
+              .then(d => { if (d) osmCache.current.set(k, parseOverpass(d)); })
+              .catch(() => {});
+          });
         });
       } catch (e: any) {
         setError(e?.message ?? 'Map failed to load');
@@ -451,50 +586,57 @@ export default function MapboxMap({
     return () => {
       readyRef.current = false;
       markerRef.current?.remove();
+      liftMarkersRef.current.forEach(m => m.remove());
       mapRef.current = null;
       map?.remove();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Fly + reload on resort change ──────────────────────────────────────
+  // ── Resort change ─────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current || !lat || !lon) return;
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     if (key === prevKey.current) return;
     prevKey.current = key;
-
-    // Fly immediately to new resort center
-    // Use cached OSM data if available for immediate correct bearing
-    const cachedGeo = osmCache.current.get(`${lat.toFixed(4)},${lon.toFixed(4)}`);
-    const initCam = computeCamera(cachedGeo ?? null, lat, lon, zoom);
+    const cachedGeo = osmCache.current.get(key) ?? null;
+    const initCam = computeCamera(cachedGeo, lat, lon, zoom);
     map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });
-
-    // Start OSM fetch immediately — don't wait for fly animation
-    // The fetch takes 2-5s anyway so starting now means it arrives sooner
-    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
+    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Style switch ───────────────────────────────────────────────────────
+  // ── Mode switch ───────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     map.setStyle(MAP_STYLE[mode]);
     map.once('styledata', () => {
-      if (readyRef.current) loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
+      if (readyRef.current)
+        loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
     });
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Diff filter update ────────────────────────────────────────────────
+  // ── Diff filter ───────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     const geo = osmCache.current.get(key);
     if (geo) {
-      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode); } catch (_) {}
+      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone); } catch (_) {}
     }
   }, [diffFilter, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Best zone update ──────────────────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+    const geo = osmCache.current.get(key);
+    if (geo) {
+      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone); } catch (_) {}
+    }
+  }, [bestZone, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) return (
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center',
