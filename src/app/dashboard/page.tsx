@@ -390,9 +390,14 @@ export default function DashboardPage() {
     setScoreData(null); setForecast([]); setLifts([]); setTrails([]); setWeatherZones({}); setLiftieStats(null);
     try {
       const h = { Authorization: `Bearer ${tok}` };
-      const [scoreRes, forecastRes] = await Promise.allSettled([
+      // Fire ALL fetches in parallel — don't wait for score before starting resort/liftie
+      const slug = deriveLiftieSlug(fav.mountain.name);
+      const [scoreRes, forecastRes, resortRes, liftieRes, trailRes] = await Promise.allSettled([
         fetch(`/api/mountains/${fav.mountain.id}/score`,    { headers: h }),
         fetch(`/api/mountains/${fav.mountain.id}/forecast`, { headers: h }),
+        fetch(`/api/resort?mountainId=${fav.mountain.id}`,  { headers: h }),
+        fetch(`/api/lifts/${slug}?mountainId=${fav.mountain.id}`),
+        fetch(`/api/mountains/${fav.mountain.id}/trails`,   { headers: h }),
       ]);
 
       // ── Score ────────────────────────────────────────────────────────────────
@@ -481,14 +486,16 @@ export default function DashboardPage() {
       const condDesc = snow24h > 6 ? 'Heavy snow' : snow24h > 2 ? 'Snow showers' : snow24h > 0 ? 'Light snow' : wind > 35 ? 'Windy' : temp > 34 ? 'Partly cloudy' : 'Clear & cold';
       setScoreData({ score: scoreVal, snowfall24hIn: snow24h, snowfall48hIn: snow.snowfall48h, windMph: wind, tempF: temp, snowDepthIn: depth, conditionDesc: condDesc });
 
-      // Try resort API first (resorts with PowderIQ accounts have full data)
-      const resortRes = await fetch(`/api/resort?mountainId=${fav.mountain.id}`, { headers: h });
+      // ── Process parallel results ──────────────────────────────────────────
+
+      // Resort API (PowderIQ operator accounts)
       let hasResortData = false;
       let hasResortTrails = false;
-      if (resortRes.ok) {
-        const rj = await resortRes.json();
+      if (resortRes.status === 'fulfilled' && resortRes.value.ok) {
+        const rj = await resortRes.value.json();
         const resort = Array.isArray(rj.data) ? rj.data[0] : rj.data;
         if (resort) {
+          // Resort has account — fetch their live lift/trail/weather data
           const [lRes, tRes, wRes] = await Promise.allSettled([
             fetch(`/api/resort/${resort.id}/lifts`,   { headers: h }),
             fetch(`/api/resort/${resort.id}/trails`,  { headers: h }),
@@ -511,63 +518,35 @@ export default function DashboardPage() {
         }
       }
 
-      // Fallback: live lift status from Liftie.info
-      if (!hasResortData) {
-        try {
-          const slug = deriveLiftieSlug(fav.mountain.name);
-          const liftieRes = await fetch(`/api/lifts/${slug}?mountainId=${fav.mountain.id}`);
-          if (liftieRes.ok) {
-            const liftieData = await liftieRes.json();
-            const liftList = liftieData.lifts ?? [];
-            if (liftList.length > 0) setLifts(liftList);
-            if (liftieData.stats) {
-              setLiftieStats(liftieData.stats);
-              // If lifts are open but score shows 0/closed, re-fetch score
-              // The proxy persisted stats to DB so now scoreService will see them
-              if ((liftieData.stats.open ?? 0) > 0) {
-                try {
-                  const freshScore = await fetch(
-                    `/api/mountains/${fav.mountain.id}/score`,
-                    { headers: h }
-                  );
-                  if (freshScore.ok) {
-                    const sd = await freshScore.json();
-                    const newScore = sd.data?.score ?? 0;
-                    if (newScore > 0) {
-                      setScoreData(prev => prev ? { ...prev, score: newScore } : prev);
-                    }
-                  }
-                } catch (_) {}
-              }
-            }
+      // Liftie (already fetched in parallel above)
+      if (!hasResortData && liftieRes.status === 'fulfilled' && liftieRes.value.ok) {
+        const liftieData = await liftieRes.value.json();
+        const liftList = liftieData.lifts ?? [];
+        if (liftList.length > 0) setLifts(liftList);
+        if (liftieData.stats) {
+          setLiftieStats(liftieData.stats);
+          if ((liftieData.stats.open ?? 0) > 0) {
+            // Re-fetch score now that Liftie has persisted open status to DB
+            fetch(`/api/mountains/${fav.mountain.id}/score`, { headers: h })
+              .then(r => r.ok ? r.json() : null)
+              .then(sd => {
+                const newScore = sd?.data?.score ?? 0;
+                if (newScore > 0) setScoreData(prev => prev ? { ...prev, score: newScore } : prev);
+              }).catch(() => {});
           }
-        } catch (e) {
-          console.warn('[Liftie] fetch failed:', e);
         }
       }
 
-      // Fallback: OSM trail data for any mountain (consumer users without resort account)
-      // This gives us real trail names + difficulty for Top Runs personalization
-      if (!hasResortTrails) {
-        try {
-          const trailRes = await fetch(`/api/mountains/${fav.mountain.id}/trails`, { headers: h });
-          if (trailRes.ok) {
-            const td = await trailRes.json();
-            const osmTrails = td.data?.trails ?? [];
-            if (osmTrails.length > 0) {
-              // Blend with Liftie lift data to infer which trails are "open"
-              // If we have open lifts, mark trails as open; otherwise leave as OSM default
-              const openLiftCount = lifts.filter(l => l.status === 'open').length;
-              const enriched = osmTrails.map((t: any) => ({
-                ...t,
-                // If lifts are open, OSM trails are likely open too
-                status: openLiftCount > 0 ? (t.status === 'groomed' ? 'groomed' : 'open') : t.status,
-              }));
-              setTrails(enriched);
-            }
-          }
-        } catch (e) {
-          console.warn('[OSM trails] fetch failed:', e);
+      // OSM trails (already fetched in parallel above)
+      if (!hasResortTrails && trailRes.status === 'fulfilled' && trailRes.value.ok) {
+        const td = await trailRes.value.json();
+        const osmTrails = td.data?.trails ?? [];
+        if (osmTrails.length > 0) {
+          const openLiftCount = lifts.filter(l => l.status === 'open').length;
+          setTrails(osmTrails.map((t: any) => ({
+            ...t,
+            status: openLiftCount > 0 ? (t.status === 'groomed' ? 'groomed' : 'open') : t.status,
+          })));
         }
       }
     } catch (e) { console.error(e); }
@@ -934,7 +913,19 @@ export default function DashboardPage() {
             const s = fav.score ?? 0;
             const isAct = selectedFav?.id === fav.id;
             return (
-              <div key={fav.id} className={`sb-resort${isAct?' act':''}`} onClick={() => setSelectedFav(fav)}>
+              <div key={fav.id} className={`sb-resort${isAct?' act':''}`}
+                onClick={() => setSelectedFav(fav)}
+                onMouseEnter={() => {
+                  // Pre-warm OSM cache on hover so clicking is instant
+                  if (fav.mountain.latitude && !isAct) {
+                    const lat = fav.mountain.latitude, lon = fav.mountain.longitude ?? 0;
+                    const k = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+                    // Fire a background pre-fetch of the trails cache
+                    fetch(`/api/mountains/${fav.mountain.id}/trails`,
+                      { headers: { Authorization: `Bearer ${token}` } })
+                      .catch(() => {});
+                  }
+                }}>
                 <div className="sb-thumb"><img src={getMtnImg(fav.mountain)} alt={fav.mountain.name}/></div>
                 <span className="sb-name">{fav.mountain.name}</span>
                 {s > 0 && <span className="sb-score" style={{color:getScoreColor(s)}}>{s}</span>}
@@ -978,6 +969,10 @@ export default function DashboardPage() {
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
+                prefetchCoords={favorites
+                  .filter(f => f.id !== activeFav.id && f.mountain.latitude)
+                  .map(f => [f.mountain.latitude!, f.mountain.longitude ?? 0] as [number,number])
+                  .slice(0, 4)}
                 zoom={(() => {
                   const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
                   if (vft < 400)  return 14.5;

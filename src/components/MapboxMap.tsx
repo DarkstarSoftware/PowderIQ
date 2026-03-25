@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 const TOKEN    = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
-const BBOX_PAD = 0.05;
+const BBOX_PAD = 0.04; // smaller bbox = faster Overpass
 const OVERPASS = 'https://overpass-api.de/api/interpreter';
 
 export type MapMode = 'trail' | 'satellite' | 'hybrid';
@@ -17,6 +17,7 @@ export interface TrailFeature {
 interface Props {
   lat: number; lon: number; zoom?: number; mode: MapMode;
   resortName?: string;
+  prefetchCoords?: [number, number][]; // other saved resort coords to pre-warm
   trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
@@ -306,7 +307,7 @@ function computeCamera(
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MapboxMap({
-  lat, lon, zoom = 13, mode, resortName,
+  lat, lon, zoom = 13, mode, resortName, prefetchCoords,
   trails = [], diffFilter = [], onLoad,
 }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -333,25 +334,33 @@ export default function MapboxMap({
     let geo = osmCache.current.get(key);
     if (!geo) {
       try {
+        // Use AbortController so switching resorts cancels in-flight requests
+        const controller = new AbortController();
         const s = _lat - BBOX_PAD, n = _lat + BBOX_PAD;
         const w = _lon - BBOX_PAD, e = _lon + BBOX_PAD;
         const res = await fetch(OVERPASS, {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
-          signal: AbortSignal.timeout(26_000),
+          body:    `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
+          signal:  AbortSignal.timeout(20_000),
         });
         if (res.ok) {
           geo = parseOverpass(await res.json());
           osmCache.current.set(key, geo);
         }
-      } catch (e) {
-        console.warn('[MapboxMap] Overpass:', e);
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') console.warn('[MapboxMap] Overpass:', e);
       }
       if (!geo) geo = {
         runs:  { type: 'FeatureCollection', features: [] },
         lifts: { type: 'FeatureCollection', features: [] },
       };
+    }
+
+    // Abort if resort changed while we were fetching
+    if (_lat.toFixed(4) + ',' + _lon.toFixed(4) !== prevKey.current) {
+      setLoading(false);
+      return;
     }
 
     if (!readyRef.current) { setLoading(false); return; }
@@ -411,6 +420,27 @@ export default function MapboxMap({
           onLoad?.();
           loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
         });
+        // Pre-warm Overpass cache for nearby/common resorts
+        // This runs silently in the background after the map loads
+        map.once('idle', () => {
+          if (prefetchCoords?.length) {
+            prefetchCoords.forEach(([pLat, pLon]: [number, number]) => {
+              const k = `${pLat.toFixed(4)},${pLon.toFixed(4)}`;
+              if (!osmCache.current.has(k)) {
+                const s = pLat - BBOX_PAD, n = pLat + BBOX_PAD;
+                const w = pLon - BBOX_PAD, e = pLon + BBOX_PAD;
+                fetch(OVERPASS, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                  body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
+                  signal: AbortSignal.timeout(15_000),
+                }).then(r => r.ok ? r.json() : null)
+                  .then(d => { if (d) osmCache.current.set(k, parseOverpass(d)); })
+                  .catch(() => {});
+              }
+            });
+          }
+        });
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
         });
@@ -440,12 +470,9 @@ export default function MapboxMap({
     const initCam = computeCamera(cachedGeo ?? null, lat, lon, zoom);
     map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });
 
-    // Load OSM and refine once animation settles
-    // Use a small delay so the fly animation starts before the heavy Overpass fetch
-    const timer = setTimeout(() => {
-      if (readyRef.current) loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
-    }, 600);
-    return () => clearTimeout(timer);
+    // Start OSM fetch immediately — don't wait for fly animation
+    // The fetch takes 2-5s anyway so starting now means it arrives sooner
+    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom);
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Style switch ───────────────────────────────────────────────────────
