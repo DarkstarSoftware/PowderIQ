@@ -217,6 +217,7 @@ function setup3D(
   mode: MapMode,
   bestZone: BestZone | null | undefined,
   enable3D = true,
+  liftStatuses?: Record<string,string>,
 ) {
   // ── Terrain (Pro only) ────────────────────────────────────────────────────
   if (enable3D && !map.getSource('mapbox-dem')) {
@@ -291,7 +292,8 @@ function setup3D(
   // ── Remove old layers ─────────────────────────────────────────────────────
   ['piq-best-zone','piq-best-zone-glow',
    'piq-runs-case','piq-runs-line','piq-runs-lbl',
-   'piq-lifts-case','piq-lifts-line','piq-lifts-lbl'].forEach(id => {
+   'piq-lifts-case','piq-lifts-line','piq-lifts-lbl',
+   'piq-hold-pills','piq-hold-labels'].forEach(id => {
     try { if (map.getLayer(id)) map.removeLayer(id); } catch (_) {}
   });
   ['piq-runs','piq-lifts','piq-best-zone-src'].forEach(id => {
@@ -354,7 +356,44 @@ function setup3D(
   } : runs;
 
   map.addSource('piq-runs',  { type: 'geojson', data: filteredRuns });
-  map.addSource('piq-lifts', { type: 'geojson', data: lifts });
+  // Enrich lift features with live status from liftStatuses prop
+  const enrichedLifts = {
+    ...lifts,
+    features: lifts.features.map((f: any) => {
+      const name   = f.properties?.name ?? '';
+      const status = liftStatuses?.[name] ?? 'unknown';
+      return { ...f, properties: { ...f.properties, status } };
+    }),
+  };
+  map.addSource('piq-lifts', { type: 'geojson', data: enrichedLifts });
+
+  // On-hold marker points — midpoint of each on-hold lift
+  const holdPoints: any[] = enrichedLifts.features
+    .filter((f: any) => f.properties?.status === 'on_hold' || f.properties?.status === 'scheduled')
+    .map((f: any) => {
+      const coords = f.geometry?.coordinates ?? [];
+      const mid    = Math.floor(coords.length / 2);
+      const pt     = coords[mid] ?? coords[0];
+      return {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: pt },
+        properties: {
+          name:   f.properties?.name ?? '',
+          status: f.properties?.status,
+          label:  f.properties?.status === 'on_hold' ? 'On Hold' : 'Scheduled',
+        },
+      };
+    });
+  if (!map.getSource('piq-hold-src')) {
+    map.addSource('piq-hold-src', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: holdPoints },
+    });
+  } else {
+    (map.getSource('piq-hold-src') as any).setData(
+      { type: 'FeatureCollection', features: holdPoints }
+    );
+  }
 
   // White casing for contrast on satellite
   map.addLayer({ id: 'piq-runs-case', type: 'line', source: 'piq-runs',
@@ -402,23 +441,65 @@ function setup3D(
     paint: { 'line-color': '#ffffff', 'line-width': 3.5, 'line-opacity': 0.45 },
   });
 
-  // Lift lines — blue dashed (like Image 2)
+  // Lift lines — colored by live status
+  // Open = red (#ef4444), On Hold/Scheduled = blue (#0074d9), Unknown/Closed = gray (#94a3b8)
   map.addLayer({ id: 'piq-lifts-line', type: 'line', source: 'piq-lifts',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color':     '#0074d9',   // blue like Image 2
-      'line-width':     2,
-      'line-dasharray': [1.5, 1.5],
-      'line-opacity':   0.9,
+      'line-color': ['match', ['get', 'status'],
+        'open',      '#ef4444',   // red — running
+        'on_hold',   '#0074d9',   // blue — hold
+        'scheduled', '#0074d9',   // blue — scheduled
+        'closed',    '#94a3b8',   // gray — closed
+        '#94a3b8'],               // default gray
+      'line-width':     2.5,
+      'line-dasharray': ['match', ['get', 'status'],
+        'open', ['literal', [1, 0]],          // solid when open
+        ['literal', [2, 2]]],                  // dashed when hold/closed
+      'line-opacity': ['match', ['get', 'status'],
+        'closed', 0.4,
+        0.92],
     },
   });
 
-  // Lift name labels
+  // Lift name labels — colored by status
   map.addLayer({ id: 'piq-lifts-lbl', type: 'symbol', source: 'piq-lifts',
     minzoom: 12,
     layout: { 'symbol-placement': 'line-center', 'text-field': ['get', 'name'],
       'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-size': 9 },
-    paint: { 'text-color': '#0074d9', 'text-halo-color': '#fff', 'text-halo-width': 1.5, 'text-opacity': 0.9 },
+    paint: {
+      'text-color': ['match', ['get', 'status'],
+        'open', '#ef4444', 'on_hold', '#0074d9', 'scheduled', '#0074d9', '#94a3b8'],
+      'text-halo-color': '#fff', 'text-halo-width': 1.5, 'text-opacity': 0.9,
+    },
+  });
+
+  // ── On Hold / Scheduled pill markers at lift midpoints ─────────────────
+  map.addLayer({ id: 'piq-hold-pills', type: 'circle', source: 'piq-hold-src',
+    paint: {
+      'circle-radius':       14,
+      'circle-color': ['match', ['get', 'status'],
+        'on_hold',   '#0074d9',
+        'scheduled', '#f59e0b',
+        '#0074d9'],
+      'circle-opacity':      0.92,
+      'circle-stroke-width': 2,
+      'circle-stroke-color': '#ffffff',
+    },
+  });
+
+  map.addLayer({ id: 'piq-hold-labels', type: 'symbol', source: 'piq-hold-src',
+    layout: {
+      'text-field':  ['get', 'label'],
+      'text-font':   ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+      'text-size':   9,
+      'text-anchor': 'center',
+    },
+    paint: {
+      'text-color':       '#ffffff',
+      'text-halo-color':  'rgba(0,0,0,0)',
+      'text-halo-width':  0,
+    },
   });
 }
 
@@ -481,7 +562,7 @@ export default function MapboxMap({
 
     try {
       if (!readyRef.current) { setLoading(false); return; }
-      setup3D(map, geo.runs, geo.lifts, _df, _mode, _enable3D ? _bestZone : null, _enable3D);
+      setup3D(map, geo.runs, geo.lifts, _df, _mode, _enable3D ? _bestZone : null, _enable3D, _liftStatuses);
 
       // Camera: base-anchored, 45° pitch, facing ski face
       const cam = computeCamera(geo, _lat, _lon, _fallbackZoom, _enable3D);
@@ -497,22 +578,9 @@ export default function MapboxMap({
           .setLngLat(summit).addTo(map);
       }
 
-      // Live lift status dots at base stations
+      // Clear old Marker dots — status is now baked into the GeoJSON line colors
       liftMarkersRef.current.forEach(m => m.remove());
       liftMarkersRef.current = [];
-      if (_liftStatuses && Object.keys(_liftStatuses).length > 0) {
-        const mgl2 = (await import('mapbox-gl')).default;
-        for (const f of geo.lifts?.features ?? []) {
-          const name = f.properties?.name ?? '';
-          const status = _liftStatuses[name];
-          if (!status) continue;
-          const baseCoord = f.geometry?.coordinates?.[0];
-          if (!baseCoord) continue;
-          const dot = new mgl2.Marker({ element: createLiftDot(status), anchor: 'center' })
-            .setLngLat(baseCoord).addTo(map);
-          liftMarkersRef.current.push(dot);
-        }
-      }
     } catch (e) {
       console.warn('[MapboxMap] render:', e);
     } finally {
@@ -617,7 +685,7 @@ export default function MapboxMap({
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     const geo = osmCache.current.get(key);
     if (geo) {
-      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone); } catch (_) {}
+      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone, enable3D, liftStatuses); } catch (_) {}
     }
   }, [diffFilter, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -628,7 +696,7 @@ export default function MapboxMap({
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     const geo = osmCache.current.get(key);
     if (geo) {
-      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone); } catch (_) {}
+      try { setup3D(map, geo.runs, geo.lifts, diffFilter, mode, bestZone, enable3D, liftStatuses); } catch (_) {}
     }
   }, [bestZone, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
