@@ -267,6 +267,43 @@ function setup3D(map: any, runs: any, lifts: any, diffFilter: string[], mode: Ma
   });
 }
 
+// ── Base-anchored camera from OSM lift endpoints ──────────────────────────
+interface CameraParams { center:[number,number]; bearing:number; zoom:number; pitch:number; }
+
+function computeCamera(
+  geo: { runs:any; lifts:any } | null,
+  resortLat: number, resortLon: number,
+  fallbackZoom: number,
+): CameraParams {
+  const def: CameraParams = { center:[resortLon,resortLat], bearing:0, zoom:fallbackZoom, pitch:75 };
+  if (!geo) return def;
+
+  const allLifts = geo.lifts?.features ?? [];
+  if (allLifts.length === 0) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
+
+  const baseNodes: [number,number][] = allLifts
+    .map((f:any) => f.geometry?.coordinates?.[0]).filter(Boolean);
+  const sumNodes:  [number,number][] = allLifts
+    .map((f:any) => { const c = f.geometry?.coordinates; return c?.[c.length-1]; }).filter(Boolean);
+
+  if (!baseNodes.length || !sumNodes.length) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
+
+  const baseLon = baseNodes.reduce((s,c)=>s+c[0],0)/baseNodes.length;
+  const baseLat = baseNodes.reduce((s,c)=>s+c[1],0)/baseNodes.length;
+  const sumLon  = sumNodes.reduce((s,c)=>s+c[0],0)/sumNodes.length;
+  const sumLat  = sumNodes.reduce((s,c)=>s+c[1],0)/sumNodes.length;
+
+  const dLon = sumLon - baseLon;
+  const dLat = sumLat - baseLat;
+  const bearing = ((Math.atan2(dLon, dLat) * 180 / Math.PI) + 360) % 360;
+
+  // Position camera behind the base so mountain fills view at 75° pitch
+  const camLon = baseLon - dLon * 0.55;
+  const camLat = baseLat - dLat * 0.55;
+
+  return { center:[camLon,camLat], bearing, zoom:computeAutoZoom(geo,fallbackZoom), pitch:75 };
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MapboxMap({
   lat, lon, zoom = 13, mode, resortName,
