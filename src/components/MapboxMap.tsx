@@ -322,54 +322,9 @@ export default function MapboxMap({
     try {
       setup3D(map, geo.runs, geo.lifts, _df, _mode);
 
-      // Camera: position at base of mountain, facing summit at 75° pitch
-      const autoZoom = computeAutoZoom(geo, _fallbackZoom);
-
-      // Find base centroid from lift first-nodes (most reliable base signal)
-      const allLifts = geo.lifts?.features ?? [];
-      let baseLon = _lon, baseLat = _lat;
-      if (allLifts.length > 0) {
-        const baseNodes: [number,number][] = allLifts
-          .map((f: any) => f.geometry?.coordinates?.[0])
-          .filter(Boolean);
-        if (baseNodes.length > 0) {
-          baseLon = baseNodes.reduce((s: number, c: [number,number]) => s + c[0], 0) / baseNodes.length;
-          baseLat = baseNodes.reduce((s: number, c: [number,number]) => s + c[1], 0) / baseNodes.length;
-        }
-      }
-
-      // Find summit from lift last-nodes
-      let sumLon = _lon, sumLat = _lat;
-      if (allLifts.length > 0) {
-        const sumNodes: [number,number][] = allLifts
-          .map((f: any) => { const c = f.geometry?.coordinates; return c?.[c.length - 1]; })
-          .filter(Boolean);
-        if (sumNodes.length > 0) {
-          sumLon = sumNodes.reduce((s: number, c: [number,number]) => s + c[0], 0) / sumNodes.length;
-          sumLat = sumNodes.reduce((s: number, c: [number,number]) => s + c[1], 0) / sumNodes.length;
-        }
-      }
-
-      // Bearing: direction FROM base TO summit (camera looks toward summit)
-      const dLon = sumLon - baseLon;
-      const dLat = sumLat - baseLat;
-      const bearing = ((Math.atan2(dLon, dLat) * 180 / Math.PI) + 360) % 360;
-
-      // Camera center: offset from base AWAY from summit
-      // This puts the base at bottom of screen, summit at top
-      // Offset distance scales with mountain span
-      const spanDeg = Math.hypot(dLon, dLat);
-      const offsetScale = 0.6; // how far behind base to position camera center
-      const camLon = baseLon - dLon * offsetScale;
-      const camLat = baseLat - dLat * offsetScale;
-
-      map.easeTo({
-        center:   [camLon, camLat],
-        zoom:     autoZoom,
-        bearing,
-        pitch:    75,
-        duration: 1200,
-      });
+      // Compute base-anchored camera from lift endpoints
+      const cam = computeCamera(geo, _lat, _lon, _fallbackZoom);
+      map.easeTo({ ...cam, duration: 1200 });
 
       // Summit pin: farthest ski coordinate from resort center
       const summit = findSummitCoord(geo, _lat, _lon);
@@ -407,7 +362,7 @@ export default function MapboxMap({
         mgl.accessToken = TOKEN;
         map = new mgl.Map({
           container: containerRef.current!, style: MAP_STYLE[mode],
-          center: [lon, lat], zoom, pitch: 75, bearing: 0,
+          center: [lon, lat], zoom, pitch: 75, bearing: 0,  // refined after OSM loads
           attributionControl: false, logoPosition: 'bottom-left', antialias: true,
         });
         map.addControl(new mgl.AttributionControl({ compact: true }), 'bottom-left');
@@ -443,7 +398,10 @@ export default function MapboxMap({
     prevKey.current = key;
 
     // Fly immediately to new resort center
-    map.flyTo({ center: [lon, lat], zoom, pitch: 75, bearing: 0, speed: 1.4, curve: 1.2 });
+    // Use cached OSM data if available for immediate correct bearing
+    const cachedGeo = osmCache.current.get(`${lat.toFixed(4)},${lon.toFixed(4)}`);
+    const initCam = computeCamera(cachedGeo ?? null, lat, lon, zoom);
+    map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });
 
     // Load OSM and refine once animation settles
     // Use a small delay so the fly animation starts before the heavy Overpass fetch
