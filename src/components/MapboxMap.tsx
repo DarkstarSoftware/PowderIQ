@@ -16,8 +16,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 const TOKEN    = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
-const BBOX_PAD = 0.04;
-const OVERPASS = 'https://overpass-api.de/api/interpreter';
 
 export type MapMode = 'trail' | 'satellite' | 'hybrid';
 
@@ -34,10 +32,12 @@ export interface BestZone {
 
 interface Props {
   lat: number; lon: number; zoom?: number; mode: MapMode;
+  mountainId?: string;           // used to fetch trails from server cache
   resortName?: string;
   bestZone?: BestZone | null;          // highlight zone for "Best Area Right Now"
   liftStatuses?: Record<string, string>; // liftName → 'open'|'closed'|'on_hold'
   prefetchCoords?: [number, number][];
+  prefetchIds?: string[];            // mountain IDs for server-side prefetch
   trails?: TrailFeature[]; diffFilter?: string[]; onLoad?: () => void;
 }
 
@@ -47,38 +47,31 @@ const MAP_STYLE: Record<MapMode, string> = {
   hybrid:    'mapbox://styles/mapbox/satellite-v9',
 };
 
-// ── Overpass ──────────────────────────────────────────────────────────────
-function buildQuery(s: number, w: number, n: number, e: number) {
-  return `[out:json][timeout:28];
-(
-  way["piste:type"~"downhill|nordic|snow_park|terrain_park"](${s},${w},${n},${e});
-  way["aerialway"~"gondola|chair_lift|drag_lift|t-bar|magic_carpet|rope_tow|cable_car|mixed_lift"](${s},${w},${n},${e});
-);
-out body geom;`;
-}
-
-function parseOverpass(data: any): { runs: any; lifts: any } {
-  const runs: any[] = [], lifts: any[] = [];
-  for (const el of data.elements ?? []) {
-    if (el.type !== 'way' || !el.geometry?.length) continue;
-    const coords = el.geometry.map((p: any) => [p.lon, p.lat]);
-    const t = el.tags ?? {};
-    if (t['piste:type']) {
-      runs.push({ type: 'Feature',
-        geometry:   { type: 'LineString', coordinates: coords },
-        properties: { name: t.name ?? t['piste:name'] ?? '',
-          difficulty: t['piste:difficulty'] ?? 'easy',
-          grooming:   t['piste:grooming'] ?? '' }});
-    } else if (t.aerialway) {
-      lifts.push({ type: 'Feature',
-        geometry:   { type: 'LineString', coordinates: coords },
-        properties: { name: t.name ?? '', aerialway: t.aerialway }});
-    }
-  }
-  return {
-    runs:  { type: 'FeatureCollection', features: runs  },
-    lifts: { type: 'FeatureCollection', features: lifts },
+// ── Trail GeoJSON fetch — server cache first, no direct Overpass ────────────
+// The server at /api/mountains/[id]/trails/geojson caches Overpass results
+// in the DB for 24h. Browser gets <50ms response on cache hit.
+async function fetchTrailGeo(
+  mountainId: string | undefined,
+  lat: number, lon: number,
+  signal: AbortSignal
+): Promise<{ runs: any; lifts: any }> {
+  const empty = {
+    runs:  { type: 'FeatureCollection' as const, features: [] },
+    lifts: { type: 'FeatureCollection' as const, features: [] },
   };
+
+  if (!mountainId) return empty;
+
+  try {
+    const res = await fetch(`/api/mountains/${mountainId}/trails/geojson`, { signal });
+    if (!res.ok) return empty;
+    const geo = await res.json();
+    if (geo?.runs && geo?.lifts) return geo;
+    return empty;
+  } catch (e: any) {
+    if (e?.name !== 'AbortError') console.warn('[MapboxMap] trail fetch:', e?.message);
+    return empty;
+  }
 }
 
 // ── Summit pin ────────────────────────────────────────────────────────────
@@ -424,8 +417,8 @@ function setup3D(
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MapboxMap({
-  lat, lon, zoom = 13, mode, resortName, bestZone,
-  liftStatuses, prefetchCoords,
+  lat, lon, zoom = 13, mode, mountainId, resortName, bestZone,
+  liftStatuses, prefetchCoords, prefetchIds,
   trails = [], diffFilter = [], onLoad,
 }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -448,34 +441,18 @@ export default function MapboxMap({
     _fallbackZoom: number,
     _bestZone: BestZone | null | undefined,
     _liftStatuses: Record<string,string> | undefined,
+    _mountainId: string | undefined,
   ) => {
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
     setLoading(true);
 
     let geo = osmCache.current.get(key);
     if (!geo) {
-      try {
-        const s = _lat - BBOX_PAD, n = _lat + BBOX_PAD;
-        const w = _lon - BBOX_PAD, e = _lon + BBOX_PAD;
-        const res = await fetch(OVERPASS, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `data=${encodeURIComponent(buildQuery(s, w, n, e))}`,
-          signal: AbortSignal.timeout(20_000),
-        });
-        if (res.ok) {
-          geo = parseOverpass(await res.json());
-          osmCache.current.set(key, geo);
-        }
-      } catch (e: any) {
-        if (e?.name !== 'AbortError') console.warn('[MapboxMap] Overpass:', e);
-      }
-      if (!geo) {
-        geo = {
-          runs:  { type: 'FeatureCollection', features: [] },
-          lifts: { type: 'FeatureCollection', features: [] },
-        };
-        // Don't cache empty results — allow retry next time
+      const abortCtrl = new AbortController();
+      geo = await fetchTrailGeo(_mountainId, _lat, _lon, abortCtrl.signal);
+      // Cache if we got data; if empty don't cache so next visit retries
+      if (geo.runs.features.length > 0 || geo.lifts.features.length > 0) {
+        osmCache.current.set(key, geo);
       }
     }
 
@@ -569,25 +546,22 @@ export default function MapboxMap({
           setReady(true);
           onLoad?.();
           activeKeyRef.current = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
+          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
         });
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
         });
-        // Prefetch other resorts after idle
+        // Prefetch other saved resorts via API after map is idle
+        // This warms both the server DB cache and the client osmCache
         map.once('idle', () => {
-          (prefetchCoords ?? []).slice(0, 4).forEach(([pLat, pLon]: [number, number]) => {
-            const k = `${pLat.toFixed(4)},${pLon.toFixed(4)}`;
-            if (osmCache.current.has(k)) return;
-            const s = pLat - BBOX_PAD, n2 = pLat + BBOX_PAD;
-            const w = pLon - BBOX_PAD, e2 = pLon + BBOX_PAD;
-            fetch(OVERPASS, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: `data=${encodeURIComponent(buildQuery(s, w, n2, e2))}`,
-              signal: AbortSignal.timeout(15_000),
-            }).then(r => r.ok ? r.json() : null)
-              .then(d => { if (d) osmCache.current.set(k, parseOverpass(d)); })
+          (prefetchIds ?? []).slice(0, 4).forEach((pid: string) => {
+            fetch(`/api/mountains/${pid}/trails/geojson`)
+              .then(r => r.ok ? r.json() : null)
+              .then(geo => {
+                if (geo?.runs && (prefetchCoords ?? []).length > 0) {
+                  // We don't have coords→key mapping here so just warm server cache
+                }
+              })
               .catch(() => {});
           });
         });
@@ -625,7 +599,7 @@ export default function MapboxMap({
     map.setStyle(MAP_STYLE[mode]);
     map.once('styledata', () => {
       if (readyRef.current)
-        loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
+        loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
     });
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 

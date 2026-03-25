@@ -979,6 +979,11 @@ export default function DashboardPage() {
               <MapboxMap
                 lat={activeFav.mountain.latitude}
                 lon={activeFav.mountain.longitude ?? 0}
+                mountainId={activeFav.mountain.id}
+                prefetchIds={favorites
+                  .filter(f => f.id !== activeFav.id)
+                  .map(f => f.mountain.id)
+                  .slice(0, 4)}
                 prefetchCoords={favorites
                   .filter(f => f.id !== activeFav.id && f.mountain.latitude)
                   .map(f => [f.mountain.latitude!, f.mountain.longitude ?? 0] as [number,number])
