@@ -562,8 +562,18 @@ export default function DashboardPage() {
   // ── Derived ──────────────────────────────────────────────────────────────────
   const activeFav   = selectedFav ?? favorites[0] ?? null;
   const score       = scoreData?.score ?? activeFav?.score ?? 0;
-  const isClosed    = score === 0 && scoreData?.conditionDesc?.includes('closed') || 
-                      (scoreData?.conditionDesc === 'This resort is currently closed for the season.');
+  // Resort is closed when: score loaded (not still loading), score is 0, and explanation says closed
+  // OR when explanation explicitly says closed regardless of score value
+  const isClosed = !scoreLoading && activeFav !== null && (
+    (score === 0 && (
+      scoreData?.explanation?.toLowerCase().includes('closed') ||
+      scoreData?.conditionDesc?.toLowerCase().includes('closed') ||
+      // No live lifts open and heuristic says off-season
+      (liftieStats !== null && (liftieStats.open ?? 0) === 0 &&
+       (liftieStats.closed ?? 0) > 0 && lifts.length > 0 &&
+       lifts.every(l => l.status === 'closed'))
+    ))
+  );
   const scoreColor  = getScoreColor(score);
   const openLifts   = lifts.filter(l => l.status === 'open').length;
   const openTrails  = trails.filter(t => t.status === 'open' || t.status === 'groomed').length;
@@ -1151,7 +1161,8 @@ export default function DashboardPage() {
             {/* Runs + Lifts panels */}
             <div className="bottom-panels">
 
-              {/* Top Runs Right Now */}
+              {/* Top Runs Right Now — hidden when resort is closed */}
+              {!isClosed && (
               <ProGate isPro={isPro} title="Top Runs Personalization" desc="Smart trail ranking based on your skill level, riding style, and live conditions.">
               <div className="runs-card">
                 <div className="runs-hdr">
@@ -1275,6 +1286,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               </ProGate>
+              )}
 
               {/* Smart Lift Access */}
               <div className="lifts-card">

@@ -435,6 +435,7 @@ export default function MapboxMap({
   const prevKey       = useRef('');
   const markerRef     = useRef<any>(null);
   const liftMarkersRef = useRef<any[]>([]);
+  const renderIdRef    = useRef(0);
   const [error,   setError]   = useState('');
   const [ready,   setReady]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -448,6 +449,7 @@ export default function MapboxMap({
     _bestZone: BestZone | null | undefined,
     _liftStatuses: Record<string,string> | undefined,
   ) => {
+    const myId = ++renderIdRef.current;
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
     setLoading(true);
 
@@ -469,19 +471,26 @@ export default function MapboxMap({
       } catch (e: any) {
         if (e?.name !== 'AbortError') console.warn('[MapboxMap] Overpass:', e);
       }
-      if (!geo) geo = {
-        runs:  { type: 'FeatureCollection', features: [] },
-        lifts: { type: 'FeatureCollection', features: [] },
-      };
+      if (!geo) {
+        geo = {
+          runs:  { type: 'FeatureCollection', features: [] },
+          lifts: { type: 'FeatureCollection', features: [] },
+        };
+        // Don't cache empty results — allow retry next time
+      }
     }
 
-    // Abort if resort changed mid-fetch
-    if (`${_lat.toFixed(4)},${_lon.toFixed(4)}` !== prevKey.current) {
-      setLoading(false);
-      return;
-    }
+    // Abort if a newer loadAndRender was called while fetching
+    if (myId !== renderIdRef.current) { setLoading(false); return; }
 
     if (!readyRef.current) { setLoading(false); return; }
+
+    // Wait for style to be fully loaded before adding layers
+    if (!map.isStyleLoaded()) {
+      await new Promise<void>(resolve => map.once('styledata', () => resolve()));
+    }
+    // Check again after waiting
+    if (myId !== renderIdRef.current) { setLoading(false); return; }
 
     try {
       setup3D(map, geo.runs, geo.lifts, _df, _mode, _bestZone);
@@ -556,7 +565,6 @@ export default function MapboxMap({
           readyRef.current = true;
           setReady(true);
           onLoad?.();
-          prevKey.current = `${lat.toFixed(4)},${lon.toFixed(4)}`;
           loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
         });
         map.on('error', (e: any) => {
