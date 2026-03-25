@@ -562,17 +562,18 @@ export default function DashboardPage() {
   // ── Derived ──────────────────────────────────────────────────────────────────
   const activeFav   = selectedFav ?? favorites[0] ?? null;
   const score       = scoreData?.score ?? activeFav?.score ?? 0;
-  // Resort is closed when: score loaded (not still loading), score is 0, and explanation says closed
-  // OR when explanation explicitly says closed regardless of score value
-  const isClosed = !scoreLoading && activeFav !== null && (
-    (score === 0 && (
-      scoreData?.conditionDesc?.toLowerCase().includes('closed') ||
-      // No live lifts open and heuristic says off-season
-      (liftieStats !== null && (liftieStats.open ?? 0) === 0 &&
-       (liftieStats.closed ?? 0) > 0 && lifts.length > 0 &&
-       lifts.every(l => l.status === 'closed'))
-    ))
-  );
+  // isClosed: score API explicitly returned 0 with no open lifts signal.
+  // Only true when ALL of:
+  //   - score API has returned (scoreData is not null)
+  //   - score is 0
+  //   - no open lifts from Liftie (if we have liftie data)
+  //   - not still loading
+  const hasOpenLifts = (liftieStats?.open ?? 0) > 0 ||
+                       lifts.some(l => l.status === 'open');
+  const isClosed = !scoreLoading &&
+                   scoreData !== null &&
+                   score === 0 &&
+                   !hasOpenLifts;
   const scoreColor  = getScoreColor(score);
   const openLifts   = lifts.filter(l => l.status === 'open').length;
   const openTrails  = trails.filter(t => t.status === 'open' || t.status === 'groomed').length;

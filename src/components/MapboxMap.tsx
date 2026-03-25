@@ -435,7 +435,6 @@ export default function MapboxMap({
   const prevKey       = useRef('');
   const markerRef     = useRef<any>(null);
   const liftMarkersRef = useRef<any[]>([]);
-  const renderIdRef    = useRef(0);
   const [error,   setError]   = useState('');
   const [ready,   setReady]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -449,8 +448,8 @@ export default function MapboxMap({
     _bestZone: BestZone | null | undefined,
     _liftStatuses: Record<string,string> | undefined,
   ) => {
-    const myId = ++renderIdRef.current;
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
+    activeKeyRef.current = key;
     setLoading(true);
 
     let geo = osmCache.current.get(key);
@@ -480,8 +479,8 @@ export default function MapboxMap({
       }
     }
 
-    // Abort if a newer loadAndRender was called while fetching
-    if (myId !== renderIdRef.current) { setLoading(false); return; }
+    // Abort if resort changed while fetching
+    if (key !== activeKeyRef.current) { setLoading(false); return; }
 
     if (!readyRef.current) { setLoading(false); return; }
 
@@ -489,8 +488,8 @@ export default function MapboxMap({
     if (!map.isStyleLoaded()) {
       await new Promise<void>(resolve => map.once('styledata', () => resolve()));
     }
-    // Check again after waiting
-    if (myId !== renderIdRef.current) { setLoading(false); return; }
+    // Check again after waiting for style
+    if (key !== activeKeyRef.current) { setLoading(false); return; }
 
     try {
       setup3D(map, geo.runs, geo.lifts, _df, _mode, _bestZone);
@@ -565,6 +564,7 @@ export default function MapboxMap({
           readyRef.current = true;
           setReady(true);
           onLoad?.();
+          activeKeyRef.current = `${lat.toFixed(4)},${lon.toFixed(4)}`;
           loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses);
         });
         map.on('error', (e: any) => {
@@ -607,6 +607,7 @@ export default function MapboxMap({
     const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
     if (key === prevKey.current) return;
     prevKey.current = key;
+    activeKeyRef.current = key; // keep in sync
     const cachedGeo = osmCache.current.get(key) ?? null;
     const initCam = computeCamera(cachedGeo, lat, lon, zoom);
     map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });

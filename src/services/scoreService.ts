@@ -33,7 +33,12 @@ export async function getMountainScore(
   const mountain = await prisma.mountain.findUnique({ where: { id: mountainId } });
   if (!mountain) throw new Error('NOT_FOUND');
 
-  const verticalFt = (mountain.topElevFt ?? 3000) - (mountain.baseElevFt ?? 1000);
+  // Vertical drop — if elevation data missing, default to 3000ft (large resort assumption)
+  // This keeps Steamboat/Snowmass/Vail in the right season tier even without DB elevation
+  const rawVertical = mountain.topElevFt && mountain.baseElevFt
+    ? mountain.topElevFt - mountain.baseElevFt
+    : null;
+  const verticalFt = rawVertical ?? 3000; // 3000ft default = large western resort
 
   // ── Determine if resort is open ───────────────────────────────────────────
   // Priority order (most reliable → least reliable):
@@ -85,7 +90,15 @@ export async function getMountainScore(
 
   // 3. Season heuristic — only when we have NO live signal at all
   if (openSignalSource === 'none') {
-    isOpen = isSkiSeason(now, verticalFt);
+    const month = now.getMonth(); // 0=Jan
+    // During peak ski season (Dec=11, Jan=0, Feb=1, Mar=2, Apr=3) assume all
+    // destination resorts (>1000ft vertical) are open — the heuristic is
+    // only useful for shoulder season edge cases
+    if (month === 11 || month <= 3) {
+      isOpen = verticalFt >= 1000 ? true : isSkiSeason(now, verticalFt);
+    } else {
+      isOpen = isSkiSeason(now, verticalFt);
+    }
     openSignalSource = 'heuristic';
   }
 
