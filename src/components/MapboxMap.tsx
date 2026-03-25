@@ -450,7 +450,6 @@ export default function MapboxMap({
     _liftStatuses: Record<string,string> | undefined,
   ) => {
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
-    activeKeyRef.current = key;
     setLoading(true);
 
     let geo = osmCache.current.get(key);
@@ -480,19 +479,23 @@ export default function MapboxMap({
       }
     }
 
-    // Abort if resort changed while fetching
-    if (key !== activeKeyRef.current) { setLoading(false); return; }
+    // If resort changed mid-fetch, skip this stale result
+    if (activeKeyRef.current && key !== activeKeyRef.current) { setLoading(false); return; }
 
     if (!readyRef.current) { setLoading(false); return; }
 
-    // Wait for style to be fully loaded before adding layers
+    // Ensure style is loaded — poll with a short timeout rather than waiting on an event
+    // (map.once('styledata') can hang if styledata already fired)
     if (!map.isStyleLoaded()) {
-      await new Promise<void>(resolve => map.once('styledata', () => resolve()));
+      let waited = 0;
+      while (!map.isStyleLoaded() && waited < 3000) {
+        await new Promise(r => setTimeout(r, 100));
+        waited += 100;
+      }
     }
-    // Check again after waiting for style
-    if (key !== activeKeyRef.current) { setLoading(false); return; }
 
     try {
+      if (!readyRef.current) { setLoading(false); return; }
       setup3D(map, geo.runs, geo.lifts, _df, _mode, _bestZone);
 
       // Camera: base-anchored, 45° pitch, facing ski face
@@ -527,9 +530,9 @@ export default function MapboxMap({
       }
     } catch (e) {
       console.warn('[MapboxMap] render:', e);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
   // ── Init ──────────────────────────────────────────────────────────────
