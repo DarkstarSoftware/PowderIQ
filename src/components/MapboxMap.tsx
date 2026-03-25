@@ -33,6 +33,7 @@ export interface BestZone {
 interface Props {
   lat: number; lon: number; zoom?: number; mode: MapMode;
   mountainId?: string;           // used to fetch trails from server cache
+  enable3D?: boolean;             // false = 2D trail map (free tier)
   resortName?: string;
   bestZone?: BestZone | null;          // highlight zone for "Best Area Right Now"
   liftStatuses?: Record<string, string>; // liftName → 'open'|'closed'|'on_hold'
@@ -147,8 +148,9 @@ interface CameraParams { center:[number,number]; bearing:number; zoom:number; pi
 function computeCamera(
   geo: { runs:any; lifts:any } | null,
   resortLat: number, resortLon: number, fallbackZoom: number,
+  enable3D = true,
 ): CameraParams {
-  const def: CameraParams = { center:[resortLon,resortLat], bearing:0, zoom:fallbackZoom, pitch:45 };
+  const def: CameraParams = { center:[resortLon,resortLat], bearing:0, zoom:fallbackZoom, pitch: enable3D ? 45 : 0 };
   if (!geo) return def;
   const allLifts = geo.lifts?.features ?? [];
   if (allLifts.length === 0) return { ...def, zoom: computeAutoZoom(geo, fallbackZoom) };
@@ -174,7 +176,7 @@ function computeCamera(
   const camLon = baseLon - dLon * 0.6;
   const camLat = baseLat - dLat * 0.6;
 
-  return { center:[camLon,camLat], bearing, zoom:computeAutoZoom(geo,fallbackZoom), pitch:45 };
+  return { center:[camLon,camLat], bearing, zoom:computeAutoZoom(geo,fallbackZoom), pitch: enable3D ? 45 : 0 };
 }
 
 // ── Build best-zone heat map GeoJSON ──────────────────────────────────────
@@ -214,16 +216,18 @@ function setup3D(
   diffFilter: string[],
   mode: MapMode,
   bestZone: BestZone | null | undefined,
+  enable3D = true,
 ) {
-  // ── Terrain ───────────────────────────────────────────────────────────────
-  if (!map.getSource('mapbox-dem')) {
+  // ── Terrain (Pro only) ────────────────────────────────────────────────────
+  if (enable3D && !map.getSource('mapbox-dem')) {
     map.addSource('mapbox-dem', {
       type: 'raster-dem',
       url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
       tileSize: 512, maxzoom: 14,
     });
   }
-  map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+  if (enable3D) map.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+  else try { map.setTerrain(null); } catch(_){}
 
   // ── Hillshade ─────────────────────────────────────────────────────────────
   if (!map.getLayer('piq-hillshade')) {
@@ -389,6 +393,9 @@ function setup3D(
     paint: { 'text-color': '#ffffff', 'text-halo-color': '#000', 'text-halo-width': 1.5, 'text-opacity': 0.9 },
   });
 
+  // Lift lines — Pro only
+  if (!enable3D) return;
+
   // Lift white casing
   map.addLayer({ id: 'piq-lifts-case', type: 'line', source: 'piq-lifts',
     layout: { 'line-cap': 'butt' },
@@ -417,7 +424,7 @@ function setup3D(
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function MapboxMap({
-  lat, lon, zoom = 13, mode, mountainId, resortName, bestZone,
+  lat, lon, zoom = 13, mode, mountainId, enable3D = true, resortName, bestZone,
   liftStatuses, prefetchCoords, prefetchIds,
   trails = [], diffFilter = [], onLoad,
 }: Props) {
@@ -442,6 +449,7 @@ export default function MapboxMap({
     _bestZone: BestZone | null | undefined,
     _liftStatuses: Record<string,string> | undefined,
     _mountainId: string | undefined,
+    _enable3D: boolean,
   ) => {
     const key = `${_lat.toFixed(4)},${_lon.toFixed(4)}`;
     setLoading(true);
@@ -473,10 +481,10 @@ export default function MapboxMap({
 
     try {
       if (!readyRef.current) { setLoading(false); return; }
-      setup3D(map, geo.runs, geo.lifts, _df, _mode, _bestZone);
+      setup3D(map, geo.runs, geo.lifts, _df, _mode, _enable3D ? _bestZone : null, _enable3D);
 
       // Camera: base-anchored, 45° pitch, facing ski face
-      const cam = computeCamera(geo, _lat, _lon, _fallbackZoom);
+      const cam = computeCamera(geo, _lat, _lon, _fallbackZoom, _enable3D);
       map.easeTo({ ...cam, duration: 1200 });
 
       // Summit pin
@@ -531,7 +539,7 @@ export default function MapboxMap({
         mgl.accessToken = TOKEN;
         map = new mgl.Map({
           container: containerRef.current!, style: MAP_STYLE[mode],
-          center: [lon, lat], zoom, pitch: 45, bearing: 0,
+          center: [lon, lat], zoom, pitch: enable3D ? 45 : 0, bearing: 0,
           attributionControl: false, logoPosition: 'bottom-left', antialias: true,
         });
         map.addControl(new mgl.AttributionControl({ compact: true }), 'bottom-left');
@@ -546,7 +554,7 @@ export default function MapboxMap({
           setReady(true);
           onLoad?.();
           activeKeyRef.current = `${lat.toFixed(4)},${lon.toFixed(4)}`;
-          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
+          loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId, enable3D);
         });
         map.on('error', (e: any) => {
           if (e?.error?.status !== 403) console.warn('[MapboxMap]', e?.error?.message ?? e);
@@ -587,9 +595,8 @@ export default function MapboxMap({
     prevKey.current = key;
     activeKeyRef.current = key; // keep in sync
     const cachedGeo = osmCache.current.get(key) ?? null;
-    const initCam = computeCamera(cachedGeo, lat, lon, zoom);
-    map.flyTo({ ...initCam, speed: 1.4, curve: 1.2 });
-    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
+    map.flyTo({ ...computeCamera(cachedGeo, lat, lon, zoom, enable3D), speed: 1.4, curve: 1.2 });
+    loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId, enable3D);
   }, [lat, lon, zoom, loadAndRender]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mode switch ───────────────────────────────────────────────────────
@@ -599,7 +606,7 @@ export default function MapboxMap({
     map.setStyle(MAP_STYLE[mode]);
     map.once('styledata', () => {
       if (readyRef.current)
-        loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId);
+        loadAndRender(map, lat, lon, diffFilter, mode, resortName, zoom, bestZone, liftStatuses, mountainId, enable3D);
     });
   }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 

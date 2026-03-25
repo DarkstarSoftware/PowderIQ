@@ -975,67 +975,61 @@ export default function DashboardPage() {
 
           {/* Map */}
           <div className="map-area">
-            {activeFav?.mountain.latitude && TOKEN_OK && isPro ? (
-              <MapboxMap
-                lat={activeFav.mountain.latitude}
-                lon={activeFav.mountain.longitude ?? 0}
-                mountainId={activeFav.mountain.id}
-                prefetchIds={favorites
-                  .filter(f => f.id !== activeFav.id)
-                  .map(f => f.mountain.id)
-                  .slice(0, 4)}
-                prefetchCoords={favorites
-                  .filter(f => f.id !== activeFav.id && f.mountain.latitude)
-                  .map(f => [f.mountain.latitude!, f.mountain.longitude ?? 0] as [number,number])
-                  .slice(0, 4)}
-                bestZone={activeFav && score > 0 ? (() => {
-                  // Best zone = near summit if powder, near base if groomed
-                  const snow24 = scoreData?.snowfall24hIn ?? 0;
-                  const hasPowder = snow24 > 2;
-                  // Offset toward summit (north) for powder, stay near center for groomed
-                  const offsetLat = hasPowder ? 0.008 : 0.003;
-                  return {
-                    lat: activeFav.mountain.latitude + offsetLat,
-                    lon: activeFav.mountain.longitude ?? 0,
-                    radiusKm: hasPowder ? 1.5 : 1.0,
-                    label: hasPowder ? 'Powder Zone' : 'Groomed Zone',
-                  };
-                })() : null}
-                liftStatuses={Object.fromEntries(lifts.map(l => [l.liftName, l.status]))}
-                zoom={(() => {
-                  const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
-                  if (vft < 400)  return 14.5;
-                  if (vft < 1000) return 13.5;
-                  if (vft < 2000) return 13;
-                  return 12.5;
-                })()}
-                mode={mapMode}
-                trails={trails}
-                diffFilter={diffFilter}
-                resortName={activeFav.mountain.name}
-                onLoad={() => setMapLoaded(true)}
-              />
-            ) : (
-              <div style={{position:'relative',width:'100%',height:'100%'}}>
-                <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
-                  onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
-                {activeFav && !isPro && (
-                  <div style={{position:'absolute',bottom:16,left:16,background:'rgba(13,27,46,0.88)',
-                    backdropFilter:'blur(10px)',borderRadius:12,padding:'10px 14px',
-                    display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}
-                    onClick={() => window.location.href='/account/billing'}>
-                    <span style={{fontSize:16}}>🗺️</span>
-                    <div>
-                      <div style={{fontSize:11,fontWeight:700,color:'#fff'}}>Unlock 3D Trail Map</div>
-                      <div style={{fontSize:10,color:'rgba(255,255,255,0.6)'}}>Interactive 3D terrain with live trail overlays</div>
+            {activeFav?.mountain.latitude && TOKEN_OK ? (() => {
+              const vft = (activeFav.mountain.topElevFt ?? 3000) - (activeFav.mountain.baseElevFt ?? 1000);
+              const autoZoom = vft < 400 ? 14.5 : vft < 1000 ? 13.5 : vft < 2000 ? 13 : 12.5;
+              const snow24 = scoreData?.snowfall24hIn ?? 0;
+              return (
+                <div style={{position:'relative',width:'100%',height:'100%'}}>
+                  <MapboxMap
+                    lat={activeFav.mountain.latitude}
+                    lon={activeFav.mountain.longitude ?? 0}
+                    mountainId={activeFav.mountain.id}
+                    prefetchIds={favorites.filter(f=>f.id!==activeFav.id).map(f=>f.mountain.id).slice(0,4)}
+                    prefetchCoords={favorites.filter(f=>f.id!==activeFav.id&&f.mountain.latitude).map(f=>[f.mountain.latitude!,f.mountain.longitude??0] as [number,number]).slice(0,4)}
+                    zoom={autoZoom}
+                    mode={isPro ? mapMode : 'trail'}
+                    enable3D={isPro}
+                    trails={trails}
+                    diffFilter={diffFilter}
+                    resortName={activeFav.mountain.name}
+                    onLoad={() => setMapLoaded(true)}
+                    bestZone={isPro && score > 0 ? {
+                      lat: activeFav.mountain.latitude + (snow24 > 2 ? 0.008 : 0.003),
+                      lon: activeFav.mountain.longitude ?? 0,
+                      radiusKm: snow24 > 2 ? 1.5 : 1.0,
+                      label: snow24 > 2 ? 'Powder Zone' : 'Groomed Zone',
+                    } : null}
+                    liftStatuses={isPro ? Object.fromEntries(lifts.map(l=>[l.liftName,l.status])) : undefined}
+                  />
+                  {/* Pro upgrade overlay for free users */}
+                  {!isPro && (
+                    <div style={{position:'absolute',bottom:14,left:14,right:14,
+                      background:'rgba(13,27,46,0.82)',backdropFilter:'blur(12px)',
+                      borderRadius:12,padding:'10px 14px',display:'flex',
+                      alignItems:'center',gap:10,cursor:'pointer',
+                      border:'1px solid rgba(255,255,255,0.1)'}}
+                      onClick={() => window.location.href='/account/billing'}>
+                      <span style={{fontSize:20}}>🏔️</span>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:12,fontWeight:700,color:'#fff',marginBottom:2}}>
+                          Upgrade to Pro for 3D Maps
+                        </div>
+                        <div style={{fontSize:10,color:'rgba(255,255,255,0.55)'}}>
+                          3D terrain · Best run highlights · Live lift status · Free camera
+                        </div>
+                      </div>
+                      <div style={{background:'var(--blue)',color:'#fff',borderRadius:8,
+                        padding:'6px 12px',fontSize:11,fontWeight:700,whiteSpace:'nowrap',flexShrink:0}}>
+                        Go Pro →
+                      </div>
                     </div>
-                    <div style={{background:'var(--blue)',color:'#fff',borderRadius:6,
-                      padding:'4px 10px',fontSize:10,fontWeight:700,whiteSpace:'nowrap',marginLeft:4}}>
-                      Pro →
-                    </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <img className="map-img" src={heroImg} alt={activeFav?.mountain.name ?? 'Resort'}
+                onError={e => { (e.target as HTMLImageElement).src='https://images.unsplash.com/photo-1605540436563-5bca919ae766?w=1200&q=80'; }}/>
             )}
 
             {/* Best Area insight card — Pro only */}
