@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase/client';
 // (imported inside MapboxMap component via useEffect)
 
 // Mapbox loaded client-only — prevents SSR crash
+import TopNav from '@/components/TopNav';
+
 const MapboxMap = dynamic(() => import('@/components/MapboxMap'), {
   ssr: false,
   loading: () => (
@@ -626,19 +628,7 @@ export default function DashboardPage() {
         html,body,#__next { height:100%; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); }
 
         /* ── TOPNAV ── */
-        .tnav { position:sticky;top:0;z-index:100;height:52px;background:var(--white);border-bottom:1px solid var(--border-2);display:flex;align-items:center;padding:0 20px;gap:16px;box-shadow:var(--shadow); }
-        .tnav-logo { display:flex;align-items:center;gap:8px;flex-shrink:0; }
-        .tnav-logo img { height:30px;width:auto; }
-        .tnav-brand { font-size:16px;font-weight:800;color:var(--text);letter-spacing:-0.03em; }
-        .tnav-tabs { display:flex;align-items:center;gap:2px;flex:1; }
-        .tnav-tab { display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;font-size:13px;font-weight:600;color:var(--text-3);text-decoration:none;white-space:nowrap;transition:all .15s; }
-        .tnav-tab:hover { background:var(--bg);color:var(--text); }
-        .tnav-tab.act { background:var(--blue-light);color:var(--blue); }
-        .tnav-right { display:flex;align-items:center;gap:8px;margin-left:auto; }
-        .api-badge { display:flex;align-items:center;gap:5px;padding:4px 10px;background:var(--green-bg);border:1px solid rgba(34,197,94,0.3);border-radius:20px;font-size:11px;font-weight:600;color:#15803d; }
-        .api-dot { width:6px;height:6px;background:var(--green);border-radius:50%; }
-        .tnav-av { width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--blue),#3b82f6);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;border:2px solid var(--border-2);overflow:hidden;text-decoration:none;flex-shrink:0; }
-        .tnav-av img { width:100%;height:100%;object-fit:cover; }
+/* nav styles in TopNav.tsx */
 
         /* ── SHELL ── */
         .shell { display:flex;height:calc(100vh - 52px);overflow:hidden; }
@@ -888,32 +878,7 @@ export default function DashboardPage() {
       `}</style>
 
       {/* ── TOPNAV ── */}
-      <nav className="tnav">
-        <div className="tnav-logo">
-          <img src="/brand/powderiq_logo.png" alt="PowderIQ"/>
-          <span className="tnav-brand">PowderIQ</span>
-        </div>
-        <div className="tnav-tabs">
-          <Link href="/dashboard" className="tnav-tab act">📊 Dashboard</Link>
-          <Link href="/mountains" className="tnav-tab">🏔️ Resorts</Link>
-          <Link href="/forecasts" className="tnav-tab">🌨️ Forecasts</Link>
-        </div>
-        <div className="tnav-right">
-          <div className="api-badge"><div className="api-dot"/>API Connected</div>
-          {hasResort && (
-            <Link href="/resort/dashboard" aria-label="Resort Dashboard"
-              style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',
-                borderRadius:8,background:'var(--blue-light)',color:'var(--blue)',
-                fontSize:12,fontWeight:700,textDecoration:'none',border:'1px solid rgba(29,110,245,0.2)',
-                whiteSpace:'nowrap'}}>
-              🎿 Resort
-            </Link>
-          )}
-          <Link href="/account/profile" className="tnav-av" aria-label="Account">
-            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : (userName ? userName[0].toUpperCase() : '👤')}
-          </Link>
-        </div>
-      </nav>
+      <TopNav active="dashboard" />
 
       {/* ── SHELL ── */}
       <div className="shell">

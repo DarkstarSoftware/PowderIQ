@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import TopNav from '@/components/TopNav';
 import { supabase } from '@/lib/supabase/client';
 
 interface Mountain { id: string; name: string; state: string; imageUrl?: string }
@@ -234,34 +235,7 @@ export default function ForecastsPage() {
         .divider { height:1px; background:var(--border); margin:6px 0 24px; }
       `}</style>
       <div className="app-shell">
-        <header className="topnav" role="banner">
-          <Link href="/" className="topnav-logo" aria-label="PowderIQ home">
-            <div className="topnav-logo-icon" aria-hidden="true">❄️</div>
-            <span className="topnav-brand">PowderIQ</span>
-          </Link>
-          <nav className="topnav-tabs" aria-label="Main navigation">
-            <Link href="/dashboard" className="topnav-tab"><span aria-hidden="true">📊</span>Dashboard</Link>
-            <Link href="/mountains" className="topnav-tab"><span aria-hidden="true">🏔️</span>Resorts</Link>
-            <Link href="/forecasts" className="topnav-tab active" aria-current="page"><span aria-hidden="true">📅</span>Forecasts</Link>
-            {(userRole==='pro_user'||userRole==='admin') && <Link href="/compare" className="topnav-tab"><span aria-hidden="true">📈</span>Analytics</Link>}
-            {(userRole==='pro_user'||userRole==='admin') && <Link href="/alerts"  className="topnav-tab"><span aria-hidden="true">🔔</span>Alerts</Link>}
-            {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span aria-hidden="true">⚙️</span>Admin</Link>}
-          </nav>
-          <div className="topnav-right">
-            <Link href="/account" className="topnav-icon-btn" aria-label="Account">⚙️</Link>
-            {hasResort && (
-              <Link href="/resort/dashboard" aria-label="Resort Dashboard"
-                style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',
-                  borderRadius:8,background:'var(--blue-light)',color:'var(--blue)',
-                  fontSize:12,fontWeight:700,textDecoration:'none',border:'1px solid rgba(29,110,245,0.2)',
-                  whiteSpace:'nowrap'}}>
-                🎿 Resort
-              </Link>
-            )}
-            <div className="topnav-avatar">{userName ? userName[0].toUpperCase() : '👤'}</div>
-            <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
-          </div>
-        </header>
+        <TopNav active="forecasts" />
 
         <main className="page-body">
           <div className="page-inner">
