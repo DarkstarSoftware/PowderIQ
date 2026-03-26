@@ -1,4 +1,5 @@
 'use client';
+import TopNav from '@/components/TopNav';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -448,41 +449,7 @@ export default function MountainDetailPage() {
         @keyframes spin { to { transform:rotate(360deg); } }
       `}</style>
 
-      {/* ── TOPNAV ── */}
-      <nav className="tnav">
-        <Link href="/dashboard" className="tnav-logo">
-          <img src="/brand/powderiq_logo.png" alt="PowderIQ" />
-          <span className="tnav-brand">PowderIQ</span>
-        </Link>
-
-        <div className="tnav-tabs">
-          <Link href="/dashboard" className="tnav-tab">
-            <span>📊</span>Dashboard
-          </Link>
-          <Link href="/mountains" className="tnav-tab act" aria-current="page">
-            <span>🏔️</span>Resorts
-          </Link>
-          <Link href="/forecasts" className="tnav-tab">
-            <span>📅</span>Forecasts
-          </Link>
-          {(userRole==='pro_user'||userRole==='admin') && (
-            <Link href="/compare" className="tnav-tab"><span>📈</span>Analytics</Link>
-          )}
-          {(userRole==='pro_user'||userRole==='admin') && (
-            <Link href="/alerts" className="tnav-tab"><span>🔔</span>Alerts</Link>
-          )}
-          {userRole==='resort_admin' && (
-            <Link href="/resort/dashboard" className="tnav-tab"><span>🎿</span>Resort</Link>
-          )}
-        </div>
-
-        <div className="tnav-right">
-          <Link href="/account/profile" className="tnav-avatar" aria-label="Account settings">
-            {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : avatarLetter}
-          </Link>
-          <button className="tnav-signout" onClick={signOut}>Sign out</button>
-        </div>
-      </nav>
+      <TopNav active="mountains" />
 
       {/* ── SHELL ── */}
       <div className="shell">
