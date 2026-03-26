@@ -31,7 +31,6 @@ export default function MountainsPage() {
   const [favorites,  setFavorites]  = useState<Set<string>>(new Set());
   const [search,     setSearch]     = useState('');
   const [loading,    setLoading]    = useState(true);
-  const [avatarUrl,  setAvatarUrl]  = useState('');
   const [token,      setToken]      = useState('');
   const [userName,   setUserName]   = useState('');
   const [userRole,   setUserRole]   = useState('user');
@@ -40,8 +39,6 @@ export default function MountainsPage() {
   const [toggling,   setToggling]   = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    const cached = localStorage.getItem('powderiq_avatar');
-    if (cached) setAvatarUrl(cached);
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session) { router.push('/auth/login'); return; }
@@ -59,7 +56,6 @@ export default function MountainsPage() {
         const me = await meRes.json();
         setUserRole(me.data?.role || 'user');
         setUserName(me.data?.profile?.displayName || '');
-        setAvatarUrl(me.data?.profile?.avatarUrl || '');
       }
       if (resortRes.ok) {
         const rd = await resortRes.json();
@@ -126,7 +122,7 @@ export default function MountainsPage() {
         body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; }
         a:focus-visible, button:focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:6px; }
         .topnav { background:var(--white); border-bottom:1px solid var(--border-2); height:60px; display:flex; align-items:center; padding:0 20px; gap:12px; position:sticky; top:0; z-index:40; box-shadow:0 1px 4px rgba(15,40,80,0.06); }
-        .topnav-logo { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+        .topnav-logo { display:flex; align-items:center; gap:8px; text-decoration:none; flex-shrink:0; }
         .topnav-logo-icon { width:32px; height:32px; border-radius:9px; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:17px; }
         .topnav-brand { font-size:17px; font-weight:800; color:var(--text); letter-spacing:-0.03em; }
         .topnav-tabs { display:flex; gap:2px; margin-left:8px; flex:1; overflow-x:auto; }
@@ -135,7 +131,7 @@ export default function MountainsPage() {
         .topnav-tab.active { color:var(--blue); border-bottom-color:var(--blue); background:var(--blue-light); }
         .topnav-right { display:flex; align-items:center; gap:8px; margin-left:auto; flex-shrink:0; }
         .topnav-icon-btn { width:34px; height:34px; border-radius:9px; background:var(--bg); border:1px solid var(--border-2); display:flex; align-items:center; justify-content:center; font-size:15px; text-decoration:none; }
-        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); overflow:hidden; text-decoration:none; cursor:pointer; }
+        .topnav-avatar { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--blue),var(--blue-mid)); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff; border:2px solid var(--border-2); }
         .topnav-signout { font-size:13px; font-weight:600; color:var(--text-3); background:none; border:none; cursor:pointer; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:8px; }
         .topnav-signout:hover { background:var(--bg); color:var(--text); }
         .page-body { background:var(--bg); min-height:calc(100vh - 60px); }
@@ -181,21 +177,30 @@ export default function MountainsPage() {
 
       <div style={{minHeight:'100vh',background:'var(--bg)'}}>
         <header className="topnav" role="banner">
-          <div className="topnav-logo">
-            <img src="/brand/powderiq_logo.png" alt="PowderIQ" style={{height:"32px",width:"auto"}}/>
+          <Link href="/" className="topnav-logo" aria-label="PowderIQ home">
+            <div className="topnav-logo-icon" aria-hidden="true">❄️</div>
             <span className="topnav-brand">PowderIQ</span>
-          </div>
+          </Link>
           <nav className="topnav-tabs" aria-label="Main navigation">
             <Link href="/dashboard" className="topnav-tab"><span>📊</span>Dashboard</Link>
             <Link href="/mountains" className="topnav-tab active" aria-current="page"><span>🏔️</span>Resorts</Link>
-            <Link href="/forecasts" className="topnav-tab"><span>🌨️</span>Forecasts</Link>
-            {hasResort && <Link href="/resort/dashboard" className="topnav-tab"><span>⛷️</span>Resort</Link>}
-            {hasResort && <Link href="/resort/dashboard" className="topnav-tab"><span>🎿</span>Resort</Link>}
+            <Link href="/forecasts" className="topnav-tab"><span>📅</span>Forecasts</Link>
+            {(userRole==='pro_user'||userRole==='admin') && <Link href="/compare" className="topnav-tab"><span>📈</span>Analytics</Link>}
+            {(userRole==='pro_user'||userRole==='admin') && <Link href="/alerts" className="topnav-tab"><span>🔔</span>Alerts</Link>}
+            {userRole==='admin' && <Link href="/admin" className="topnav-tab"><span>⚙️</span>Admin</Link>}
           </nav>
           <div className="topnav-right">
-            <Link href="/account/profile" className="topnav-avatar" aria-label="Account">
-              {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : (userName ? userName[0].toUpperCase() : "👤")}
-            </Link>
+            <Link href="/account" className="topnav-icon-btn" aria-label="Account">⚙️</Link>
+            {hasResort && (
+              <Link href="/resort/dashboard" aria-label="Resort Dashboard"
+                style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',
+                  borderRadius:8,background:'var(--blue-light)',color:'var(--blue)',
+                  fontSize:12,fontWeight:700,textDecoration:'none',border:'1px solid rgba(29,110,245,0.2)',
+                  whiteSpace:'nowrap'}}>
+                🎿 Resort
+              </Link>
+            )}
+            <div className="topnav-avatar">{userName ? userName[0].toUpperCase() : '👤'}</div>
             <button className="topnav-signout" onClick={handleLogout}>Sign out</button>
           </div>
         </header>

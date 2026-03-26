@@ -897,10 +897,18 @@ export default function DashboardPage() {
           <Link href="/dashboard" className="tnav-tab act">📊 Dashboard</Link>
           <Link href="/mountains" className="tnav-tab">🏔️ Resorts</Link>
           <Link href="/forecasts" className="tnav-tab">🌨️ Forecasts</Link>
-          {hasResort && <Link href="/resort/dashboard" className="tnav-tab">⛷️ Resort</Link>}
         </div>
         <div className="tnav-right">
           <div className="api-badge"><div className="api-dot"/>API Connected</div>
+          {hasResort && (
+            <Link href="/resort/dashboard" aria-label="Resort Dashboard"
+              style={{display:'flex',alignItems:'center',gap:5,padding:'5px 11px',
+                borderRadius:8,background:'var(--blue-light)',color:'var(--blue)',
+                fontSize:12,fontWeight:700,textDecoration:'none',border:'1px solid rgba(29,110,245,0.2)',
+                whiteSpace:'nowrap'}}>
+              🎿 Resort
+            </Link>
+          )}
           <Link href="/account/profile" className="tnav-av" aria-label="Account">
             {avatarUrl ? <img src={avatarUrl} alt="avatar"/> : (userName ? userName[0].toUpperCase() : '👤')}
           </Link>
