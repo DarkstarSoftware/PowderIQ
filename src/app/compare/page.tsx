@@ -36,7 +36,7 @@ export default function ComparePage() {
       const tok = data.session.access_token;
       setToken(tok);
 
-      const [meRes, mRes, resortRes] = await Promise.all([
+      const [meRes, mRes] = await Promise.all([
         fetch('/api/me',     { headers: { Authorization: `Bearer ${tok}` } }),
         fetch('/api/mountains'),
       ]);
