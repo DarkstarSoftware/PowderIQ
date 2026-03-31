@@ -105,8 +105,8 @@ async function grantPro(userId: string, event: any) {
 
   // Clear any stale closed/zero scores so they recompute with Pro access
   await prisma.mountainScore.deleteMany({
-    where: { userId, score: 0 },
-  }).catch(() => {}); // MountainScore may not have userId — ignore if so
+    where: { score: 0 },
+  }).catch(() => {});
 
   console.log(`[RevenueCat] ✓ Pro granted to ${userId} via ${store}, expires ${expiresAt.toISOString()}`);
 }
