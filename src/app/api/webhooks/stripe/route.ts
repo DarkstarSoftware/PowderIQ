@@ -78,7 +78,10 @@ export async function POST(req: NextRequest) {
 
 async function syncActive(userId: string, sub: Stripe.Subscription) {
   const now     = new Date();
-  const expires = new Date(sub.current_period_end * 1000);
+  const periodEnd = (sub as any).current_period_end
+    ?? sub.items?.data?.[0]?.current_period_end
+    ?? Math.floor(Date.now() / 1000) + 365 * 24 * 3600;
+  const expires = new Date(periodEnd * 1000);
   const priceId = (sub.items.data[0]?.price?.id) ?? '';
 
   await prisma.$transaction([
