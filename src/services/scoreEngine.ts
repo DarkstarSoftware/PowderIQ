@@ -15,6 +15,7 @@ export interface SnowData {
   forecastSnow24h?: number; // optional forecast
   // Season context
   verticalFt?:  number; // resort vertical drop — used to calibrate thresholds
+  latitude?:    number; // resort latitude — used for hemisphere detection
   isOpenSeason?: boolean; // explicitly set if known
 }
 
@@ -75,44 +76,58 @@ function adjustWeights(profile: RiderProfile | null): Weights {
 //
 // IMPORTANT: If the caller knows lifts are actually open (from Liftie),
 // pass isOpenSeason=true in SnowData to override this heuristic entirely.
-export function isSkiSeason(now: Date = new Date(), verticalFt = 1000): boolean {
+// ── Season detection — hemisphere aware ─────────────────────────────────────
+// Northern Hemisphere (lat >= 0): season Nov–Apr
+// Southern Hemisphere (lat <  0): season Jun–Oct (NZ, Chile, Argentina, Australia)
+// verticalFt used to calibrate open/close dates by resort size.
+export function isSkiSeason(
+  now: Date = new Date(),
+  verticalFt = 1000,
+  latitude = 45   // default NH; pass mountain.latitude for accuracy
+): boolean {
   const month = now.getMonth(); // 0-indexed Jan=0
   const day   = now.getDate();
-
-  // Hard off-season: Jun 1 – Oct 31 (nothing is open)
-  if (month >= 5 && month <= 9) return false;
+  const isSH  = latitude < 0;  // Southern Hemisphere
 
   // Helper: is today after a given month/day?
   const afterDate = (m: number, d: number) =>
     month > m || (month === m && day >= d);
 
-  // Nov 1–14: only year-round/high-altitude resorts open early
+  // ── Southern Hemisphere (NZ, Chile, Argentina, Australia) ────────────────
+  // Season: Jun 1 – Oct 31 (roughly)
+  if (isSH) {
+    // Hard off-season: Nov 1 – May 31
+    if (month <= 4 || month === 11) return false;
+
+    // Jun 1 – Jun 14: only large resorts open early
+    if (month === 5 && day < 15) {
+      return verticalFt >= 1500;
+    }
+
+    // Jun 15 onward — apply close dates in October
+    if (verticalFt < 500)        { if (afterDate(8, 20))  return false; } // close Sep 20
+    else if (verticalFt < 1500)  { if (afterDate(9, 1))   return false; } // close Oct 1
+    else if (verticalFt < 3000)  { if (afterDate(9, 15))  return false; } // close Oct 15
+    else                         { if (afterDate(9, 31))  return false; } // close Oct 31
+
+    return true;
+  }
+
+  // ── Northern Hemisphere ──────────────────────────────────────────────────
+  // Hard off-season: Jun 1 – Oct 31
+  if (month >= 5 && month <= 9) return false;
+
+  // Nov 1–14: only large resorts open early
   if (month === 10 && day < 15) {
-    return verticalFt >= 2000; // large resorts may be open, small ones not yet
+    return verticalFt >= 2000;
   }
 
-  // Nov 15 onward: all resorts in season until spring close dates below
-
-  // Small Midwest hills (Pine Knob ~300ft): close Mar 20
-  if (verticalFt < 500) {
-    if (afterDate(2, 20)) return false;
-  }
-  // Mid-size regionals (< 1500ft): close Apr 1
-  else if (verticalFt < 1500) {
-    if (afterDate(3, 1)) return false;
-  }
-  // Large regionals + destination resorts (Steamboat 3668ft, Park City 3100ft): close Apr 20
-  else if (verticalFt < 3000) {
-    if (afterDate(3, 20)) return false;
-  }
-  // Major high-altitude (Vail 3450ft, Jackson 4139ft, Snowmass 4406ft): close Apr 27
-  else if (verticalFt < 4500) {
-    if (afterDate(3, 27)) return false;
-  }
-  // Year-round / extreme altitude (Mammoth, Timberline): close May 31
-  else {
-    if (afterDate(4, 31)) return false;
-  }
+  // Nov 15 onward — apply spring close dates
+  if (verticalFt < 500)        { if (afterDate(2, 20)) return false; } // Mar 20
+  else if (verticalFt < 1500)  { if (afterDate(3, 1))  return false; } // Apr 1
+  else if (verticalFt < 3000)  { if (afterDate(3, 20)) return false; } // Apr 20
+  else if (verticalFt < 4500)  { if (afterDate(3, 27)) return false; } // Apr 27
+  else                         { if (afterDate(4, 15)) return false; } // May 15
 
   return true;
 }
@@ -186,7 +201,7 @@ export function computeScore(
   // If explicitly told it's closed, or if we detect it's out of season, score = 0
   const inSeason = snow.isOpenSeason !== undefined
     ? snow.isOpenSeason
-    : isSkiSeason(now, vertical);
+    : isSkiSeason(now, vertical, snow.latitude ?? 45);
 
   if (!inSeason) {
     const breakdown: ScoreBreakdown = {

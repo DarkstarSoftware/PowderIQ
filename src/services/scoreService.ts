@@ -95,9 +95,9 @@ export async function getMountainScore(
     // destination resorts (>1000ft vertical) are open — the heuristic is
     // only useful for shoulder season edge cases
     if (month === 11 || month <= 3) {
-      isOpen = verticalFt >= 1000 ? true : isSkiSeason(now, verticalFt);
+      isOpen = verticalFt >= 1000 ? true : isSkiSeason(now, verticalFt, mountain.latitude);
     } else {
-      isOpen = isSkiSeason(now, verticalFt);
+      isOpen = isSkiSeason(now, verticalFt, mountain.latitude);
     }
     openSignalSource = 'heuristic';
   }
@@ -148,7 +148,7 @@ export async function getMountainScore(
 
   // ── Fetch snow data and compute score ─────────────────────────────────────
   const snow = await getSnowDataCached(mountainId, mountain.latitude, mountain.longitude);
-  const enrichedSnow = { ...snow, verticalFt, isOpenSeason: true };
+  const enrichedSnow = { ...snow, verticalFt, latitude: mountain.latitude, isOpenSeason: true };
   const result = computeScore(enrichedSnow, profile);
 
   if (!profile) {
